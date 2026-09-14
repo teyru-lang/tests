@@ -1,0 +1,126 @@
+import teyru.*
+
+// The Spring Boot web pieces: one class that answers the exceptions the
+// controllers throw, an interceptor that runs around every route, files served
+// from a directory when no route claims the path, and CORS.
+//
+// The routes are asked through MockServer, so none of this needs a port, a
+// socket, or a second thread.
+
+class BoomException extends RuntimeException {
+  public BoomException(String message) {
+    super(message)
+  }
+}
+
+@ControllerAdvice
+@Service
+class Advice {
+  @ExceptionHandler(BoomException.class)
+  ResponseEntity boom(BoomException e) {
+    return ResponseEntity.of(409, "handled: " + e.getMessage()).header("X-Handled", "advice")
+  }
+
+  @ExceptionHandler(IllegalStateException.class)
+  String other(IllegalStateException e) {
+    return "state: " + e.getMessage()
+  }
+}
+
+@Service
+class Audit implements HandlerInterceptor {
+  public static int seen = 0
+
+  public boolean preHandle(HttpRequest req) {
+    seen++
+    return req.path.equals("/blocked") == false
+  }
+
+  public void afterCompletion(HttpRequest req, HttpResponse res) {
+    res.header("X-Audit", "" + seen)
+  }
+}
+
+@RestController
+class Api {
+  @GetMapping("/ok")
+  String ok() {
+    return "fine"
+  }
+
+  @GetMapping("/boom")
+  String boom() {
+    throw new BoomException("kaput")
+  }
+
+  @GetMapping("/state")
+  String state() {
+    throw new IllegalStateException("wrong")
+  }
+
+  @GetMapping("/blocked")
+  String blocked() {
+    return "reached"
+  }
+}
+
+class Main {
+  // req builds the request a caller would receive, which is what MockServer
+  // does for the tests that do not care about a header.
+  private static HttpRequest req(String method, String target) {
+    HttpRequest r = new HttpRequest()
+    r.method = method
+    r.path = target
+    r.version = "HTTP/1.1"
+    return r
+  }
+
+  public static void main(String[] args) {
+    Files.createDirectories("/tmp/teyru-static")
+    Files.writeString("/tmp/teyru-static/hello.txt", "from a file\n")
+    Files.writeString("/tmp/teyru-static/index.html", "<h1>home</h1>\n")
+
+    ApplicationContext ctx = new ApplicationContext()
+    SpringApplication.loadConfig(ctx, new String[] {
+        "--spring.web.static=/tmp/teyru-static",
+        "--spring.web.cors=*",
+    })
+    ctx.refresh()
+    MockServer server = new MockServer(ctx)
+
+    System.out.println("ok=" + server.get("/ok"))
+    System.out.println("audit=" + server.request("GET", "/ok").headerValueOf("x-audit"))
+
+    // an exception a controller throws is answered by the advice, not as a 500
+    HttpResponse boom = server.request("GET", "/boom")
+    System.out.println("boom=" + boom.status + " " + boom.body + " " + boom.headerValueOf("x-handled"))
+    HttpResponse state = server.request("GET", "/state")
+    System.out.println("state=" + state.status + " " + state.body)
+
+    // an interceptor that answers false stops the request before the controller
+    HttpResponse blocked = server.request("GET", "/blocked")
+    System.out.println("blocked=" + blocked.status + " " + blocked.body)
+
+    // a path no route claims is a file, when the program has one
+    HttpResponse file = server.request("GET", "/hello.txt")
+    System.out.println("file=" + file.status + " " + file.contentType + " " + file.body.trim())
+    HttpResponse index = server.request("GET", "/")
+    System.out.println("index=" + index.status + " " + index.body.trim())
+    HttpResponse missing = server.request("GET", "/nope.txt")
+    System.out.println("missing=" + missing.status + " " + missing.body)
+    System.out.println("escape=" + server.handle(req("GET", "/../etc/passwd")).status)
+
+    // CORS: a preflight is answered without reaching a controller, and a real
+    // request from another origin is told it may proceed
+    HttpRequest pre = req("OPTIONS", "/ok")
+    pre.addHeader("Origin", "https://example.com")
+    pre.addHeader("Access-Control-Request-Method", "GET")
+    HttpResponse flight = server.handle(pre)
+    System.out.println("preflight=" + flight.status + " " + flight.headerValueOf("access-control-allow-origin"))
+
+    HttpRequest cross = req("GET", "/ok")
+    cross.addHeader("Origin", "https://example.com")
+    HttpResponse allowed = server.handle(cross)
+    System.out.println("cors=" + allowed.status + " " + allowed.headerValueOf("access-control-allow-origin"))
+  }
+}
