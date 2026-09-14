@@ -18,14 +18,14 @@ enum Plain {
   GREEN
 }
 
-enum Size {
+enum ShirtSize {
   SMALL(1, "small"),
   LARGE(9, "large")
   :
   private final int weight
   private final String label
 
-  Size(int weight, String label) {
+  ShirtSize(int weight, String label) {
     this.weight = weight
     this.label = label
   }
@@ -73,11 +73,11 @@ class T137 {
     System.out.println(Plain.valueOf("GREEN"))
 
     System.out.println("== arguments reach the constructor ==")
-    for (Size s : Size.values()) {
+    for (ShirtSize s : ShirtSize.values()) {
       System.out.println(s + " " + s.weight() + " " + s.describe())
     }
-    System.out.println(Size.SMALL.weight() + Size.LARGE.weight())
-    System.out.println(Size.valueOf("LARGE").describe())
+    System.out.println(ShirtSize.SMALL.weight() + ShirtSize.LARGE.weight())
+    System.out.println(ShirtSize.valueOf("LARGE").describe())
 
     System.out.println("== and a constant with a body ==")
     for (Op o : Op.values()) {

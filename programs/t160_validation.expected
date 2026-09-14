@@ -1,0 +1,12 @@
+200 created:ada:36:165
+400 bad request: name: name is required
+400 bad request: nickname: nickname must be 2 to 6 characters
+400 bad request: age: age must be at least 18
+400 bad request: height: height must be at most 200
+good=ok
+missing=name: name is required
+shortName=nickname: nickname must be 2 to 6 characters
+young=age: age must be at least 18
+tall=height: height must be at most 200
+wrong=code: @Min applies to a number, not to String
+nothing=passed

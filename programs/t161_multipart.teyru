@@ -1,0 +1,108 @@
+import teyru.*
+
+// Multipart uploads: a multipart/form-data body split into its parts, the file
+// a field name was sent as, and the answer a request that is not multipart
+// gets -- null, not an exception.
+//
+// The requests are built by hand and driven through MockServer.handle, which is
+// the same entry the socket loop calls, so the parsing is exercised without a
+// port or a client. The urlencoded form the request already read is driven
+// through HttpParser.parse, because that is where readForm runs.
+
+@RestController
+class Uploads {
+  // describe is what a handler reads off a part. It is declared here rather
+  // than below upload because a method may only be called after it is written.
+  static String describe(MultipartFile f) {
+    if (f == null) {
+      return "none"
+    }
+    return "filename=" + f.originalFilename + " type=" + f.contentType +
+        " size=" + f.size() + " body=" + f.content.trim()
+  }
+
+  @PostMapping("/upload")
+  String upload(HttpRequest req) {
+    return "file=[" + describe(req.multipart("file")) +
+        "] note=[" + describe(req.multipart("note")) + "]"
+  }
+
+  @PostMapping("/form")
+  String form(@RequestParam(value = "a") String a, @RequestParam(value = "b") String b) {
+    return "a=" + a + " b=" + b
+  }
+}
+
+class Main {
+  static final String BOUNDARY = "----TeyruBoundary7MA4YWxkTrZu0gW"
+
+  // part is one part of a multipart body as a browser writes it: the boundary
+  // line, the part's own headers, a blank line, the content.
+  static String part(String name, String filename, String type, String content) {
+    String head = "Content-Disposition: form-data; name=\"" + name + "\""
+    if (filename.length() > 0) {
+      head = head + "; filename=\"" + filename + "\""
+    }
+    head = head + "\r\n"
+    if (type.length() > 0) {
+      head = head + "Content-Type: " + type + "\r\n"
+    }
+    return "--" + BOUNDARY + "\r\n" + head + "\r\n" + content + "\r\n"
+  }
+
+  static String body() {
+    return part("note", "", "", "hello from the form") +
+        part("file", "hello.txt", "text/plain", "the file's contents") +
+        "--" + BOUNDARY + "--\r\n"
+  }
+
+  static HttpRequest upload(String contentType, String text) {
+    HttpRequest req = new HttpRequest()
+    req.method = "POST"
+    req.path = "/upload"
+    req.version = "HTTP/1.1"
+    req.body = text
+    req.addHeader("Content-Type", contentType)
+    req.addHeader("Content-Length", "" + text.length())
+    return req
+  }
+
+  public static void main(String[] args) {
+    ApplicationContext ctx = Application.boot(args)
+    MockServer server = new MockServer(ctx)
+
+    // a form field and a file, through the same handle() the socket loop calls
+    HttpResponse res = server.handle(upload("multipart/form-data; boundary=" + BOUNDARY, body()))
+    System.out.println("upload=" + res.status + " " + res.body)
+
+    // the boundary may be quoted, which is what a client sends when it is
+    // generated with characters that would end the parameter
+    HttpResponse quoted = server.handle(upload("multipart/form-data; boundary=\"" + BOUNDARY + "\"", body()))
+    System.out.println("quoted=" + quoted.status + " " + quoted.body)
+
+    // a body that stops in the middle of a part is not the multipart it claims
+    // to be: the part before the break is still a part, the one after it is not
+    String cut = part("note", "", "", "hello from the form") + part("file", "hello.txt", "text/plain", "half a fi")
+    HttpResponse truncated = server.handle(upload("multipart/form-data; boundary=" + BOUNDARY, cut))
+    System.out.println("truncated=" + truncated.status + " " + truncated.body)
+
+    // a request that is not multipart answers null, and the handler says so
+    HttpResponse plain = server.handle(upload("application/x-www-form-urlencoded", "a=1&b=2"))
+    System.out.println("plain=" + plain.status + " " + plain.body)
+
+    // a multipart request whose Content-Type names no boundary does too
+    HttpResponse bare = server.handle(upload("multipart/form-data", body()))
+    System.out.println("bare=" + bare.status + " " + bare.body)
+
+    // and the same, asked of the parser directly
+    System.out.println("notMultipart=" + (MultipartForm.part("a=1&b=2", "", "file") == null) +
+        " noSuchBoundary=" + (MultipartForm.part("a=1&b=2", "xyz", "file") == null) +
+        " boundary=[" + MultipartForm.boundary("text/plain") + "]")
+
+    // the urlencoded form the request already read still binds
+    HttpResponse form = server.handle(HttpParser.parse(
+        "POST /form HTTP/1.1\r\nHost: x\r\nContent-Type: application/x-www-form-urlencoded\r\n" +
+        "Content-Length: 9\r\n\r\na=one&b=2"))
+    System.out.println("form=" + form.status + " " + form.body)
+  }
+}

@@ -1,0 +1,7 @@
+upload=200 file=[filename=hello.txt type=text/plain size=19 body=the file's contents] note=[filename= type= size=19 body=hello from the form]
+quoted=200 file=[filename=hello.txt type=text/plain size=19 body=the file's contents] note=[filename= type= size=19 body=hello from the form]
+truncated=200 file=[none] note=[filename= type= size=19 body=hello from the form]
+plain=200 file=[none] note=[none]
+bare=200 file=[none] note=[none]
+notMultipart=true noSuchBoundary=true boundary=[]
+form=200 a=one b=2

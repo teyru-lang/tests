@@ -1,0 +1,117 @@
+import teyru.*
+
+// Bean validation: the constraints a class declares on its own fields, checked
+// when the binding builds an object out of a request body, and the 400 the web
+// layer answers with when one of them is broken.
+//
+// The route is driven through MockServer, so the whole path is exercised: the
+// JSON binding builds the Person, Validation.check reads its fields
+// reflectively, and the server turns the violation into a bad request that
+// names the field the client has to fix.
+
+class Person {
+  @NotNull(message = "name is required")
+  String name
+  @Size(min = 2, max = 6, message = "nickname must be 2 to 6 characters")
+  String nickname
+  @Min(value = 18, message = "age must be at least 18")
+  int age
+  @Max(value = 200, message = "height must be at most 200")
+  int height
+
+  Person() {
+    name = null
+    nickname = "ok"
+    age = 20
+    height = 170
+  }
+}
+
+// Wrong puts constraints on fields they cannot read: a @Min on a String and a
+// @Size on an int. Each is a violation whose message says so, which is what a
+// class written wrong gets -- a 400 that names the field, not a crash.
+class Wrong {
+  @Min(value = 1, message = "unused")
+  String code
+  @Size(min = 1, max = 3, message = "unused")
+  int count
+
+  Wrong() {
+    code = "abc"
+    count = 2
+  }
+}
+
+@RestController
+@RequestMapping("/people")
+class People {
+  @PostMapping("")
+  String create(@RequestBody Person p) {
+    return "created:" + p.name + ":" + p.age + ":" + p.height
+  }
+}
+
+class Main {
+  static void post(MockServer server, String json) {
+    HttpResponse res = server.request("POST", "/people", json, "application/json")
+    System.out.println(res.status + " " + res.body)
+  }
+
+  static void say(String label, Person p) {
+    try {
+      Validation.check(p)
+      System.out.println(label + "=ok")
+    } catch (ValidationException e) {
+      System.out.println(label + "=" + e.getMessage())
+    }
+  }
+
+  public static void main(String[] args) {
+    ApplicationContext ctx = Application.boot(args)
+    MockServer server = new MockServer(ctx)
+
+    // a body that satisfies every constraint its type declares
+    post(server, "{\"name\":\"ada\",\"nickname\":\"lov\",\"age\":36,\"height\":165}")
+    // then each constraint broken in turn: a 400 whose body names the field
+    post(server, "{\"nickname\":\"ok\",\"age\":36,\"height\":165}")
+    post(server, "{\"name\":\"ada\",\"nickname\":\"toolong\",\"age\":36,\"height\":165}")
+    post(server, "{\"name\":\"ada\",\"nickname\":\"ok\",\"age\":9,\"height\":165}")
+    post(server, "{\"name\":\"ada\",\"nickname\":\"ok\",\"age\":36,\"height\":250}")
+
+    // the same rules, called directly on an object
+    Person good = new Person()
+    good.name = "ada"
+    say("good", good)
+
+    Person missing = new Person()
+    say("missing", missing)
+
+    Person shortName = new Person()
+    shortName.name = "ada"
+    shortName.nickname = "x"
+    say("shortName", shortName)
+
+    Person young = new Person()
+    young.name = "ada"
+    young.age = 17
+    say("young", young)
+
+    Person tall = new Person()
+    tall.name = "ada"
+    tall.height = 201
+    say("tall", tall)
+
+    // a constraint the field cannot satisfy is a violation, not a crash
+    try {
+      Validation.check(new Wrong())
+      System.out.println("wrong=no violation")
+    } catch (ValidationException e) {
+      System.out.println("wrong=" + e.getMessage())
+    }
+
+    // a bean that is not there has no fields to check
+    Person nothing = null
+    Validation.check(nothing)
+    System.out.println("nothing=passed")
+  }
+}
