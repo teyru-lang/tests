@@ -1,0 +1,134 @@
+import teyru.*
+
+// The WebSocket handshake and frames, over a real connection.
+//
+// The handshake is checked against RFC 6455's own example: the key
+// `dGhlIHNhbXBsZSBub25jZQ==` must be answered with
+// `s3pPLMBiTxaQ9kYGzzhZRbK+xOo=`, and a server that answers anything else is
+// closed by every client there is.
+//
+// The frames are the ones a client sends: masked, because a client must mask,
+// fragmented when a message is long, and with a ping in the middle that the
+// server has to answer without the message being disturbed.
+
+class Echo implements WebSocketHandler {
+  public void onOpen(WebSocketSession s) {
+    System.out.println("open " + s.getPath())
+  }
+
+  public void onMessage(WebSocketSession s, String text) {
+    s.send("echo:" + text)
+  }
+
+  public void onBinary(WebSocketSession s, byte[] data) {
+    s.send("bin:" + data.length)
+  }
+
+  public void onClose(WebSocketSession s) {
+    System.out.println("closed")
+  }
+}
+
+class Main {
+  public static void main(String[] args) throws Exception {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.addWebSocket("/ws", new Echo())
+    server.bind()
+
+    Socket s = new Socket("127.0.0.1", server.getPort())
+    SocketOutputStream out = s.getOutputStream()
+    SocketInputStream in = s.getInputStream()
+
+    // the handshake, with the key RFC 6455 uses in its example
+    out.write("GET /ws HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n")
+
+    // a text frame, a second one, a ping between two halves of a fragmented
+    // message, a binary frame, and a close
+    out.write(frame(WebSocketFrame.TEXT, "hi".getBytes(), true))
+    out.write(frame(WebSocketFrame.TEXT, "there".getBytes(), true))
+    out.write(frame(WebSocketFrame.PING, "?".getBytes(), true))
+    out.write(frame(WebSocketFrame.TEXT, "frag".getBytes(), false))
+    out.write(frame(WebSocketFrame.CONT, "mented".getBytes(), true))
+    byte[] three = new byte[3]
+    out.write(frame(WebSocketFrame.BINARY, three, true))
+    out.write(frame(WebSocketFrame.CLOSE, new byte[0], true))
+    out.flush()
+
+    System.out.println("answered=" + server.serveIdle(200))
+
+    // the handshake's answer, then the frames the server sent
+    String status = in.readLine()
+    while (true) {
+      String line = in.readLine()
+      if (line == null || line.isEmpty()) {
+        break
+      }
+      if (line.toLowerCase().startsWith("sec-websocket-accept")) {
+        status = status + " " + line
+      }
+    }
+    System.out.println(status)
+    while (true) {
+      WebSocketFrame f = readServerFrame(in)
+      if (f == null) {
+        break
+      }
+      if (f.opcode == WebSocketFrame.TEXT) {
+        System.out.println("text=" + WebSocketFrame.text(f))
+        continue
+      }
+      if (f.opcode == WebSocketFrame.BINARY) {
+        System.out.println("binary=" + WebSocketFrame.text(f))
+        continue
+      }
+      if (f.opcode == WebSocketFrame.PONG) {
+        System.out.println("pong=" + WebSocketFrame.text(f))
+        continue
+      }
+      if (f.opcode == WebSocketFrame.CLOSE) {
+        System.out.println("close")
+        break
+      }
+    }
+    s.close()
+  }
+
+  // frame renders one client frame, masked as a client must: the four bytes of
+  // the key repeat over the payload, which is the whole of the masking.
+  private static byte[] frame(int opcode, byte[] payload, boolean fin) {
+    byte[] mask = { 0x12, 0x34, 0x56, 0x78 }
+    byte[] out = new byte[6 + payload.length]
+    out[0] = (byte) ((fin ? 0x80 : 0x00) | opcode)
+    out[1] = (byte) (0x80 | payload.length)
+    for (int i = 0 : i < 4 : i++) {
+      out[2 + i] = mask[i]
+    }
+    for (int i = 0 : i < payload.length : i++) {
+      out[6 + i] = (byte) (payload[i] ^ mask[i % 4])
+    }
+    return out
+  }
+
+  // readServerFrame reads one frame a server sends: never masked, and short
+  // enough here that the length is one byte.
+  private static WebSocketFrame readServerFrame(SocketInputStream in) {
+    int b0 = in.read()
+    if (b0 < 0) {
+      return null
+    }
+    int b1 = in.read()
+    if (b1 < 0) {
+      return null
+    }
+    WebSocketFrame f = new WebSocketFrame()
+    f.fin = (b0 & 0x80) != 0
+    f.opcode = b0 & 0x0f
+    int len = b1 & 0x7f
+    f.payload = new byte[len]
+    in.readFully(f.payload, 0, f.payload.length)
+    return f
+  }
+}

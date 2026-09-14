@@ -1,0 +1,10 @@
+open /ws
+closed
+answered=1
+HTTP/1.1 101 Switching Protocols Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
+text=echo:hi
+text=echo:there
+pong=?
+text=echo:fragmented
+text=bin:3
+close

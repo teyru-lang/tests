@@ -1,0 +1,9 @@
+answered=1
+first: HTTP/1.1 200 OK [connection=keep-alive] body=1
+second: HTTP/1.1 200 OK [connection=keep-alive] body=c=a=b; c=d
+chunked: HTTP/1.1 200 OK [connection=keep-alive] body=got:hello!
+head: HTTP/1.1 200 OK [connection=keep-alive]
+options: HTTP/1.1 204 No Content [allow=GET] [connection=keep-alive]
+unknown: HTTP/1.1 501 Not Implemented [connection=keep-alive] body=not implemented: BREW
+stream: HTTP/1.1 200 OK [connection=keep-alive] chunks=chunky
+cookie: HTTP/1.1 200 OK [set-cookie=sid=42; Path=/; HttpOnly] [connection=close] body=ok

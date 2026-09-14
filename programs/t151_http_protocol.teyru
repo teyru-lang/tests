@@ -1,0 +1,177 @@
+import teyru.*
+
+// The parts of HTTP/1.1 a client actually relies on, over one real connection:
+// a keep-alive connection that answers more than one request, a body framed by
+// chunks, a cookie, HEAD (headers without a body) and OPTIONS (the Allow
+// header).
+//
+// The server has no threads, so the test drives it the way a client would if it
+// were not in a hurry: it writes everything it means to send, then lets the
+// server answer, then reads what came back. Both requests of the keep-alive
+// pair are on the wire before the server sees the first, which is what makes
+// the second one proof that the connection stayed open.
+
+@RestController
+class Api {
+  @GetMapping("/one")
+  String one() {
+    return "1"
+  }
+
+  @PostMapping("/echo")
+  String echo(@RequestBody String body) {
+    return "got:" + body
+  }
+
+  @GetMapping("/who")
+  String who(@RequestHeader("Cookie") String c) {
+    return "c=" + c
+  }
+
+  @GetMapping("/stream")
+  HttpResponse stream() {
+    HttpResponse res = new HttpResponse()
+    res.chunkedBody = true
+    res.body = "chunky"
+    return res
+  }
+
+  @GetMapping("/set")
+  HttpResponse set() {
+    HttpResponse res = new HttpResponse()
+    res.body = "ok"
+    res.setCookie("sid", "42", "Path=/; HttpOnly")
+    return res
+  }
+}
+
+class Main {
+  public static void main(String[] args) throws Exception {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    Router router = Application.routerFrom(ctx)
+    HttpServer server = new HttpServer(0, router, ctx)
+    server.bind()
+    int port = server.getPort()
+
+    Socket s = new Socket("127.0.0.1", port)
+    SocketOutputStream out = s.getOutputStream()
+    SocketInputStream in = s.getInputStream()
+
+    // Everything the client means to say goes on the wire first, and one serveIdle
+    // answers all of it: the server has no threads, so it runs until the
+    // connection ends, and the connection ends when the last request says so.
+    //
+    // The keep-alive pair is the point: the second request is answered on the
+    // same connection as the first, which only happens if the first did not
+    // close it.
+    out.write("GET /one HTTP/1.1\r\nHost: x\r\n\r\n")
+    out.write("GET /who HTTP/1.1\r\nHost: x\r\nCookie: a=b; c=d\r\n\r\n")
+    // a body framed by chunks, read by the server as one
+    out.write("POST /echo HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n" +
+        "5\r\nhello\r\n1\r\n!\r\n0\r\n\r\n")
+    // HEAD takes a GET's route and sends the headers without the body, so the
+    // next response on this connection still lines up
+    out.write("HEAD /one HTTP/1.1\r\nHost: x\r\n\r\n")
+    // OPTIONS is the protocol's own: the Allow header says what the path takes
+    out.write("OPTIONS /one HTTP/1.1\r\nHost: x\r\n\r\n")
+    // a method the server does not implement is a 501, not a 404
+    out.write("BREW /one HTTP/1.1\r\nHost: x\r\n\r\n")
+    // a response of unknown length is framed by chunks instead of a length
+    out.write("GET /stream HTTP/1.1\r\nHost: x\r\n\r\n")
+    // Set-Cookie comes back on the response, one header per cookie, and this
+    // last request closes the connection
+    out.write("GET /set HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    out.flush()
+
+    System.out.println("answered=" + server.serveIdle(200))
+    System.out.println("first: " + head(in))
+    System.out.println("second: " + head(in))
+    System.out.println("chunked: " + head(in))
+    System.out.println("head: " + head(in, true))
+    System.out.println("options: " + head(in))
+    System.out.println("unknown: " + head(in))
+    System.out.println("stream: " + head(in))
+    System.out.println("cookie: " + head(in))
+    s.close()
+  }
+
+  // head reads one response's status line and headers, and the body that
+  // follows it, so the next read starts at the next response.
+  private static String head(SocketInputStream in) {
+    return head(in, false)
+  }
+
+  // head reads one response. A HEAD response carries the headers the GET would
+  // have carried, Content-Length among them, and no body at all -- which is what
+  // the flag is for: the length is there, and nothing follows it.
+  private static String head(SocketInputStream in, boolean noBody) {
+    String status = in.readLine()
+    int length = -1
+    boolean chunked = false
+    while (true) {
+      String line = in.readLine()
+      if (line == null || line.isEmpty()) {
+        break
+      }
+      int colon = line.indexOf(":")
+      if (colon <= 0) {
+        continue
+      }
+      String name = line.substring(0, colon).trim().toLowerCase()
+      String value = line.substring(colon + 1).trim()
+      if (name.equals("content-length")) {
+        length = Integer.parseInt(value)
+      }
+      if (name.equals("transfer-encoding") && value.indexOf("chunked") >= 0) {
+        chunked = true
+      }
+      if (name.equals("set-cookie") || name.equals("allow") || name.equals("connection")) {
+        status = status + " [" + name + "=" + value + "]"
+      }
+    }
+    if (length > 0 && noBody == false) {
+      byte[] buf = new byte[length]
+      int got = 0
+      while (got < length) {
+        int n = in.read(buf, got, length - got)
+        if (n <= 0) {
+          break
+        }
+        got += n
+      }
+      status = status + " body=" + Net.stringFrom(buf, 0, got)
+    }
+    if (chunked) {
+      status = status + " chunks=" + readChunks(in)
+    }
+    return status
+  }
+
+  private static String readChunks(SocketInputStream in) {
+    StringBuilder b = new StringBuilder()
+    while (true) {
+      String size = in.readLine()
+      if (size == null) {
+        break
+      }
+      int n = Integer.parseInt(size.trim(), 16)
+      if (n == 0) {
+        in.readLine()
+        break
+      }
+      byte[] buf = new byte[n]
+      int got = 0
+      while (got < n) {
+        int k = in.read(buf, got, n - got)
+        if (k <= 0) {
+          break
+        }
+        got += k
+      }
+      b.append(Net.stringFrom(buf, 0, got))
+      in.readLine()
+    }
+    return b.toString()
+  }
+}
