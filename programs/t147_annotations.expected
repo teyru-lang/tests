@@ -1,0 +1,16 @@
+class=2 Tag controller
+second=teyru.RequestMapping /pets
+defaults=|2 0 false
+present=true false
+byType=controller
+field=name
+intField=0
+enum=B Kind
+classValue=teyru.Object
+method=greet 3 true
+names=3 value
+ctor=0 false
+equals=true
+hash=true
+text=@Tag
+missing refused

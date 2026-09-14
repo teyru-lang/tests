@@ -1,0 +1,84 @@
+import java.lang.reflect.*
+
+// Annotations a program declares and others read back, which is what the
+// frameworks in this library do now: the container reads @Autowired and the
+// JSON binding reads @SerializedName through this API rather than through the
+// compiler.
+@interface Tag {
+  String value() default ""
+  int level() default 0
+  boolean loud() default false
+}
+
+enum Kind {
+  A,
+  B
+}
+
+@interface Marked {
+  Kind kind() default Kind.A
+  Class target() default Object.class
+}
+
+@Tag("controller")
+@RequestMapping("/pets")
+class PetController {
+  @Tag("name")
+  public String name = "rex"
+
+  @Tag("count")
+  public int count = 2
+
+  @Marked(kind = Kind.B, target = String.class)
+  public String marked = ""
+
+  public PetController() {
+  }
+
+  @Tag(value = "greet", level = 3, loud = true)
+  public String greet() {
+    return "hi"
+  }
+}
+
+class Main {
+  public static void main(String[] args) {
+    Class c = PetController.class
+    Annotation[] anns = c.getAnnotations()
+    System.out.println("class=" + anns.length + " " + anns[0].annotationType().getName() + " " + anns[0].stringValue("value"))
+    System.out.println("second=" + anns[1].annotationType().getName() + " " + anns[1].stringValue("value"))
+    System.out.println("defaults=" + anns[1].stringValue("method") + "|" + anns[1].elementNames().length + " " + anns[0].intValue("level") + " " + anns[0].booleanValue("loud"))
+
+    System.out.println("present=" + c.isAnnotationPresent(Tag.class) + " " + c.isAnnotationPresent(Marked.class))
+    System.out.println("byType=" + c.getAnnotation(Tag.class).stringValue("value"))
+
+    Field name = c.getDeclaredField("name")
+    System.out.println("field=" + name.getAnnotation(Tag.class).stringValue("value"))
+    Field count = c.getDeclaredField("count")
+    System.out.println("intField=" + count.getAnnotation(Tag.class).intValue("level"))
+
+    Field marked = c.getDeclaredField("marked")
+    Annotation mark = marked.getAnnotation(Marked.class)
+    System.out.println("enum=" + mark.enumValue("kind") + " " + mark.enumType("kind").getName())
+    System.out.println("classValue=" + mark.classValue("target").getName())
+
+    Method greet = c.getMethod("greet")
+    Annotation g = greet.getAnnotation(Tag.class)
+    System.out.println("method=" + g.stringValue("value") + " " + g.intValue("level") + " " + g.booleanValue("loud"))
+    System.out.println("names=" + g.elementNames().length + " " + g.elementNames()[0])
+
+    Constructor ctor = c.getDeclaredConstructor()
+    System.out.println("ctor=" + ctor.getAnnotations().length + " " + greet.isAnnotationPresent(Marked.class))
+
+    System.out.println("equals=" + c.getAnnotation(Tag.class).equals(anns[0]))
+    System.out.println("hash=" + (c.getAnnotation(Tag.class).hashCode() == anns[0].hashCode()))
+    System.out.println("text=" + anns[0].toString())
+
+    try {
+      name.getAnnotation(Tag.class).intValue("missing")
+      System.out.println("read a missing element")
+    } catch (IllegalArgumentException e) {
+      System.out.println("missing refused")
+    }
+  }
+}
