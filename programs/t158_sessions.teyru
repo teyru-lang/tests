@@ -1,0 +1,116 @@
+import teyru.*
+
+// Sessions: a run of requests that share one identity.
+//
+// The controller below keeps a count in the session, so "add" twice is "count=2"
+// only if the second request carried the cookie the first answer set. The test
+// drives that by hand, because MockServer answers a request rather than keeping
+// a connection's cookies: it takes the Set-Cookie off the first answer and puts
+// it on the next request, which is what a browser does.
+
+@RestController
+class Cart {
+  @GetMapping("/cart/add")
+  public String add(HttpRequest req) {
+    HttpSession s = Sessions.of(req)
+    int v = 0
+    Object n = s.getAttribute("count")
+    if (n != null) {
+      v = ((Integer) n).intValue()
+    }
+    v = v + 1
+    s.setAttribute("count", Integer.valueOf(v))
+    return "count=" + v + " new=" + s.isNew()
+  }
+
+  @GetMapping("/cart/show")
+  public String show(HttpRequest req) {
+    HttpSession s = Sessions.find(req)
+    if (s == null) {
+      return "no session"
+    }
+    return "count=" + s.getString("count") + " names=" + s.attributeNames().size()
+  }
+
+  @GetMapping("/logout")
+  public String logout(HttpRequest req) {
+    HttpSession s = Sessions.find(req)
+    if (s == null) {
+      return "no session"
+    }
+    s.setAttribute("count", Integer.valueOf(-1))
+    s.invalidate()
+    return "invalidated count=" + Sessions.count()
+  }
+}
+
+class Main {
+  // call sends one GET through the server with the cookie the caller has, and
+  // answers the body; the cookie itself is read with cookieOf.
+  static HttpResponse call(MockServer server, String path, String cookie) {
+    HttpRequest req = new HttpRequest()
+    req.method = "GET"
+    req.path = path
+    req.version = "HTTP/1.1"
+    if (cookie.isEmpty() == false) {
+      req.addHeader("Cookie", cookie)
+      req.readCookies()
+    }
+    return server.handle(req)
+  }
+
+  // cookieOf turns a Set-Cookie header into the name=value pair a browser would
+  // send back, dropping the attributes after the first pair.
+  static String cookieOf(HttpResponse res) {
+    String raw = res.headerValueOf("set-cookie")
+    if (raw.isEmpty()) {
+      return ""
+    }
+    int semi = raw.indexOf(";")
+    if (semi < 0) {
+      return raw
+    }
+    return raw.substring(0, semi)
+  }
+
+  public static void main(String[] args) {
+    Sessions.clear()
+    ApplicationContext ctx = new ApplicationContext()
+    SpringApplication.loadConfig(ctx, new String[] { "--spring.web.enabled=false" })
+    ctx.refresh()
+    MockServer server = new MockServer(ctx)
+
+    // the first request has no cookie, so it is given one
+    HttpResponse first = call(server, "/cart/add", "")
+    String cookie = cookieOf(first)
+    System.out.println("first=" + first.body)
+    System.out.println(
+        "issued=" + (cookie.isEmpty() == false) +
+        " httpOnly=" + first.headerValueOf("set-cookie").indexOf("HttpOnly") +
+        " count=" + Sessions.count())
+
+    // asking about a session without the cookie is not having one
+    System.out.println("anonymous=" + call(server, "/cart/show", "").body)
+
+    // and with the cookie it is the same session, count and all
+    HttpResponse second = call(server, "/cart/add", cookie)
+    System.out.println("second=" + second.body)
+    System.out.println("show=" + call(server, "/cart/show", cookie).body)
+    // a session that already exists is not announced again: no cookie on the
+    // answer, and the handler is told it is not new
+    System.out.println("noNewCookie=" + cookieOf(second).isEmpty())
+
+    // a second client that never sends a cookie gets a session of its own
+    HttpResponse other = call(server, "/cart/add", "")
+    System.out.println("other=" + other.body + " distinct=" + (cookieOf(other).equals(cookie) == false))
+    System.out.println("count=" + Sessions.count())
+
+    // logging out ends it: the old cookie is not recognised any more, and
+    // nothing else is disturbed
+    System.out.println("logout=" + call(server, "/logout", cookie).body)
+    System.out.println("after=" + call(server, "/cart/show", cookie).body)
+    System.out.println("count=" + Sessions.count())
+
+    ctx.close()
+  }
+}

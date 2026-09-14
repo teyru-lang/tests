@@ -1,0 +1,11 @@
+first=count=1 new=true
+issued=true httpOnly=58 count=1
+anonymous=no session
+second=count=2 new=false
+show=count=2 names=1
+noNewCookie=true
+other=count=1 new=true distinct=true
+count=2
+logout=invalidated count=1
+after=no session
+count=1
