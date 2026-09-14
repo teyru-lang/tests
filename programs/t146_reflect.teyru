@@ -1,0 +1,160 @@
+import java.lang.reflect.*
+
+interface Shape {
+  int area()
+}
+
+class Sized {
+  public static final int LIMIT = 7
+  private int size
+
+  public Sized(int size) {
+    this.size = size
+  }
+  public int get() {
+    return size
+  }
+}
+
+class Square extends Sized implements Shape {
+  public String tag
+
+  public Square(int size) {
+    super(size)
+    this.tag = "sq"
+  }
+  public int area() {
+    return get() * get()
+  }
+  public String toString() {
+    return "Square(" + get() + ")"
+  }
+}
+
+enum Color {
+  RED,
+  GREEN
+}
+
+class Box {
+  public int value
+  public String note
+}
+
+class Main {
+  public static void main(String[] args) throws Exception {
+    Class sq = Square.class
+    System.out.println(sq.getName() + " " + sq.getSimpleName() + " " + sq.getSuperclass().getName())
+    System.out.println("iface=" + sq.getInterfaces()[0].getName() + " " + Modifier.toString(sq.getModifiers()))
+
+    Field[] fs = sq.getDeclaredFields()
+    for (int i = 0 : i < fs.length : i++) {
+      System.out.println("f " + fs[i].getName() + " " + fs[i].getType().getName() + " " + Modifier.toString(fs[i].getModifiers()))
+    }
+
+    Square s = new Square(3)
+    Field tag = sq.getDeclaredField("tag")
+    System.out.println("tag=" + tag.get(s))
+    tag.set(s, "other")
+    System.out.println("tag=" + s.tag)
+
+    Field limit = Sized.class.getDeclaredField("LIMIT")
+    System.out.println("limit=" + limit.getInt(s))
+    try {
+      limit.setInt(s, 9)
+      System.out.println("wrote a final field")
+    } catch (IllegalAccessException e) {
+      System.out.println("final refused")
+    }
+    limit.setAccessible(true)
+    limit.setInt(s, 9)
+    System.out.println("forced=" + limit.getInt(s))
+
+    Method area = sq.getMethod("area")
+    System.out.println("area=" + area.invoke(s) + " " + area.getReturnType().getName() + " "
+        + area.getParameterCount() + " " + Modifier.toString(area.getModifiers()))
+
+    Method get = Sized.class.getMethod("get")
+    System.out.println("virtual=" + get.invoke(s))
+
+    Method length = String.class.getMethod("length")
+    System.out.println("len=" + length.invoke("abc"))
+    try {
+      length.invoke(new Object())
+      System.out.println("bad receiver accepted")
+    } catch (IllegalArgumentException e) {
+      System.out.println("receiver checked")
+    }
+
+    Method parse = Integer.class.getMethod("parseInt", String.class)
+    try {
+      parse.invoke(null, "not a number")
+      System.out.println("no throw")
+    } catch (InvocationTargetException e) {
+      System.out.println("wrapped=" + e.getCause().getClass().getName())
+    }
+
+    Constructor k = sq.getConstructor(int.class)
+    Object made = k.newInstance(4)
+    System.out.println("made=" + made + " area=" + area.invoke(made) + " params=" + k.getParameterCount())
+    try {
+      Square.class.newInstance()
+      System.out.println("built without a constructor")
+    } catch (InstantiationException e) {
+      System.out.println("instantiation=" + e.getMessage())
+    }
+
+    Class boxed = Class.forName("Box")
+    Box b = (Box)boxed.newInstance()
+    boxed.getField("value").setInt(b, 5)
+    boxed.getField("note").set(b, "hi")
+    System.out.println("box=" + b.value + " " + b.note)
+
+    System.out.println("alias=" + Class.forName("java.lang.String").getName())
+    try {
+      Class.forName("Nope")
+      System.out.println("found a missing class")
+    } catch (ClassNotFoundException e) {
+      System.out.println("missing=" + e.getMessage())
+    }
+
+    Object arr = Array.newInstance(int.class, 3)
+    Array.setInt(arr, 0, 11)
+    Array.setInt(arr, 1, 22)
+    Array.set(arr, 2, 33)
+    System.out.println("arr=" + Array.getLength(arr) + " " + Array.getInt(arr, 1) + " " + Array.get(arr, 0))
+    Object names = Array.newInstance(String.class, 1)
+    Array.set(names, 0, "s")
+    System.out.println("names=" + Array.get(names, 0))
+
+    Object[] colors = Color.class.getEnumConstants()
+    System.out.println("colors=" + colors.length + " " + colors[0] + " " + colors[1])
+
+    System.out.println("mods=" + Modifier.toString(501))
+    System.out.println("neg=" + Modifier.isPublic(-1) + " " + Modifier.isFinal(16) + " " + Modifier.toString(0).length())
+
+    System.out.println("assign=" + Shape.class.isAssignableFrom(Square.class) + " "
+        + Square.class.isAssignableFrom(Shape.class) + " " + Sized.class.isAssignableFrom(Square.class))
+    System.out.println("inst=" + sq.isInstance(s) + " " + sq.isInstance("no") + " " + sq.isInstance(null))
+    System.out.println("kind=" + sq.isArray() + " " + int.class.isPrimitive() + " " + Shape.class.isInterface()
+        + " " + Color.class.isEnum())
+
+    try {
+      sq.getDeclaredField("missing")
+      System.out.println("found a missing field")
+    } catch (NoSuchFieldException e) {
+      System.out.println("nofield=" + e.getMessage())
+    }
+    try {
+      sq.getMethod("missing")
+      System.out.println("found a missing method")
+    } catch (NoSuchMethodException e) {
+      System.out.println("nomethod=" + e.getMessage())
+    }
+
+    Method toString = Square.class.getMethod("toString")
+    System.out.println("method=" + toString.getName() + " " + toString.getDeclaringClass().getName())
+    System.out.println("ctor=" + k.getDeclaringClass().getName() + " " + Modifier.toString(k.getModifiers()))
+    System.out.println("canon=" + sq.getCanonicalName())
+  }
+}

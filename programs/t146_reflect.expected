@@ -1,0 +1,31 @@
+Square Square Sized
+iface=Shape 
+f tag teyru.String public
+tag=sq
+tag=other
+limit=7
+final refused
+forced=9
+area=9 int 0 public
+virtual=3
+len=3
+receiver checked
+wrapped=teyru.NumberFormatException
+made=Square(4) area=16 params=1
+instantiation=Square
+box=5 hi
+alias=teyru.String
+missing=Nope
+arr=3 22 11
+names=s
+colors=2 RED GREEN
+mods=public protected final transient volatile synchronized native
+neg=true true 0
+assign=true false true
+inst=true false false
+kind=false true true true
+nofield=Square.missing
+nomethod=Square.missing()
+method=toString Square
+ctor=Square public
+canon=Square
