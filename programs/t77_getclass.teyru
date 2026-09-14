@@ -3,9 +3,9 @@
 // because the runtime returned the raw tyclass* where the printing path
 // (ty_str_of_obj) expects an object with a class pointer and a vtable.
 //
-// `println(s.getClass())` prints the bare class name. Java prints "class Shape"
-// there: java.lang.Class.toString is "class " + getName, while the prelude
-// writes Class.toString as getName (lib/01_core.teyru).
+// `println(s.getClass())` prints what javac prints there: "class Shape", from
+// Class.toString (lib/26_reflect.teyru), which is "class " + getName for a
+// class and "interface " + getName for an interface.
 class Shape {
   public Shape() {
   }
