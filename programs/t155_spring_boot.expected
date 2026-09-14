@@ -1,0 +1,10 @@
+settings=configured 64 true
+default=fallback
+has=true false
+beans=3
+list=rex,ada
+one=200 pet 7 found
+none=404 no pet 9
+created=201 /pets/8 {"name":"ada"}
+closed=yes
+prodBeans=4

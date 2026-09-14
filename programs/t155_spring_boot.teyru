@@ -1,0 +1,101 @@
+import teyru.*
+
+// The Spring Boot shape: a program configured from a file, a settings class
+// bound from it, a bean that exists only under a profile, a @PreDestroy that
+// runs when the context closes, and a controller that answers with a status and
+// a header rather than a bare body.
+//
+// The server is asked through MockServer rather than a socket: a test of a route
+// should not need a port, a client, or two threads, which is the same reason
+// Spring has MockMvc.
+
+@ConfigurationProperties(prefix = "app")
+@Service
+class Settings {
+  public String name = "unset"
+  public int maxSize = -1
+  public boolean verbose = false
+}
+
+@Profile("prod")
+@Service
+class ProdOnly {
+  public String where = "prod"
+}
+
+@Service
+class Lifecycle {
+  public static String closed = "no"
+
+  @PreDestroy
+  public void shutdown() {
+    closed = "yes"
+  }
+}
+
+@RestController
+class Pets {
+  @GetMapping("/pets")
+  String list() {
+    return "rex,ada"
+  }
+
+  @GetMapping("/pets/{id}")
+  ResponseEntity one(@PathVariable("id") int id) {
+    if (id == 7) {
+      return ResponseEntity.of(200, "pet " + id).header("X-Pet", "found")
+    }
+    return ResponseEntity.of(404, "no pet " + id)
+  }
+
+  @PostMapping("/pets")
+  ResponseEntity create(@RequestBody String body) {
+    return ResponseEntity.created("/pets/8", body)
+  }
+}
+
+class Main {
+  public static void main(String[] args) {
+    // the configuration a deployment would ship, written where the test can
+    // point at it: a file first, then the arguments on top of it
+    Files.writeString("/tmp/teyru-spring-test.properties",
+        "# a settings file\n" +
+        "app.name = configured\n" +
+        "app.max-size=64\n" +
+        "spring.web.enabled=false\n")
+
+    ApplicationContext ctx = new ApplicationContext()
+    SpringApplication.loadConfig(ctx, new String[] {
+        "--spring.config.name=/tmp/teyru-spring-test.properties",
+        "--app.verbose=true",
+    })
+    ctx.refresh()
+
+    Settings s = (Settings) ctx.getBean(Settings.class)
+    System.out.println("settings=" + s.name + " " + s.maxSize + " " + s.verbose)
+    System.out.println("default=" + ctx.getProperty("app.missing", "fallback"))
+    System.out.println("has=" + ctx.hasProperty("app.name") + " " + ctx.hasProperty("app.missing"))
+
+    // no profile named, so the bean under @Profile("prod") is not built
+    System.out.println("beans=" + ctx.beanCount())
+
+    MockServer server = new MockServer(ctx)
+    System.out.println("list=" + server.get("/pets"))
+    HttpResponse one = server.request("GET", "/pets/7")
+    System.out.println("one=" + one.status + " " + one.body + " " + one.headerValueOf("x-pet"))
+    HttpResponse none = server.request("GET", "/pets/9")
+    System.out.println("none=" + none.status + " " + none.body)
+    HttpResponse made = server.request("POST", "/pets", "{\"name\":\"ada\"}", "application/json")
+    System.out.println("created=" + made.status + " " + made.headerValueOf("location") + " " + made.body)
+
+    ctx.close()
+    System.out.println("closed=" + Lifecycle.closed)
+
+    // a second context, this time with the profile the bean is under
+    ApplicationContext prod = new ApplicationContext()
+    SpringApplication.loadConfig(prod, new String[] { "--spring.profiles.active=prod" })
+    prod.refresh()
+    System.out.println("prodBeans=" + prod.beanCount())
+    prod.close()
+  }
+}
