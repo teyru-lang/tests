@@ -1,0 +1,155 @@
+// Collections, arrays and maps in the Gson binding.
+//
+// Gson binds a field declared List<X>, Set<X>, Map<String,X> or X[] by asking
+// the field's generic type what its elements are. This binding gets the erased
+// type from java.lang.reflect and nothing more -- lib/26_reflect.teyru has no
+// generic types, and every array type in a program is one class -- so the shape
+// of the document is what says what an element is, and only an element that
+// carries its own type can be built. This program is what that buys, and where
+// it stops: every element the binding cannot answer for is refused with the
+// member named rather than placed and left to fault at the use site.
+
+import teyru.*
+
+class Item {
+  String name
+  int qty
+}
+
+class Bag {
+  List<String> tags
+  Set<Integer> ids
+  Map<String, Integer> counts
+  Map<String, Object> mixed
+  List<Object> loose
+  ArrayList<String> concrete
+  LinkedHashMap<String, Integer> linked
+  TreeSet<Integer> sorted
+  TreeMap<String, Integer> ordered
+  SortedSet<Integer> sortedIface
+  Deque<String> queue
+  List<Item> items
+  List<List<String>> nested
+  String[] words
+  Item[] many
+}
+
+class Main {
+  static String join(Iterable<?> l) {
+    StringBuilder sb = new StringBuilder()
+    for (Object o : l) {
+      if (sb.length() > 0) {
+        sb.append(",")
+      }
+      sb.append(o)
+    }
+    return sb.toString()
+  }
+
+  static String pairs(Map<String, Integer> m) {
+    StringBuilder sb = new StringBuilder()
+    for (Map.Entry<String, Integer> e : m.entrySet()) {
+      if (sb.length() > 0) {
+        sb.append(",")
+      }
+      sb.append(e.getKey()).append("=").append(e.getValue())
+    }
+    return sb.toString()
+  }
+
+  static String why(Gson gson, String json) {
+    try {
+      gson.<Bag>fromJson(json, Bag.class)
+      return "bound"
+    } catch (JsonParseException e) {
+      return e.getMessage()
+    }
+  }
+
+  public static void main(String[] args) {
+    Gson gson = new Gson()
+
+    String json = "{\"tags\":[\"a\",\"b\"],\"ids\":[3,1],\"counts\":{\"x\":1,\"y\":2}," +
+        "\"loose\":[\"s\",5,true,null]," +
+        "\"concrete\":[\"c\"],\"linked\":{\"b\":2,\"a\":1}," +
+        "\"sorted\":[9,7,8],\"ordered\":{\"b\":2,\"a\":1},\"sortedIface\":[4,2]," +
+        "\"queue\":[\"q1\",\"q2\"]}"
+
+    Bag b = gson.fromJson(json, Bag.class)
+
+    // a List<X> is a list, a Set<X> a set and a Map<String,X> a map, and each
+    // element takes its type from the document because nothing else states it
+    System.out.println("tags=" + join(b.tags))
+    System.out.println("ids=" + join(b.ids))
+    System.out.println("counts=" + pairs(b.counts))
+    System.out.println("concrete=" + join(b.concrete))
+    System.out.println("linked=" + pairs(b.linked))
+    System.out.println("sorted=" + join(b.sorted))
+    System.out.println("ordered=" + pairs(b.ordered))
+    System.out.println("sortedIface=" + join(b.sortedIface))
+    System.out.println("queue=" + join(b.queue))
+
+    // the container a declared interface gets, which is Gson's choice of
+    // implementation: ArrayList, LinkedHashSet, LinkedHashMap, TreeSet,
+    // TreeMap, ArrayDeque
+    Object tags = b.tags
+    Object ids = b.ids
+    Object counts = b.counts
+    Object sortedIface = b.sortedIface
+    Object queue = b.queue
+    System.out.println("impl=" + tags.getClass().getName() + " " + ids.getClass().getName() +
+        " " + counts.getClass().getName() + " " + sortedIface.getClass().getName() +
+        " " + queue.getClass().getName())
+
+    // a container declares a class and the class is what is built, not the
+    // interface's default
+    Object concrete = b.concrete
+    Object ordered = b.ordered
+    System.out.println("declared=" + concrete.getClass().getName() + " " + ordered.getClass().getName())
+
+    // an element that carries its type is bound, and each keeps the type the
+    // document gave it
+    for (int i = 0 : i < b.loose.size() : i++) {
+      Object e = b.loose.get(i)
+      System.out.println("loose[" + i + "]=" + (e == null ? "null" : e.getClass().getName()))
+    }
+
+    // both directions: a container is an array, a map is an object, and each
+    // implementation writes the shape it holds
+    System.out.println(gson.toJson(b.tags))
+    System.out.println(gson.toJson(b.counts))
+    System.out.println(gson.toJson(b.sorted))
+    System.out.println(gson.toJson(b.ordered))
+    System.out.println(gson.toJson(b.queue))
+
+    // the writing direction has nothing to infer: a List<Item> holding Items is
+    // written as the objects they are, however the field was declared
+    List<Item> real = new ArrayList<Item>()
+    Item one = new Item()
+    one.name = "made"
+    one.qty = 4
+    real.add(one)
+    System.out.println("real=" + gson.toJson(real))
+    Map<String, Item> byName = new LinkedHashMap<String, Item>()
+    byName.put("k", one)
+    System.out.println("byName=" + gson.toJson(byName))
+    System.out.println("array=" + gson.toJson(new int[] {1, 2, 3}) + " " +
+        gson.toJson(new String[] {"a", "b"}) + " " + gson.toJson(new Item[] {one}))
+
+    // an empty container is empty, whatever it was declared with
+    Bag empty = gson.fromJson("{\"tags\":[],\"ids\":[],\"counts\":{},\"words\":[],\"many\":[]}", Bag.class)
+    System.out.println("empty=" + empty.tags.size() + " " + empty.ids.size() + " " +
+        empty.counts.size() + " " + empty.words.length + " " + empty.many.length)
+
+    // an element that is an object cannot be built, because the element type the
+    // member declared is erased and this language does not check the cast a use
+    // of it makes: the binding refuses and names the member
+    System.out.println("--- refusals ---")
+    System.out.println("items: " + why(gson, "{\"items\":[{\"name\":\"x\",\"qty\":1}]}"))
+    System.out.println("nested: " + why(gson, "{\"nested\":[[\"a\"]]}"))
+    System.out.println("mixed: " + why(gson, "{\"mixed\":{\"o\":{\"in\":1}}}"))
+    System.out.println("words: " + why(gson, "{\"words\":[\"w1\"]}"))
+    System.out.println("many: " + why(gson, "{\"many\":[{\"name\":\"x\"}]}"))
+    System.out.println("numbers: " + why(gson, "{\"words\":[1,2]}"))
+  }
+}

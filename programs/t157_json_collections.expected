@@ -1,0 +1,31 @@
+tags=a,b
+ids=3,1
+counts=x=1,y=2
+concrete=c
+linked=b=2,a=1
+sorted=7,8,9
+ordered=a=1,b=2
+sortedIface=2,4
+queue=q1,q2
+impl=teyru.ArrayList teyru.LinkedHashSet teyru.LinkedHashMap teyru.TreeSet teyru.ArrayDeque
+declared=teyru.ArrayList teyru.TreeMap
+loose[0]=teyru.String
+loose[1]=teyru.Integer
+loose[2]=teyru.Boolean
+loose[3]=null
+["a","b"]
+{"x":1,"y":2}
+[7,8,9]
+{"a":1,"b":2}
+["q1","q2"]
+real=[{"name":"made","qty":4}]
+byName={"k":{"name":"made","qty":4}}
+array=[1,2,3] ["a","b"] [{"name":"made","qty":4}]
+empty=0 0 0 0 0
+--- refusals ---
+items: cannot bind the JSON object at $.items[0]: a container's element type is erased at run time, and this language does not check the cast that reads an element, so a tree placed where the program declared a class would be read as that class instead of being reported. Bind the member with @JsonAdapter, which names the whole member's element type
+nested: cannot bind the JSON array at $.nested[0]: a container's element type is erased at run time, and this language does not check the cast that reads an element, so a tree placed where the program declared a class would be read as that class instead of being reported. Bind the member with @JsonAdapter, which names the whole member's element type
+mixed: cannot bind the JSON object at $.mixed.o: a container's element type is erased at run time, and this language does not check the cast that reads an element, so a tree placed where the program declared a class would be read as that class instead of being reported. Bind the member with @JsonAdapter, which names the whole member's element type
+words: cannot bind the array at $.words: an array's element class is not available at run time -- every array type in a program is one class, so nothing tells an int[] from a String[] and an array built with the wrong element kind reads the wrong words instead of failing. Declare the member as a List, or bind it with @JsonAdapter
+many: cannot bind the array at $.many: an array's element class is not available at run time -- every array type in a program is one class, so nothing tells an int[] from a String[] and an array built with the wrong element kind reads the wrong words instead of failing. Declare the member as a List, or bind it with @JsonAdapter
+numbers: cannot bind the array at $.words: an array's element class is not available at run time -- every array type in a program is one class, so nothing tells an int[] from a String[] and an array built with the wrong element kind reads the wrong words instead of failing. Declare the member as a List, or bind it with @JsonAdapter
