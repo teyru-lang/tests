@@ -1,11 +1,11 @@
 // The edges of the JSON binding: a char, an Object field, a class the call
 // site never names, and an enum.
 //
-// Each of these is a case where Gson's reflection has an answer and a compiler
-// that generates the binding instead has to be told what the answer is. What
-// the binding writes has to be what it can read: a char goes out as the string
-// Gson writes and comes back from one, and an Object field carries whatever
-// arrived -- a tree -- rather than being looked up as a class on the way back.
+// Each of these is a case the binding has to answer from the class alone: a
+// char goes out as the string Gson writes and comes back from one, an Object
+// field carries whatever arrived -- a tree -- rather than being looked up as a
+// class on the way back, and an enum is matched by name. What the binding
+// writes has to be what it can read.
 
 class Chars {
   char letter = 'z'
@@ -59,7 +59,7 @@ class Main {
     System.out.println(pBack.color + "/" + pBack.spare)
 
     try {
-      gson.fromJson("{\"color\":\"PURPLE\"}", Paint.class)
+      gson.<Paint>fromJson("{\"color\":\"PURPLE\"}", Paint.class)
     } catch (JsonParseException e) {
       System.out.println("rejected: " + e.getMessage())
     }

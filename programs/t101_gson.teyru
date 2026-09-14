@@ -1,15 +1,12 @@
-// Gson's object binding, which is where the compiler has to do the work.
+// Gson's object binding, which the runtime now does by reflection.
 //
 // Gson binds a class to JSON by reflection: fromJson(s, Person.class) asks the
-// runtime to look at Person's fields. Teyru has no reflection, so the compiler
-// looks instead: it generates a reader and a writer for each bound class and
-// rewrites the call to use them. The call site keeps Gson's spelling and does
-// not even need the cast Gson's generic signature would have required.
+// runtime to look at Person's fields. So does this: the compiler used to
+// generate a reader and a writer per bound class and rewrite each call to use
+// them, and the binding reads the class itself now (lib/27_json_binding.teyru).
 //
-// The one case with no compile-time answer is a reference whose static type is
-// Object -- the object's own class decides, through the table the generated
-// classes fill in from their static initializers, which is the same answer Gson
-// gives.
+// A reference whose static type is Object is no different from any other: the
+// object's own class answers, which is the answer Gson gives.
 
 import teyru.*
 
@@ -59,7 +56,7 @@ class Main {
     // the runtime table, for a reference the compiler could not see through
     Object any = p
     System.out.println(gson.toJson(any))
-    Person back = (Person) JsonBinding.readFrom(json, Person.class)
+    Person back = JsonBinding.<Person>readFrom(json, Person.class)
     System.out.println(back.name + "/" + back.address.city)
 
     // and the tree API underneath, unchanged
