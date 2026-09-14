@@ -5,7 +5,7 @@ interface Shape {
 }
 
 class Sized {
-  public static final int LIMIT = 7
+  public final int limit = 7
   private int size
 
   public Sized(int size) {
@@ -58,7 +58,7 @@ class Main {
     tag.set(s, "other")
     System.out.println("tag=" + s.tag)
 
-    Field limit = Sized.class.getDeclaredField("LIMIT")
+    Field limit = Sized.class.getDeclaredField("limit")
     System.out.println("limit=" + limit.getInt(s))
     try {
       limit.setInt(s, 9)
