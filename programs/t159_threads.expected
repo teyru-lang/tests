@@ -1,0 +1,17 @@
+== the main thread is a thread ==
+name=main idIsOne=true alive=true
+== a counter both threads increment ==
+method-worker alive before start=false
+ids differ=true bothAlive=true
+total=400000 expected=400000 exact=true
+method-worker alive after join=false name=method-worker
+== sleep is measured, not assumed ==
+slept at least 45ms=true
+== a thread allocates while the main thread collects ==
+worker kept 60000 items, checksum 1799970000
+garbage=124999750000
+main's own bag 60000 items, checksum 1799970000
+== wait and notify across threads ==
+messages=2 first=one second=two
+timed wait gave up after 50ms=true under 5s=true
+done

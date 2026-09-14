@@ -1,0 +1,207 @@
+/* Threads: two of them on one counter, a big allocation on one while the other
+   collects, and a sleep that is really measured.
+ 
+   What each part is here to prove:
+ 
+   - `synchronized` excludes. Two threads increment one counter 200,000 times
+     each, one through a synchronized method and one through a synchronized
+     block on the same object, and the total has to be exactly 400,000. A
+     lowered monitor (a no-op, which is what the runtime had before) loses
+     increments; a monitor that is never released hangs the second thread.
+ 
+   - The collector sees every thread's stack. One thread fills a list of 60,000
+     objects and then sleeps, holding them from its own stack and nowhere else,
+     while the main thread allocates half a million objects and every collection
+     that follows runs while that thread is stopped. Its list has to come back
+     with every element intact: a collector that scans only the main thread's
+     stack frees the lot, and the checksum below is what notices.
+ 
+   - Thread.sleep waits, measured with System.nanoTime rather than assumed.
+ 
+   - wait/notify hand a value across threads, which is the other half of what a
+     monitor is for.
+ 
+   The output is compared byte for byte, so the parts that print from a thread
+   are sequenced with the same monitor they are testing: the worker prints only
+   after the main thread says it may, and the main thread prints nothing else
+   while a worker is running. */
+
+class Counter {
+  private long n = 0
+
+  public synchronized void increment() {
+    this.n = this.n + 1
+  }
+
+  public void incrementBlock() {
+    synchronized (this) {
+      this.n = this.n + 1
+      /* the monitor is reentrant, so nesting it on the same object must not
+         deadlock, and it must count one increment */
+      synchronized (this) {
+        this.n = this.n + 1
+        this.n = this.n - 1
+      }
+    }
+  }
+
+  public long get() {
+    return this.n
+  }
+}
+
+class Item {
+  private long value
+
+  public Item(long value) {
+    this.value = value
+  }
+
+  public long getValue() {
+    return this.value
+  }
+}
+
+class Bag {
+  private ArrayList<Item> items = new ArrayList<Item>()
+
+  public synchronized void fill(int count) {
+    for (int i = 0 : i < count : i++) {
+      this.items.add(new Item(i))
+    }
+  }
+
+  public synchronized long checksum() {
+    long sum = 0
+    for (Item it : this.items) {
+      sum = sum + it.getValue()
+    }
+    return sum
+  }
+
+  public synchronized int size() {
+    return this.items.size()
+  }
+}
+
+/* One flag, and the monitor that makes waiting for it mean something. */
+class Gate {
+  private boolean open = false
+
+  public synchronized void open() {
+    this.open = true
+    this.notifyAll()
+  }
+
+  public synchronized void await() {
+    while (!this.open) {
+      this.wait(5000)
+    }
+  }
+}
+
+class Main {
+  public static void main(String[] args) {
+    System.out.println("== the main thread is a thread ==")
+    Thread main = Thread.currentThread()
+    System.out.println("name=" + main.getName() + " idIsOne=" + (main.getId() == 1L) + " alive=" + main.isAlive())
+
+    System.out.println("== a counter both threads increment ==")
+    Counter counter = new Counter()
+    Gate counterGate = new Gate()
+    final int perThread = 200000
+    Thread method = new Thread(new Runnable() {
+      public void run() {
+        for (int i = 0 : i < perThread : i++) {
+          counter.increment()
+        }
+        counterGate.open()
+      }
+    }, "method-worker")
+    Thread block = new Thread(new Runnable() {
+      public void run() {
+        for (int i = 0 : i < perThread : i++) {
+          counter.incrementBlock()
+        }
+        counterGate.open()
+      }
+    }, "block-worker")
+
+    System.out.println("method-worker alive before start=" + method.isAlive())
+    method.start()
+    block.start()
+    System.out.println("ids differ=" + (method.getId() != block.getId()) + " bothAlive=" + (method.isAlive() && block.isAlive()))
+    /* both workers signal on the same gate, and it stays open: the two waits
+       below are what the main thread has to do before it reads the counter */
+    counterGate.await()
+    counterGate.await()
+    method.join()
+    block.join()
+    long total = counter.get()
+    System.out.println("total=" + total + " expected=" + (2L * perThread) + " exact=" + (total == 2L * perThread))
+    System.out.println("method-worker alive after join=" + method.isAlive() + " name=" + method.getName())
+
+    System.out.println("== sleep is measured, not assumed ==")
+    long before = System.nanoTime()
+    Thread.sleep(50)
+    long sleptMillis = (System.nanoTime() - before) / 1000000L
+    System.out.println("slept at least 45ms=" + (sleptMillis >= 45L))
+
+    System.out.println("== a thread allocates while the main thread collects ==")
+    final Bag bag = new Bag()
+    final int items = 60000
+    Thread collector = new Thread(new Runnable() {
+      public void run() {
+        Bag mine = new Bag()
+        mine.fill(items)
+        /* this thread now holds every one of those objects from its own stack
+           and from nothing else, while the main thread allocates below and
+           every collection that follows stops this thread and walks its stack */
+        Thread.sleep(200)
+        bag.fill(mine.size())
+        System.out.println("worker kept " + mine.size() + " items, checksum " + mine.checksum())
+      }
+    }, "alloc-worker")
+    collector.start()
+    long garbage = 0
+    for (int i = 0 : i < 500000 : i++) {
+      /* allocated and dropped: every one of these is dead the next time round,
+         so the collections below happen with live data on both stacks */
+      Item dead = new Item(i)
+      garbage = garbage + dead.getValue()
+    }
+    collector.join()
+    System.out.println("garbage=" + garbage)
+    System.out.println("main's own bag " + bag.size() + " items, checksum " + bag.checksum())
+
+    System.out.println("== wait and notify across threads ==")
+    final Gate handoff = new Gate()
+    final ArrayList<String> messages = new ArrayList<String>()
+    Thread producer = new Thread(new Runnable() {
+      public void run() {
+        Thread.sleep(30)
+        synchronized (handoff) {
+          messages.add("one")
+          messages.add("two")
+          handoff.open()
+        }
+      }
+    }, "producer")
+    producer.start()
+    handoff.await()
+    producer.join()
+    System.out.println("messages=" + messages.size() + " first=" + messages.get(0) + " second=" + messages.get(1))
+
+    /* a wait nobody notifies has to give up on its own, on the clock it was
+       given: a monitor that "waits" by returning at once is what a lowered
+       wait() is, and the boolean below is what notices it */
+    long waitStart = System.nanoTime()
+    synchronized (messages) {
+      messages.wait(60)
+    }
+    long waitedMillis = (System.nanoTime() - waitStart) / 1000000L
+    System.out.println("timed wait gave up after 50ms=" + (waitedMillis >= 50L) + " under 5s=" + (waitedMillis < 5000L))
+
+    System.out.println("done")
+  }
+}

@@ -19,12 +19,12 @@
  *      && /tmp/net_c_test
  *
  * The socket layer is included rather than linked, so the file compiles the
- * exact source the compiler embeds. Only four runtime symbols are referenced by
- * it -- ty_str_new, ty_alloc_arr, ty_roots and ty_sp -- and this test defines
- * them itself, minimally and without a collector, because a collector is not
- * what is under test here and the real one belongs to a generated program that
- * has a heap, classes and a startup sequence. Nothing below allocates enough to
- * want a collection.
+ * exact source the compiler embeds. Three runtime symbols are referenced by it
+ * -- ty_str_new, ty_alloc_arr, and the thread state the shadow stack macros
+ * reach through (ty_self) -- and this test defines them itself, minimally and
+ * without a collector, because a collector is not what is under test here and
+ * the real one belongs to a generated program that has a heap, classes and a
+ * startup sequence. Nothing below allocates enough to want a collection.
  */
 
 #include "../../internal/runtime/src/tyrt_net.c"
@@ -37,10 +37,17 @@
 #include <signal.h>
 #include <sys/wait.h>
 
-/* ---- the four symbols tyrt_net.c reaches for --------------------------- */
+/* ---- the three symbols tyrt_net.c reaches for -------------------------- */
 
-void *ty_roots[1024];
-int64_t ty_sp = 0;
+/* TY_ROOT_PUSH indexes the calling thread's shadow stack, which is a field of
+   the thread state tyrt_thread.c owns (tyrt.h). This test has one thread, so a
+   static state with a static block is the whole of it: no start, no park, no
+   collection. */
+static void *test_roots[1024];
+static tythread test_state = {
+    .roots = test_roots,
+};
+_Thread_local tythread *ty_self = &test_state;
 
 tystr *ty_str_new(const char *data, int64_t len) {
   tystr *s = (tystr *)malloc(sizeof(tystr) + (size_t)len + 1);
