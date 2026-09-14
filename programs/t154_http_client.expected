@@ -1,0 +1,23 @@
+http example.com 8080 /pets/7 full=1
+target=/pets/7?full=1 authority=example.com:8080
+https api.example.com 443 /v1/items 0
+localhost 80 /
+/ localhost:9000
+--- get ---
+GET /pets?full=1 HTTP/1.1
+Host: example.com:8080
+Connection: keep-alive
+
+--- post ---
+POST /items HTTP/1.1
+Host: example.com
+Content-Type: application/json
+Content-Length: 7
+Connection: keep-alive
+
+{"a":1}201 {"a":1} application/json true
+200 [hello world]
+204 body=0 true
+404 9 false not found
+302 /pets 0
+https: https is not supported: the runtime has no TLS

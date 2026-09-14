@@ -1,0 +1,121 @@
+import teyru.*
+
+// A WebSocket declared the way everything else in this library is: the class
+// implements WebSocketHandler, @WebSocketMapping says where it answers, and the
+// scanner registers it from the container's class list -- so a handler that is
+// also a bean can be injected like any other bean, which is what Spring gives
+// and what registering one by hand in main does not.
+
+interface Greeter {
+  String greet(String who)
+}
+
+@Service
+class HelloGreeter implements Greeter {
+  public String greet(String who) {
+    return "hello " + who
+  }
+}
+
+@WebSocketMapping("/chat")
+@Service
+class Chat implements WebSocketHandler {
+  @Autowired Greeter greeter
+
+  public void onOpen(WebSocketSession s) {
+    s.send("welcome to " + s.getPath())
+  }
+
+  public void onMessage(WebSocketSession s, String text) {
+    s.send(greeter.greet(text))
+  }
+
+  public void onBinary(WebSocketSession s, byte[] data) {
+    s.send("bytes:" + data.length)
+  }
+
+  public void onClose(WebSocketSession s) {
+  }
+}
+
+class Main {
+  public static void main(String[] args) throws Exception {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    System.out.println("registered=" + WebSocketScanner.register(ctx, server))
+    server.bind()
+
+    Socket s = new Socket("127.0.0.1", server.getPort())
+    SocketOutputStream out = s.getOutputStream()
+    SocketInputStream in = s.getInputStream()
+    out.write("GET /chat HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
+        "Sec-WebSocket-Key: AQIDBAUGBwgJCgsMDQ4PEA==\r\nSec-WebSocket-Version: 13\r\n\r\n")
+    out.write(clientText("world"))
+    out.write(clientText("again"))
+    out.write(clientClose())
+    out.flush()
+    System.out.println("served=" + server.serveIdle(200))
+
+    String status = in.readLine()
+    while (true) {
+      String line = in.readLine()
+      if (line == null || line.isEmpty()) {
+        break
+      }
+      if (line.toLowerCase().startsWith("sec-websocket-accept")) {
+        status = status + " " + line
+      }
+    }
+    System.out.println(status)
+    while (true) {
+      WebSocketFrame f = readFrame(in)
+      if (f == null) {
+        break
+      }
+      if (f.opcode == WebSocketFrame.CLOSE) {
+        System.out.println("close")
+        break
+      }
+      System.out.println("text=" + WebSocketFrame.text(f))
+    }
+    s.close()
+  }
+
+  // clientText is one masked text frame, which is what a client must send.
+  private static byte[] clientText(String text) {
+    byte[] payload = text.getBytes()
+    byte[] mask = { 1, 2, 3, 4 }
+    byte[] out = new byte[6 + payload.length]
+    out[0] = (byte) 0x81
+    out[1] = (byte) (0x80 | payload.length)
+    for (int i = 0 : i < 4 : i++) {
+      out[2 + i] = mask[i]
+    }
+    for (int i = 0 : i < payload.length : i++) {
+      out[6 + i] = (byte) (payload[i] ^ mask[i % 4])
+    }
+    return out
+  }
+
+  private static byte[] clientClose() {
+    return new byte[] { (byte) 0x88, (byte) 0x80, 1, 2, 3, 4 }
+  }
+
+  private static WebSocketFrame readFrame(SocketInputStream in) {
+    int b0 = in.read()
+    if (b0 < 0) {
+      return null
+    }
+    int b1 = in.read()
+    if (b1 < 0) {
+      return null
+    }
+    WebSocketFrame f = new WebSocketFrame()
+    f.fin = (b0 & 0x80) != 0
+    f.opcode = b0 & 0x0f
+    f.payload = new byte[b1 & 0x7f]
+    in.readFully(f.payload, 0, f.payload.length)
+    return f
+  }
+}

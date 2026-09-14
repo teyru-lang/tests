@@ -1,0 +1,7 @@
+registered=1
+served=1
+HTTP/1.1 101 Switching Protocols Sec-WebSocket-Accept: C/0nmHhBztSRGR1CwL6Tf4ZjwpY=
+text=welcome to /chat
+text=hello world
+text=hello again
+close

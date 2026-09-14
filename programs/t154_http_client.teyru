@@ -1,0 +1,65 @@
+import teyru.*
+
+// The HTTP client's parts, without a socket: what a URL is split into, what a
+// request renders as, and what a response reads back as.
+//
+// The round trip needs two things happening at once -- a client waiting for an
+// answer while a server gives one -- and this language has one thread today, so
+// the round trip is a test of its own once threads land. Everything up to the
+// socket is here, and it is where the mistakes are: a request line with the
+// wrong target, a Host header that disagrees with the URL, a body whose length
+// is not what the header says, or a chunked body read as if it were not.
+
+class Main {
+  public static void main(String[] args) {
+    HttpUrl a = HttpUrl.of("http://example.com:8080/pets/7?full=1")
+    System.out.println(a.scheme + " " + a.host + " " + a.port + " " + a.path + " " + a.query)
+    System.out.println("target=" + a.target() + " authority=" + a.authority())
+
+    HttpUrl b = HttpUrl.of("https://api.example.com/v1/items")
+    System.out.println(b.scheme + " " + b.host + " " + b.port + " " + b.path + " " + b.query.length())
+
+    HttpUrl c = HttpUrl.of("http://localhost")
+    System.out.println(c.host + " " + c.port + " " + c.path)
+
+    HttpUrl d = HttpUrl.of("http://localhost:9000")
+    System.out.println(d.target() + " " + d.authority())
+
+    // a GET renders the request line, the Host the URL implies, and keep-alive
+    HttpClientRequest get = HttpClientRequest.of("GET", "http://example.com:8080/pets?full=1")
+    System.out.println("--- get ---")
+    System.out.print(get.render(HttpUrl.of(get.url)))
+
+    // a POST adds the length of the body and the caller's headers
+    HttpClientRequest post = HttpClientRequest.of("POST", "http://example.com/items")
+        .contentType("application/json").body("{\"a\":1}")
+    System.out.println("--- post ---")
+    System.out.print(post.render(HttpUrl.of(post.url)))
+
+    // a response with a length
+    HttpClientResponse r1 = ClientResponseParser.of("HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nContent-Length: 7\r\n\r\n{\"a\":1}\r\n")
+    System.out.println(r1.statusCode() + " " + r1.body() + " " + r1.header("content-type") + " " + r1.isSuccessful())
+
+    // a response framed by chunks
+    HttpClientResponse r2 = ClientResponseParser.of("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n")
+    System.out.println(r2.statusCode() + " [" + r2.body() + "]")
+
+    // 204 has no body however its headers read, and a 404 is not successful
+    HttpClientResponse r3 = ClientResponseParser.of("HTTP/1.1 204 No Content\r\nContent-Length: 5\r\n\r\n")
+    System.out.println(r3.statusCode() + " body=" + r3.body().length() + " " + r3.isSuccessful())
+    HttpClientResponse r4 = ClientResponseParser.of("HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\n\r\nnot found")
+    System.out.println(r4.statusCode() + " " + r4.header("Content-Length") + " " + r4.isSuccessful() + " " + r4.body())
+
+    // a 302 keeps its Location for a caller that wants to follow it
+    HttpClientResponse r5 = ClientResponseParser.of("HTTP/1.1 302 Found\r\nLocation: /pets\r\nContent-Length: 0\r\n\r\n")
+    System.out.println(r5.statusCode() + " " + r5.header("location") + " " + r5.body().length())
+
+    // https is refused rather than attempted: the runtime has no TLS
+    try {
+      HttpClient.newHttpClient().send(HttpClientRequest.of("GET", "https://example.com/"))
+      System.out.println("https attempted")
+    } catch (IllegalStateException e) {
+      System.out.println("https: " + e.getMessage())
+    }
+  }
+}
