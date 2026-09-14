@@ -1,0 +1,8 @@
+server ready=true
+GET /api/hello -> 200 [hello from the server]
+POST /api/orders -> 200 [order 3 x coffee]
+GET /api/missing -> 404 [not found: /api/missing]
+GET /api/greet -> 200 [you sent t162] X-Echo=t162 Connection=keep-alive
+GET /api/hello again -> 200 [hello from the server]
+server thread alive after join=false
+done

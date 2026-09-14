@@ -1,0 +1,126 @@
+import teyru.*
+
+// The HTTP client and the HTTP server, over a real socket, in one program.
+//
+// Everything up to the socket was already tested: t154 renders a request and
+// reads a response as strings, t151 and t104 drive the server through its
+// handle() and through raw sockets. What none of them could do is the one thing
+// a round trip is -- a client waiting for an answer while a server gives one --
+// because that needs the two to run at the same time, and this language had one
+// thread. It has threads now, so the server runs its accept loop on one and the
+// main thread is the client: the calls below are the client's own send path
+// connecting, writing, reading and parsing, with no hand-written bytes
+// anywhere.
+//
+// The port is asked for, not chosen: the server binds 0, which is the kernel
+// saying which port is free, and the test never prints it -- two runs of this
+// program must produce the same bytes, and a port number would not.
+
+class Order {
+  String item
+  int count
+  Order() {
+    item = ""
+    count = 0
+  }
+}
+
+@RestController
+@RequestMapping("/api")
+class ApiController {
+  // a GET whose answer is the status and the body
+  @GetMapping("/hello")
+  String hello() {
+    return "hello from the server"
+  }
+
+  // a POST whose JSON body the parameter was bound from: the answer names the
+  // fields the binding read, so a body that arrived mangled cannot pass
+  @PostMapping("/orders")
+  String order(@RequestBody Order o) {
+    return "order " + o.count + " x " + o.item
+  }
+
+  // a response that carries a header of its own, and the header the client set
+  // on the request it answers
+  @GetMapping("/greet")
+  HttpResponse greet(@RequestHeader("X-Client") String who) {
+    HttpResponse res = new HttpResponse()
+    res.body = "you sent " + who
+    res.header("X-Echo", who)
+    return res
+  }
+}
+
+class Main {
+  public static void main(String[] args) throws Exception {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    // bind before the thread starts: the port is needed to build the URLs, and
+    // a listener that is already bound answers a connection that arrives while
+    // the serving thread is still on its way to accept
+    server.bind()
+    int port = server.getPort()
+    String base = "http://127.0.0.1:" + port
+
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "server")
+    serving.start()
+
+    // Wait for an answer rather than for a length of time: the first call is
+    // retried until the server answers it, with a bounded number of tries so
+    // that a port that never opens is a line of output rather than a program
+    // that hangs.
+    boolean ready = false
+    for (int attempt = 0 : attempt < 100 && ready == false : attempt++) {
+      try {
+        ready = Http.get(base + "/api/hello").statusCode() == 200
+      } catch (IOException e) {
+        Thread.sleep(10)
+      }
+    }
+    System.out.println("server ready=" + ready)
+    if (ready == false) {
+      System.out.println("the server never answered on the port it bound")
+      task.stop()
+      serving.join()
+      server.close()
+      return
+    }
+
+    // a GET: the status comes back, and so does the body
+    HttpClientResponse hello = Http.get(base + "/api/hello")
+    System.out.println("GET /api/hello -> " + hello.statusCode() + " [" + hello.body() + "]")
+
+    // a POST: the JSON body is bound to the parameter, and the handler answers
+    // out of the object the binding made
+    HttpClientResponse order = Http.postJson(base + "/api/orders", "{\"item\":\"coffee\",\"count\":3}")
+    System.out.println("POST /api/orders -> " + order.statusCode() + " [" + order.body() + "]")
+
+    // a path no controller claimed
+    HttpClientResponse missing = Http.get(base + "/api/missing")
+    System.out.println("GET /api/missing -> " + missing.statusCode() + " [" + missing.body() + "]")
+
+    // a client of its own: a header set on the request and read back off the
+    // answer, and then a second request on the same client. The answer says
+    // keep-alive, which is the server agreeing that the connection stays -- and
+    // a connection that stays is one the client's next request goes out on.
+    HttpClient client = HttpClient.newHttpClient().connectTimeout(5000)
+    HttpClientResponse greet = client.send(
+        HttpClientRequest.of("GET", base + "/api/greet").header("X-Client", "t162"))
+    System.out.println("GET /api/greet -> " + greet.statusCode() + " [" + greet.body() + "] X-Echo=" + greet.header("x-echo") +
+        " Connection=" + greet.header("connection"))
+    HttpClientResponse again = client.send(HttpClientRequest.of("GET", base + "/api/hello"))
+    System.out.println("GET /api/hello again -> " + again.statusCode() + " [" + again.body() + "]")
+    client.close()
+
+    // stop the loop and wait for the thread that ran it: a server left running
+    // would hold the port and outlive the program that started it
+    task.stop()
+    serving.join()
+    server.close()
+    System.out.println("server thread alive after join=" + serving.isAlive())
+    System.out.println("done")
+  }
+}
