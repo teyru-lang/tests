@@ -1,0 +1,35 @@
+import teyru.*
+
+// Two beans of one type and nothing to choose between them: refused at refresh,
+// as Spring refuses it, with both names in the message.
+
+interface Greeter {
+  String greet()
+}
+
+@Component
+class First implements Greeter {
+  public String greet() { return "1" }
+}
+
+@Component
+class Second implements Greeter {
+  public String greet() { return "2" }
+}
+
+@Service
+class NeedsGreeter {
+  @Autowired Greeter greeter
+}
+
+class Main {
+  public static void main(String[] args) {
+    ApplicationContext ctx = new ApplicationContext()
+    try {
+      ctx.refresh()
+      System.out.println("chose between two candidates: " + ctx.beanCount())
+    } catch (IllegalStateException e) {
+      System.out.println("ambiguous: " + e.getMessage())
+    }
+  }
+}

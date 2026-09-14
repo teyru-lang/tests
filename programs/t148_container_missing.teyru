@@ -1,0 +1,27 @@
+import teyru.*
+
+// A bean with no candidate is refused while the container builds, which is when
+// Spring refuses it too. It used to be a compile error: the compiler resolved
+// the wiring, so it could see there was nothing to inject. A container that
+// reads the classes at run time cannot, and this is what it says instead.
+
+interface Repo {
+  String ping()
+}
+
+@Service
+class NeedsRepo {
+  @Autowired Repo repo
+}
+
+class Main {
+  public static void main(String[] args) {
+    ApplicationContext ctx = new ApplicationContext()
+    try {
+      ctx.refresh()
+      System.out.println("built a bean with no candidate")
+    } catch (IllegalStateException e) {
+      System.out.println("missing: " + e.getMessage())
+    }
+  }
+}

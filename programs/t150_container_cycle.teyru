@@ -1,0 +1,27 @@
+import teyru.*
+
+// A dependency loop is refused rather than answered with a half-built object,
+// which is what Spring does and what the compiler did before the container read
+// the classes itself.
+
+@Service
+class CycleA {
+  @Autowired CycleB b
+}
+
+@Service
+class CycleB {
+  @Autowired CycleA a
+}
+
+class Main {
+  public static void main(String[] args) {
+    ApplicationContext ctx = new ApplicationContext()
+    try {
+      ctx.refresh()
+      System.out.println("built a dependency loop")
+    } catch (IllegalStateException e) {
+      System.out.println("cycle: " + e.getMessage())
+    }
+  }
+}
