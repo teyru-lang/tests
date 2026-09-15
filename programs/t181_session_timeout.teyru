@@ -1,0 +1,110 @@
+import teyru.*
+
+// When a session ends: the inactivity limit, the interval a single session
+// overrides it with, the sweep that keeps a busy store from growing, and the
+// two settings keys Boot spells the timeout with.
+//
+// Two of the lines below sleep a little past the limit they set, because an
+// inactivity limit is a wall-clock promise and there is no way to test one
+// without waiting. What the program *prints* is booleans, not durations, so the
+// output is the same on every machine and every run.
+
+class Main {
+  // request builds a request carrying the cookie for a session id, which is what
+  // a browser sends back.
+  static HttpRequest requestWith(String id) {
+    HttpRequest req = new HttpRequest()
+    req.method = "GET"
+    req.path = "/"
+    if (id.length() > 0) {
+      req.addHeader("Cookie", Sessions.COOKIE_NAME + "=" + id)
+      req.readCookies()
+    }
+    return req
+  }
+
+  public static void main(String[] args) {
+    Sessions.clear()
+
+    // no limit is the default: a program has to ask for expiry
+    System.out.println("defaultLimit=" + Sessions.getTimeout())
+    HttpRequest plain = requestWith("")
+    HttpSession forever = Sessions.of(plain)
+    Thread.sleep(1100)
+    System.out.println("noLimitKeeps=" + (Sessions.find(requestWith(forever.getId())) != null))
+
+    // with a limit, an idle session is gone and its cookie names nothing
+    Sessions.clear()
+    Sessions.setTimeout(1)
+    System.out.println("limit=" + Sessions.getTimeout())
+    HttpRequest first = requestWith("")
+    HttpSession s = Sessions.of(first)
+    System.out.println("new=" + s.isNew() + " idSet=" + (s.getId().length() > 0))
+    System.out.println("aliveBefore=" + (Sessions.find(requestWith(s.getId())) != null))
+    Thread.sleep(1300)
+    System.out.println("expiredAfter=" + (Sessions.find(requestWith(s.getId())) == null))
+    System.out.println("dropped=" + (Sessions.count() == 0))
+
+    // a session that sets its own interval survives the store's shorter one
+    Sessions.clear()
+    HttpRequest own = requestWith("")
+    HttpSession one = Sessions.of(own)
+    one.setMaxInactiveInterval(60)
+    System.out.println("ownInterval=" + one.getMaxInactiveInterval())
+    Thread.sleep(1300)
+    System.out.println("ownSurvives=" + (Sessions.find(requestWith(one.getId())) != null))
+    System.out.println("ownExpired=" + one.isExpired(System.currentTimeMillis()))
+
+    // an expired session still in the store keeps a session's own interval
+    // answer honest when it has none
+    Sessions.clear()
+    HttpSession two = Sessions.of(requestWith(""))
+    Thread.sleep(1300)
+    System.out.println("storeIntervalApplies=" + two.isExpired(System.currentTimeMillis()))
+
+    // prune is the whole store at once, for a quiet moment or a test
+    Sessions.clear()
+    Sessions.of(requestWith(""))
+    Sessions.of(requestWith(""))
+    Thread.sleep(1300)
+    System.out.println("beforePrune=" + Sessions.count())
+    System.out.println("pruned=" + Sessions.prune())
+    System.out.println("afterPrune=" + Sessions.count())
+
+    // the settings key, in Boot's spelling and in this project's shorter one
+    ApplicationContext ctx = new ApplicationContext()
+    SpringApplication.loadConfig(ctx, new String[] {
+        "--server.servlet.session.timeout=30m",
+        "--spring.web.session.timeout=45s",
+    })
+    System.out.println("bootKeyWins=" + SpringApplication.sessionTimeoutSeconds(ctx))
+
+    ApplicationContext shortKey = new ApplicationContext()
+    SpringApplication.loadConfig(shortKey, new String[] { "--spring.web.session.timeout=45s" })
+    System.out.println("shortKey=" + SpringApplication.sessionTimeoutSeconds(shortKey))
+
+    ApplicationContext bare = new ApplicationContext()
+    SpringApplication.loadConfig(bare, new String[] { "--server.servlet.session.timeout=90" })
+    System.out.println("bareSeconds=" + SpringApplication.sessionTimeoutSeconds(bare))
+
+    ApplicationContext hours = new ApplicationContext()
+    SpringApplication.loadConfig(hours, new String[] { "--server.servlet.session.timeout=2h" })
+    System.out.println("hours=" + SpringApplication.sessionTimeoutSeconds(hours))
+
+    ApplicationContext days = new ApplicationContext()
+    SpringApplication.loadConfig(days, new String[] { "--server.servlet.session.timeout=1d" })
+    System.out.println("days=" + SpringApplication.sessionTimeoutSeconds(days))
+
+    ApplicationContext junk = new ApplicationContext()
+    SpringApplication.loadConfig(junk, new String[] { "--server.servlet.session.timeout=soon" })
+    System.out.println("junk=" + SpringApplication.sessionTimeoutSeconds(junk))
+
+    // a session whose state was emptied is not a session even while its id is
+    // still in the store, which is what invalidate leaves behind
+    Sessions.clear()
+    HttpSession gone = Sessions.of(requestWith(""))
+    String goneId = gone.getId()
+    gone.invalidate()
+    System.out.println("invalidated=" + (Sessions.find(requestWith(goneId)) == null))
+  }
+}

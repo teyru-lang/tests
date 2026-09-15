@@ -1,0 +1,21 @@
+defaultLimit=0
+noLimitKeeps=true
+limit=1
+new=true idSet=true
+aliveBefore=true
+expiredAfter=true
+dropped=true
+ownInterval=60
+ownSurvives=true
+ownExpired=false
+storeIntervalApplies=true
+beforePrune=2
+pruned=2
+afterPrune=0
+bootKeyWins=1800
+shortKey=45
+bareSeconds=90
+hours=7200
+days=86400
+junk=0
+invalidated=true
