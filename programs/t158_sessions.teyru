@@ -86,7 +86,7 @@ class Main {
     System.out.println("first=" + first.body)
     System.out.println(
         "issued=" + (cookie.isEmpty() == false) +
-        " httpOnly=" + first.headerValueOf("set-cookie").indexOf("HttpOnly") +
+        " httpOnly=" + (first.headerValueOf("set-cookie").indexOf("HttpOnly") >= 0) +
         " count=" + Sessions.count())
 
     // asking about a session without the cookie is not having one

@@ -1,0 +1,16 @@
+big   accept=gzip     encoding=[gzip] vary=[Accept-Encoding] compressed=true content-length-is-body=true decodes=true crc=3771104302
+big   accept=         encoding=[] vary=[Accept-Encoding] compressed=false content-length-is-body=true decodes=true crc=3771104302
+big   accept=br       encoding=[] vary=[Accept-Encoding] compressed=false content-length-is-body=true decodes=true crc=3771104302
+big   accept=gzip;q=0 encoding=[] vary=[Accept-Encoding] compressed=false content-length-is-body=true decodes=true crc=3771104302
+big   accept=*        encoding=[gzip] vary=[Accept-Encoding] compressed=true content-length-is-body=true decodes=true crc=3771104302
+big   accept=deflate, gzip encoding=[gzip] vary=[Accept-Encoding] compressed=true content-length-is-body=true decodes=true crc=3771104302
+small accept=gzip     encoding=[] vary=[Accept-Encoding] compressed=false content-length-is-body=true decodes=true crc=3962962204
+plain accept=gzip     encoding=[] vary=[] compressed=false content-length-is-body=true decodes=true crc=3771104302
+text  accept=gzip     encoding=[] vary=[] compressed=false content-length-is-body=true decodes=true crc=3771104302
+server ready=true
+live plain encoding=[] status=200 body-is-text=true crc=3771104302
+live gzip  encoding=[gzip] status=200 body-is-text=true crc=3771104302
+live gzip  vary=[Accept-Encoding]
+live again encoding=[] body-is-text=true
+server thread alive after join=false
+done

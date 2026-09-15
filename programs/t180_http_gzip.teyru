@@ -1,0 +1,205 @@
+/* Content-Encoding: gzip in the web layer.
+
+   This is the one test here with no .java.ref: there is no javac program to be
+   the same program as, because the two things it exercises -- the server's
+   handle() path and the client's parser -- exist only in this library. What the
+   gzip format itself is, and whether it is the format javac reads and writes,
+   is settled by t177_deflate and t178_gzip; what is left for this program is
+   the wiring, and that is a question about this library's own two halves.
+
+   Four things are being checked.
+
+   * A response that asks for it is compressed when the request offered gzip:
+     the answer carries Content-Encoding: gzip, its Content-Length is the
+     compressed length and the body decodes back to what the handler wrote.
+   * A request that did not offer gzip gets the bytes the handler wrote, and so
+     does one that offered something else or refused gzip outright with a
+     q-value of zero. That is the whole point of the header: a client that never
+     said it could decode gzip must not be handed gzip.
+   * Vary: Accept-Encoding is present whenever a response is one that depends on
+     the request's coding, so a cache in front of this server cannot keep one
+     answer and hand it to both kinds of client.
+   * A body below the threshold is left alone even when everything asked for it,
+     because compressing it costs more than it saves.
+
+   The first three are driven through MockServer, which is the connection loop's
+   handle() without a socket, and the client's half is driven over a real socket
+   by a ServerTask on a thread of its own: the client's send path writes
+   Accept-Encoding, the client's parser reads Content-Encoding and expanding the
+   body is what makes body() the text the handler wrote rather than the bytes
+   that crossed the wire. The port is asked for and never printed, so two runs
+   of this program produce the same bytes. */
+
+package teyru
+
+class GzipBody {
+  // A body long enough that compressing it is worth the header, and repetitive
+  // enough that the answer is not a coincidence.
+  public static String big() {
+    StringBuilder b = new StringBuilder()
+    for (int i = 0 : i < 64 : i++) {
+      b.append("the quick brown fox jumps over the lazy dog, line ").append(i).append("\n")
+    }
+    return b.toString()
+  }
+
+  // A body below the threshold a response is compressed at.
+  public static String small() {
+    return "too short to be worth a gzip header"
+  }
+}
+
+@RestController
+@RequestMapping("/api")
+class GzipController {
+  @GetMapping("/big")
+  HttpResponse big() {
+    HttpResponse res = new HttpResponse()
+    res.body = GzipBody.big()
+    res.gzipBody = true
+    return res
+  }
+
+  @GetMapping("/small")
+  HttpResponse small() {
+    HttpResponse res = new HttpResponse()
+    res.body = GzipBody.small()
+    res.gzipBody = true
+    return res
+  }
+
+  // A response that never asked to be compressed, which is what every other
+  // route in this library is.
+  @GetMapping("/plain")
+  HttpResponse plain() {
+    HttpResponse res = new HttpResponse()
+    res.body = GzipBody.big()
+    return res
+  }
+
+  @GetMapping("/text")
+  String text() {
+    return GzipBody.big()
+  }
+}
+
+class Main {
+  static void p(String s) { System.out.println(s) }
+
+  static long crc(String s) {
+    CRC32 c = new CRC32()
+    c.update(s.getBytes())
+    return c.getValue()
+  }
+
+  // The header value a rendered response carries, or "".
+  static String rendered(String response, String name) {
+    String[] lines = response.split("\r\n")
+    for (int i = 0 : i < lines.length : i++) {
+      int colon = lines[i].indexOf(':')
+      if (colon > 0 && lines[i].substring(0, colon).toLowerCase().equals(name)) {
+        return lines[i].substring(colon + 1).trim()
+      }
+    }
+    return ""
+  }
+
+  // ask drives one request through the server's handle(), which is what the
+  // connection loop calls; accept is the Accept-Encoding header, or "" for a
+  // request that offers nothing.
+  static HttpResponse ask(MockServer server, String path, String accept) {
+    HttpRequest req = new HttpRequest()
+    req.method = "GET"
+    req.path = path
+    req.version = "HTTP/1.1"
+    if (accept.length() > 0) {
+      req.addHeader("Accept-Encoding", accept)
+    }
+    return server.handle(req)
+  }
+
+  static void show(MockServer server, String label, String path, String accept) {
+    HttpResponse res = ask(server, path, accept)
+    String encoding = res.headerValueOf("Content-Encoding")
+    String vary = res.headerValueOf("Vary")
+    String renderedText = res.respond("HTTP/1.1", true, false)
+    String length = rendered(renderedText, "content-length")
+    String original = path.equals("/api/small") ? GzipBody.small() : GzipBody.big()
+    String decoded = encoding.equals("gzip") ? Gzip.decompress(res.body) : res.body
+    p(label +
+      " encoding=[" + encoding + "]" +
+      " vary=[" + vary + "]" +
+      " compressed=" + (res.body.length() < original.length()) +
+      " content-length-is-body=" + length.equals("" + res.body.length()) +
+      " decodes=" + decoded.equals(original) +
+      " crc=" + crc(decoded))
+  }
+
+  public static void main(String[] args) throws Exception {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    MockServer server = new MockServer(ctx)
+
+    // ---------- what the request offered, and what came back ----------
+    show(server, "big   accept=gzip    ", "/api/big", "gzip")
+    show(server, "big   accept=        ", "/api/big", "")
+    show(server, "big   accept=br      ", "/api/big", "br")
+    show(server, "big   accept=gzip;q=0", "/api/big", "gzip;q=0")
+    show(server, "big   accept=*       ", "/api/big", "*")
+    show(server, "big   accept=deflate, gzip", "/api/big", "deflate, gzip")
+    show(server, "small accept=gzip    ", "/api/small", "gzip")
+    show(server, "plain accept=gzip    ", "/api/plain", "gzip")
+    show(server, "text  accept=gzip    ", "/api/text", "gzip")
+
+    // ---------- a live round trip ----------
+    ApplicationContext live = new ApplicationContext()
+    live.refresh()
+    HttpServer http = new HttpServer(0, Application.routerFrom(live), live)
+    http.bind()
+    String base = "http://127.0.0.1:" + http.getPort()
+    ServerTask task = new ServerTask(http)
+    Thread serving = new Thread(task, "server")
+    serving.start()
+
+    boolean ready = false
+    for (int attempt = 0 : attempt < 100 && ready == false : attempt++) {
+      try {
+        ready = Http.get(base + "/api/plain").statusCode() == 200
+      } catch (IOException e) {
+        Thread.sleep(10)
+      }
+    }
+    p("server ready=" + ready)
+    if (ready == false) {
+      task.stop()
+      serving.join()
+      http.close()
+      p("done")
+      return
+    }
+
+    // A request that did not offer gzip gets the bytes the handler wrote.
+    HttpClientResponse plain = Http.get(base + "/api/big")
+    p("live plain encoding=[" + plain.header("Content-Encoding") + "] status=" + plain.statusCode() +
+      " body-is-text=" + plain.body().equals(GzipBody.big()) + " crc=" + crc(plain.body()))
+
+    // A request that did offer it gets gzip on the wire and the same text out
+    // of the client, which is the client half doing its job.
+    HttpClient client = HttpClient.newHttpClient().connectTimeout(5000)
+    HttpClientResponse packed = client.send(HttpClientRequest.of("GET", base + "/api/big").acceptGzip())
+    p("live gzip  encoding=[" + packed.header("Content-Encoding") + "] status=" + packed.statusCode() +
+      " body-is-text=" + packed.body().equals(GzipBody.big()) + " crc=" + crc(packed.body()))
+    p("live gzip  vary=[" + packed.header("Vary") + "]")
+
+    // The same client, not asking, on a connection it already has.
+    HttpClientResponse again = client.send(HttpClientRequest.of("GET", base + "/api/big"))
+    p("live again encoding=[" + again.header("Content-Encoding") + "] body-is-text=" + again.body().equals(GzipBody.big()))
+    client.close()
+
+    task.stop()
+    serving.join()
+    http.close()
+    p("server thread alive after join=" + serving.isAlive())
+    p("done")
+  }
+}

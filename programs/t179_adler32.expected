@@ -1,0 +1,38 @@
+empty 1
+byte 0 65537
+byte 1 131074
+byte 97 6422626
+byte 127 8388736
+byte 128 8454273
+byte 255 16777472
+int 0x161 6422626
+int -1 16777472
+int 0x100 65537
+check 123456789 152961502
+fox 1541148634
+fox bytes 1541148634
+fox slice 108659230
+fox interface 1541148634
+fox interface slice 108659230
+len 5550 2250726897
+len 5551 3831455288
+len 5552 1122918016
+len 5553 2713149129
+len 5554 14245651
+len 11100 394639431
+len 11101 3492788394
+len 11102 2303506702
+len 11103 1120844147
+len 11104 4238850521
+bytes len 5551 3831455288
+bytes len 5552 1122918016
+bytes len 5553 2713149129
+100000 2095160517
+read twice 38600999 38600999
+after reset 1
+reused 38600999
+appended 135004749
+null output throws NullPointerException
+signed range Range [-1, -1 + 2) out of bounds for length 3
+over range Range [2, 2 + 3) out of bounds for length 3
+empty ranges 1

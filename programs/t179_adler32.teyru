@@ -1,0 +1,144 @@
+/* java.util.zip.Adler32 and the Checksum interface it implements, exercised
+   against the JDK's own answers. This is the same program as the javac 21
+   program in t179_adler32.java.ref, whose output is t179_adler32.expected, so
+   every number below is what the JDK produced.
+
+   Adler-32 is the checksum RFC 1950 wraps a zlib stream in, and it is two sums
+   modulo 65521: s1 is the bytes added up and s2 is s1 added up at every step.
+   The one place a hand-written version can be wrong without looking wrong is
+   where s1 and s2 are reduced -- once per byte and once per 5552 bytes give the
+   same answer, and a version that reduces once per byte but overflows in
+   between, or one that reduces at the wrong multiple, does not. The block
+   boundaries are therefore pinned from both sides: five lengths around 5552 and
+   around 11104 through update(byte[]) (one reduction per block) and the same
+   lengths a byte at a time through update(int) (a reduction per byte), which
+   reach the same value by different arithmetic.
+
+   What the test also pins is that the empty message checksums to one rather
+   than to zero: s1 and s2 start at 1 and 0, which is what makes the value of a
+   stream with nothing in it the identity of the operation, and it is the
+   difference between this checksum and CRC-32's convention of zero. */
+
+package teyru
+
+class T179 {
+  static void p(String s) { System.out.println(s) }
+
+  static byte[] msg(int n) {
+    String alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    byte[] out = new byte[n]
+    for (int i = 0 : i < n : i++) {
+      out[i] = (byte) alpha.charAt(i % 62)
+    }
+    return out
+  }
+
+  public static void main(String[] args) {
+    // ---------- the empty message is one, not zero ----------
+    Adler32 a = new Adler32()
+    p("empty " + a.getValue())
+
+    // ---------- one byte at a time, and update(int) takes the low eight bits ----------
+    int[] one = { 0x00, 0x01, 0x61, 0x7f, 0x80, 0xff }
+    for (int i = 0 : i < one.length : i++) {
+      Adler32 d = new Adler32()
+      d.update(one[i])
+      p("byte " + one[i] + " " + d.getValue())
+    }
+    Adler32 e = new Adler32()
+    e.update(0x161)
+    p("int 0x161 " + e.getValue())
+    Adler32 f = new Adler32()
+    f.update(-1)
+    p("int -1 " + f.getValue())
+    Adler32 g = new Adler32()
+    g.update(0x100)
+    p("int 0x100 " + g.getValue())
+
+    // ---------- the standard check value ----------
+    Adler32 h = new Adler32()
+    h.update("123456789".getBytes())
+    p("check 123456789 " + h.getValue())
+
+    // ---------- a sentence, whole, byte at a time, in slices, by interface ----------
+    byte[] fox = "The quick brown fox jumps over the lazy dog".getBytes()
+    Adler32 i = new Adler32()
+    i.update(fox)
+    p("fox " + i.getValue())
+    Adler32 j = new Adler32()
+    for (int k = 0 : k < fox.length : k++) {
+      j.update(fox[k])
+    }
+    p("fox bytes " + j.getValue())
+    Adler32 k2 = new Adler32()
+    k2.update(fox, 4, 5)
+    p("fox slice " + k2.getValue())
+    Checksum cs = new Adler32()
+    cs.update(fox)
+    p("fox interface " + cs.getValue())
+    Checksum cs2 = new Adler32()
+    cs2.update(fox, 4, 5)
+    p("fox interface slice " + cs2.getValue())
+
+    // ---------- the block boundaries of the deferred modulo ----------
+    for (int n = 5550 : n <= 5554 : n++) {
+      Adler32 q = new Adler32()
+      q.update(msg(n))
+      p("len " + n + " " + q.getValue())
+    }
+    for (int n = 11100 : n <= 11104 : n++) {
+      Adler32 q = new Adler32()
+      q.update(msg(n))
+      p("len " + n + " " + q.getValue())
+    }
+    for (int n = 5551 : n <= 5553 : n++) {
+      Adler32 q = new Adler32()
+      byte[] m = msg(n)
+      for (int k = 0 : k < m.length : k++) {
+        q.update(m[k])
+      }
+      p("bytes len " + n + " " + q.getValue())
+    }
+    Adler32 big = new Adler32()
+    big.update(msg(100000))
+    p("100000 " + big.getValue())
+
+    // ---------- reset, and reading twice ----------
+    Adler32 r = new Adler32()
+    r.update("abc".getBytes())
+    long first = r.getValue()
+    long again = r.getValue()
+    p("read twice " + first + " " + again)
+    r.reset()
+    p("after reset " + r.getValue())
+    r.update("abc".getBytes())
+    p("reused " + r.getValue())
+    r.update("abc".getBytes())
+    p("appended " + r.getValue())
+
+    // ---------- the failures ----------
+    byte[] none = null
+    try {
+      new Adler32().update(none, 0, 0)
+      p("null accepted")
+    } catch (NullPointerException ex) {
+      p("null output throws NullPointerException")
+    }
+    try {
+      new Adler32().update("abc".getBytes(), -1, 2)
+      p("signed range accepted")
+    } catch (ArrayIndexOutOfBoundsException ex) {
+      p("signed range " + ex.getMessage())
+    }
+    try {
+      new Adler32().update("abc".getBytes(), 2, 3)
+      p("over range accepted")
+    } catch (ArrayIndexOutOfBoundsException ex) {
+      p("over range " + ex.getMessage())
+    }
+    Adler32 edge = new Adler32()
+    edge.update("abc".getBytes(), 3, 0)
+    edge.update("abc".getBytes(), 0, 0)
+    p("empty ranges " + edge.getValue())
+  }
+}

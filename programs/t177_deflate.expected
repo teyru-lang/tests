@@ -1,0 +1,186 @@
+round trip EMPTY lvl=0 raw=true true
+round trip EMPTY lvl=0 raw=false true
+round trip EMPTY lvl=1 raw=true true
+round trip EMPTY lvl=1 raw=false true
+round trip EMPTY lvl=6 raw=true true
+round trip EMPTY lvl=6 raw=false true
+round trip EMPTY lvl=9 raw=true true
+round trip EMPTY lvl=9 raw=false true
+round trip ONE lvl=0 raw=true true
+round trip ONE lvl=0 raw=false true
+round trip ONE lvl=1 raw=true true
+round trip ONE lvl=1 raw=false true
+round trip ONE lvl=6 raw=true true
+round trip ONE lvl=6 raw=false true
+round trip ONE lvl=9 raw=true true
+round trip ONE lvl=9 raw=false true
+round trip HELLO lvl=0 raw=true true
+round trip HELLO lvl=0 raw=false true
+round trip HELLO lvl=1 raw=true true
+round trip HELLO lvl=1 raw=false true
+round trip HELLO lvl=6 raw=true true
+round trip HELLO lvl=6 raw=false true
+round trip HELLO lvl=9 raw=true true
+round trip HELLO lvl=9 raw=false true
+round trip TEXT lvl=0 raw=true true
+round trip TEXT lvl=0 raw=false true
+round trip TEXT lvl=1 raw=true true
+round trip TEXT lvl=1 raw=false true
+round trip TEXT lvl=6 raw=true true
+round trip TEXT lvl=6 raw=false true
+round trip TEXT lvl=9 raw=true true
+round trip TEXT lvl=9 raw=false true
+round trip COMP lvl=0 raw=true true
+round trip COMP lvl=0 raw=false true
+round trip COMP lvl=1 raw=true true
+round trip COMP lvl=1 raw=false true
+round trip COMP lvl=6 raw=true true
+round trip COMP lvl=6 raw=false true
+round trip COMP lvl=9 raw=true true
+round trip COMP lvl=9 raw=false true
+round trip RAND lvl=0 raw=true true
+round trip RAND lvl=0 raw=false true
+round trip RAND lvl=1 raw=true true
+round trip RAND lvl=1 raw=false true
+round trip RAND lvl=6 raw=true true
+round trip RAND lvl=6 raw=false true
+round trip RAND lvl=9 raw=true true
+round trip RAND lvl=9 raw=false true
+java blob  EMPTY lvl=0 raw=true true crc=0
+teyru blob EMPTY lvl=0 raw=true true crc=0
+java blob  EMPTY lvl=0 raw=false true crc=0
+teyru blob EMPTY lvl=0 raw=false true crc=0
+java blob  EMPTY lvl=1 raw=true true crc=0
+teyru blob EMPTY lvl=1 raw=true true crc=0
+java blob  EMPTY lvl=1 raw=false true crc=0
+teyru blob EMPTY lvl=1 raw=false true crc=0
+java blob  EMPTY lvl=6 raw=true true crc=0
+teyru blob EMPTY lvl=6 raw=true true crc=0
+java blob  EMPTY lvl=6 raw=false true crc=0
+teyru blob EMPTY lvl=6 raw=false true crc=0
+java blob  EMPTY lvl=9 raw=true true crc=0
+teyru blob EMPTY lvl=9 raw=true true crc=0
+java blob  EMPTY lvl=9 raw=false true crc=0
+teyru blob EMPTY lvl=9 raw=false true crc=0
+java blob  ONE lvl=0 raw=true true crc=3554254475
+teyru blob ONE lvl=0 raw=true true crc=3554254475
+java blob  ONE lvl=0 raw=false true crc=3554254475
+teyru blob ONE lvl=0 raw=false true crc=3554254475
+java blob  ONE lvl=1 raw=true true crc=3554254475
+teyru blob ONE lvl=1 raw=true true crc=3554254475
+java blob  ONE lvl=1 raw=false true crc=3554254475
+teyru blob ONE lvl=1 raw=false true crc=3554254475
+java blob  ONE lvl=6 raw=true true crc=3554254475
+teyru blob ONE lvl=6 raw=true true crc=3554254475
+java blob  ONE lvl=6 raw=false true crc=3554254475
+teyru blob ONE lvl=6 raw=false true crc=3554254475
+java blob  ONE lvl=9 raw=true true crc=3554254475
+teyru blob ONE lvl=9 raw=true true crc=3554254475
+java blob  ONE lvl=9 raw=false true crc=3554254475
+teyru blob ONE lvl=9 raw=false true crc=3554254475
+java blob  HELLO lvl=0 raw=true true crc=222957957
+teyru blob HELLO lvl=0 raw=true true crc=222957957
+java blob  HELLO lvl=0 raw=false true crc=222957957
+teyru blob HELLO lvl=0 raw=false true crc=222957957
+java blob  HELLO lvl=1 raw=true true crc=222957957
+teyru blob HELLO lvl=1 raw=true true crc=222957957
+java blob  HELLO lvl=1 raw=false true crc=222957957
+teyru blob HELLO lvl=1 raw=false true crc=222957957
+java blob  HELLO lvl=6 raw=true true crc=222957957
+teyru blob HELLO lvl=6 raw=true true crc=222957957
+java blob  HELLO lvl=6 raw=false true crc=222957957
+teyru blob HELLO lvl=6 raw=false true crc=222957957
+java blob  HELLO lvl=9 raw=true true crc=222957957
+teyru blob HELLO lvl=9 raw=true true crc=222957957
+java blob  HELLO lvl=9 raw=false true crc=222957957
+teyru blob HELLO lvl=9 raw=false true crc=222957957
+java blob  TEXT lvl=1 raw=true true crc=3963146669
+teyru blob TEXT lvl=1 raw=true true crc=3963146669
+java blob  TEXT lvl=1 raw=false true crc=3963146669
+teyru blob TEXT lvl=1 raw=false true crc=3963146669
+java blob  TEXT lvl=6 raw=true true crc=3963146669
+teyru blob TEXT lvl=6 raw=true true crc=3963146669
+java blob  TEXT lvl=6 raw=false true crc=3963146669
+teyru blob TEXT lvl=6 raw=false true crc=3963146669
+java blob  TEXT lvl=9 raw=true true crc=3963146669
+teyru blob TEXT lvl=9 raw=true true crc=3963146669
+java blob  TEXT lvl=9 raw=false true crc=3963146669
+teyru blob TEXT lvl=9 raw=false true crc=3963146669
+java blob  COMP lvl=1 raw=true true crc=2833226495
+teyru blob COMP lvl=1 raw=true true crc=2833226495
+java blob  COMP lvl=1 raw=false true crc=2833226495
+teyru blob COMP lvl=1 raw=false true crc=2833226495
+java blob  COMP lvl=6 raw=true true crc=2833226495
+teyru blob COMP lvl=6 raw=true true crc=2833226495
+java blob  COMP lvl=6 raw=false true crc=2833226495
+teyru blob COMP lvl=6 raw=false true crc=2833226495
+java blob  COMP lvl=9 raw=true true crc=2833226495
+teyru blob COMP lvl=9 raw=true true crc=2833226495
+java blob  COMP lvl=9 raw=false true crc=2833226495
+teyru blob COMP lvl=9 raw=false true crc=2833226495
+this deflater reproduces its blob EMPTY lvl=0 raw=true true
+this deflater reproduces its blob EMPTY lvl=0 raw=false true
+this deflater reproduces its blob EMPTY lvl=1 raw=true true
+this deflater reproduces its blob EMPTY lvl=1 raw=false true
+this deflater reproduces its blob EMPTY lvl=6 raw=true true
+this deflater reproduces its blob EMPTY lvl=6 raw=false true
+this deflater reproduces its blob EMPTY lvl=9 raw=true true
+this deflater reproduces its blob EMPTY lvl=9 raw=false true
+this deflater reproduces its blob ONE lvl=0 raw=true true
+this deflater reproduces its blob ONE lvl=0 raw=false true
+this deflater reproduces its blob ONE lvl=1 raw=true true
+this deflater reproduces its blob ONE lvl=1 raw=false true
+this deflater reproduces its blob ONE lvl=6 raw=true true
+this deflater reproduces its blob ONE lvl=6 raw=false true
+this deflater reproduces its blob ONE lvl=9 raw=true true
+this deflater reproduces its blob ONE lvl=9 raw=false true
+this deflater reproduces its blob HELLO lvl=0 raw=true true
+this deflater reproduces its blob HELLO lvl=0 raw=false true
+this deflater reproduces its blob HELLO lvl=1 raw=true true
+this deflater reproduces its blob HELLO lvl=1 raw=false true
+this deflater reproduces its blob HELLO lvl=6 raw=true true
+this deflater reproduces its blob HELLO lvl=6 raw=false true
+this deflater reproduces its blob HELLO lvl=9 raw=true true
+this deflater reproduces its blob HELLO lvl=9 raw=false true
+this deflater reproduces its blob TEXT lvl=1 raw=true true
+this deflater reproduces its blob TEXT lvl=1 raw=false true
+this deflater reproduces its blob TEXT lvl=6 raw=true true
+this deflater reproduces its blob TEXT lvl=6 raw=false true
+this deflater reproduces its blob TEXT lvl=9 raw=true true
+this deflater reproduces its blob TEXT lvl=9 raw=false true
+this deflater reproduces its blob COMP lvl=1 raw=true true
+this deflater reproduces its blob COMP lvl=1 raw=false true
+this deflater reproduces its blob COMP lvl=6 raw=true true
+this deflater reproduces its blob COMP lvl=6 raw=false true
+this deflater reproduces its blob COMP lvl=9 raw=true true
+this deflater reproduces its blob COMP lvl=9 raw=false true
+level 0 raw crc  EMPTY 1164233810
+level 0 zlib crc EMPTY 2390237681
+input crc        EMPTY 0
+level 0 raw crc  ONE 1784383768
+level 0 zlib crc ONE 1048474491
+input crc        ONE 3554254475
+level 0 raw crc  HELLO 383032883
+level 0 zlib crc HELLO 231959554
+input crc        HELLO 222957957
+level 0 raw crc  TEXT 149236928
+level 0 zlib crc TEXT 1942338120
+input crc        TEXT 3963146669
+level 0 raw crc  COMP 1339965606
+level 0 zlib crc COMP 3980868969
+input crc        COMP 2833226495
+level 0 raw crc  RAND 2693974436
+level 0 zlib crc RAND 489012017
+input crc        RAND 1306716187
+bad header DataFormatException: incorrect header check
+bad method DataFormatException: unknown compression method
+bad window DataFormatException: invalid window size
+block type 3 DataFormatException: invalid block type
+stored nlen DataFormatException: invalid stored block lengths
+bad adler DataFormatException: incorrect data check
+truncated ok finished=false
+distance code 30 DataFormatException: invalid distance code
+distance too far back DataFormatException: invalid distance too far back
+too many symbols DataFormatException: too many length or distance symbols
+oversubscribed lengths DataFormatException: invalid code lengths set
+done

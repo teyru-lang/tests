@@ -1,0 +1,272 @@
+
+/* java.util.zip.GZIPOutputStream and GZIPInputStream, exercised against the
+   JDK. This is the same program as the javac 21 program in
+   t178_gzip.java.ref, whose output is t178_gzip.expected.
+
+   gzip is deflate with something around it, and the something is where a
+   hand-written implementation goes wrong: a ten-byte header whose fifth byte is
+   a set of optional fields, a CRC-32 and a length modulo 2^32 at the end, and
+   the rule that a stream of two files is one stream. Every one of those is
+   pinned here.
+
+   Both directions, as in t177 and for the same reason: each program carries one
+   stream the JDK's GZIPOutputStream wrote and one this library's, and both
+   inflate both. The header and the trailer this library writes are byte for
+   byte the JDK's, which the two blobs of the small inputs show directly --
+   `this writer reproduces its blob` asks each side whether its own writer still
+   produces the recorded bytes, and `the two writers agree` is the statement
+   that the two recordings are the same bytes for those inputs.
+
+   The failures are the ones javac raises for, matched on class and on message:
+   a stream that is not gzip at all, a compression method that is not deflate,
+   a trailer whose CRC-32 or length disagrees with what was decompressed, and
+   the three ways a stream can end early -- inside the header, inside the
+   compressed data, and inside the trailer. The last three are all EOFException,
+   but only the middle one carries a message, because that is where the JDK's
+   inflater has a message to give and its byte reader does not.
+
+   A concatenation of two gzip streams inflates to both of them, which is what
+   RFC 1952's "a gzip file may consist of a series of members" means and what
+   the JDK does. A stream that ends after the last member's trailer is not
+   corrupt: the reader tries to read another header, finds the end, and stops. */
+
+package teyru
+
+class T178 {
+  static void p(String s) { System.out.println(s) }
+
+  static final String[] JAVA_GZ = {
+  "1f8b08000000000000ff03000000000000000000",
+  "1f8b08000000000000ff7304008b9ed9d301000000",
+  "1f8b08000000000000ffcb48cdc9c95728cf2fca49010085114a0d0b000000",
+  "1f8b08000000000000ffedca470180301045412b5f016a628092d0d910084d3d98e0f6ce33aef35a735f8faa929d8b825d1af21c37d9e193f68fa7f2b9d5585bc891c96432994c2693c96432994cfe23bfadd138eca00f0000",
+  "" +
+    "1f8b08000000000000ffeddb636310080080e16cdb2ddbae556bd5b25bb56cdb5a58d6b26d2d2f77c83c64e38c3ad45deeaefb11ef7d7cffc1f3079e18b1e3254c923c55da0c99b3e5c89daf6091e2a5ca5608ac1a5cb376bd86" +
+    "4d9ab76cddae6397eebdfa0e183c6ce4987113274f9b3967dec225cb57adddb079dbceddfba20f1ffb24669cf88992a6489d2e6396ec39f3e42f54b444e972152b07550fa953bf51d3d0566dda77eadaa377bf8143868f1a3b3e" +
+    "62caf45991f3172d5db17addc62ddba3f6ec3f78e4f8a7b1e226489c2c659af499b206e4ca5ba070b19265ca57aa52ad46adba0d1a376b11d6b643e76e3dfbf41f3474c4e8f00993a6ce983d77c1e2652bd7acdfb475c7aebd07" +
+    "0e1d3df119e47f0ef92721ff14e49f86fc33907f16f2cf41fe79c8bf00f91721ff12e45f86fc2b90ff05e47f09f95f41fed7907f15f2af41fe75c8bf01f93721ff16e4df86fc3b907f17f2ef41fe7dc87f00f90f21ff11e43f86" +
+    "fc2790ff0de47f0bf9df41fef790ff03e4ff08f93f41fecf90ff0be4ff0af94f21ff19e4ff06f9bf43fe1f90ff27e43f87fc1790ff17e4ff0df92f21ff15e4bf86fc3790ff16f2df41fe7bc8ff00f9ff40febf90ff11f263407e" +
+    "4cc88f05f9b1213f0ee4c785fc78901f1ff213407e42c84f04f989213f09e42785fc64909f1cf253407e4ac84f05f9a9213f0de4a785fc74909f1ef233407e46c8cf04f999213f0be46785fc6c909f1df203203f07e4e784fc5c" +
+    "909f1bf2f3407e5ec8cf07f9f921bf00e41784fc42905f18f28b407e51c82f06f9c521bf04e49784fc52905f1af2cb407e59c82f07f9e521bf02e45784fc4a901f08f99521bf0ae45785fc20c8af06f9c1905f1df26b407e4dc8" +
+    "0f81fc5a905f1bf2eb407e5dc8af07f9f521bf01e43784fc4690df18f29b407e53c86f06f9cd213f14f25b407e4bc86f05f96190df1af2db407e5bc86f07f9ed21bf03e47784fc4e90df19f2bb407e57c8ef06f9dd21bf07e4f7" +
+    "84fc5e90df1bf2fb407e5fc8ef07f9fd217f00e40f84fc41903f18f28740fe50c81f06f9c3217f04e48f84fc51903f1af2c740fe58c80f87fc71903f1ef22740fe44c88f80fc49903f19f2a740fe54c89f06f9d3217f06e4cf84" +
+    "fc59903f1bf2e7407e24e4cf85fc79903f1ff21740fe42c85f04f98b217f09e42f85fc6590bf1cf25740fe4ac85f05f9ab217f0de4af85fc7590bf1ef23740fe46c8df04f99b217f0be46f85fc6d90bf1df27740fe4ec88f82fc" +
+    "5d90bf1bf2f740fe5ec8df07f9fb21ff00e44743fe41c83f04f98721ff08e41f85fc63907f1cf24f40beffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfff" +
+    "effff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfff" +
+    "effff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfff" +
+    "effff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfff" +
+    "effff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdffffcbffff0fff9adfa800000100",
+  }
+
+  static final String[] TEYRU_GZ = {
+  "1f8b08000000000000ff03000000000000000000",
+  "1f8b08000000000000ff7304008b9ed9d301000000",
+  "1f8b08000000000000ffcb48cdc9c95728cf2fca49010085114a0d0b000000",
+  "1f8b08000000000000ffedca470180301045412b5f016a3040091d1602a1a94f4ce4f6ce33e5e07484b199557b7b3675f66a0aeb7eca6ee775255eaaff536b7d2132994c2693c96432994c2693c9597204add138eca00f0000",
+  "" +
+    "1f8b08000000000000ffecdbc30118080000c1d8b66ddbb66ddbb66ddbb6ede42eb66ddb368bd8ef76300d4c80c0c14286091f296a8cd8f11226499e2a6d86ccd972e6c95fa86889d2e52a56a95eab6e83c6cd5ab669dfa96b8f" +
+    "defd060e193e6aec84c9d366ce99bf68e98ad5eb366ed9beebbf804182870a1b2172b49871e2274a9a2275ba8c59b2e7ca5ba070b19265ca57aa5aa376bd864d9ab76adba173b79e7dfa0f1a3a62f4b88953a6cf9abb60f1b295" +
+    "6bd66fdaba63f7ff818286081d2e6294e8b1e226489c2c659af499b2e6c89daf6091e2a5ca56a85cad669dfa8d9ab668ddae6397eebdfa0e183c6ce498f193a6ce983d6fe192e5abd66ed8bc6de79ebd90bf0ff2f743fe01c83f" +
+    "08f98720ff30e41f81fca3907f0cf28f43fe09c83f09f9a720ff34e49f81fcb3907f0ef2cf43fe05c8bf08f99720ff32e45f81fcab907f0df2af43fe0dc8bf09f9b720ff36e4df81fcbb907f0ff2ef43fe03c87f08f98f20ff31" +
+    "e43f81fca790ff0cf29f43fe0bc87f09f9af20ff35e4bf81fcb790ff0ef2df43fe07c8ff08f99f20ff33e47f81fcaf90ff0df2bf43fe0fc8ff09f9bf20ff37e4ff81fcbf901f00f203427e20c80f0cf941203f28e40783fce090" +
+    "1f02f243427e28c80f0df961203f2ce48783fcf0901f01f223427e24c88f0cf951203f2ae44783fce8901f03f263427e2cc88f0df971203f2ee4c783fcf8909f00f213427e22c84f0cf949203f29e42783fce4909f02f253427e" +
+    "2ac84f0df969203f2de4a783fcf4909f01f233427e26c8cf0cf959203f2be46783fcec909f03f273427e2ec8cf0df979203f2fe4e783fcfc905f00f20b427e21c82f0cf94520bf28e41783fce2905f02f24b427e29c82f0df965" +
+    "20bf2ce49783fcf2905f01f22b427e25c8af0cf95520bf2ae45783fcea905f03f26b427e2dc8af0df97520bf2ee4d783fcfa90df00f21b427e23c86f0cf94d20bf29e43783fce690df02f25b427e2bc86f0df96d20bf2de4b783" +
+    "fcf690df01f23b427e27c8ef0cf95d20bf2be47783fcee90df03f27b427e2fc8ef0df97d20bf2fe4f783fcfe903f00f20742fe20c81f0cf943207f28e40f83fce1903f02f24742fe28c81f0df963207f2ce48f83fcf1903f01f2" +
+    "2742fe24c89f0cf953207f2ae44f83fce9903f03f26742fe2cc89f0df973207f2ee4cf83fcf990bf00f21742fe22c85f0cf94b207f29e42f83fce590bf02f25742fe2ac85f0df96b207f2de4af83fcf590bf01f23742fe26c8df" +
+    "0cf95b207f2be46f83fced90bf03f27742fe2ec8df0df97bfcfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbf" +
+    "ffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbf" +
+    "ffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbf" +
+    "ffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbfffdfffeffff7fffbfffdfffe7fffbf" +
+    "ffdfffeffff7fffbfffdfffe7fffbfffdfffefffffb7c1b0ff1f00ff9adfa800000100",
+  }
+
+  static long crc32(byte[] b) {
+    CRC32 c = new CRC32()
+    c.update(b)
+    return c.getValue()
+  }
+
+  static byte[] unhex(String s) {
+    byte[] out = new byte[s.length() / 2]
+    for (int i = 0 : i < out.length : i++) {
+      out[i] = (byte) Integer.parseInt(s.substring(i * 2, i * 2 + 2), 16)
+    }
+    return out
+  }
+
+  static byte[] text(int n) {
+    String unit = "The quick brown fox jumps over the lazy dog. "
+    byte[] out = new byte[n]
+    for (int i = 0 : i < n : i++) {
+      out[i] = (byte) unit.charAt(i % unit.length())
+    }
+    return out
+  }
+
+  static byte[] comp(int n) {
+    byte[] out = new byte[n]
+    for (int i = 0 : i < n : i++) {
+      out[i] = (byte) ((i % 64) * 3 + (i / 64))
+    }
+    return out
+  }
+
+  static byte[] inp(int i) {
+    if (i == 0) { return new byte[0] }
+    if (i == 1) { return "A".getBytes() }
+    if (i == 2) { return "hello world".getBytes() }
+    if (i == 3) { return text(4000) }
+    return comp(65536)
+  }
+
+  static byte[] gzip(byte[] in) {
+    ByteArrayOutputStream bo = new ByteArrayOutputStream()
+    GZIPOutputStream g = new GZIPOutputStream(bo, 512)
+    g.write(in, 0, in.length)
+    g.close()
+    return bo.toByteArray()
+  }
+
+  static byte[] gunzip(byte[] comp) {
+    GZIPInputStream in = new GZIPInputStream(new ByteArrayInputStream(comp), 512)
+    ByteArrayOutputStream bo = new ByteArrayOutputStream()
+    byte[] buf = new byte[4096]
+    while (true) {
+      int n = in.read(buf, 0, buf.length)
+      if (n <= 0) { break }
+      bo.write(buf, 0, n)
+    }
+    return bo.toByteArray()
+  }
+
+  static String kind(Throwable e) {
+    if (e instanceof ZipException) { return "ZipException" }
+    if (e instanceof EOFException) { return "EOFException" }
+    if (e instanceof IOException) { return "IOException" }
+    return e.getClass().getName()
+  }
+
+  static void read(String label, byte[] data) {
+    try {
+      byte[] got = gunzip(data)
+      p(label + " ok len=" + got.length + " crc=" + crc32(got))
+    } catch (Throwable e) {
+      p(label + " " + kind(e) + ": " + e.getMessage())
+    }
+  }
+
+  /* A gzip header with one optional field in it: the ten bytes, the field, then
+     the compressed data. The header CRC is the low sixteen bits of the CRC-32
+     of everything before it, which is what the field means. */
+  static byte[] headed(byte[] gz, int flg, byte[] field) {
+    ByteArrayOutputStream bo = new ByteArrayOutputStream()
+    byte[] h = new byte[10]
+    System.arraycopy(gz, 0, h, 0, 10)
+    h[3] = (byte) flg
+    bo.write(h, 0, 10)
+    if (field != null) {
+      bo.write(field, 0, field.length)
+    }
+    int at = 10
+    if ((flg & 0x02) != 0) {
+      CRC32 c = new CRC32()
+      byte[] sofar = bo.toByteArray()
+      c.update(sofar)
+      long v = c.getValue()
+      bo.write((int) (v & 0xFF))
+      bo.write((int) ((v >>> 8) & 0xFF))
+    }
+    bo.write(gz, at, gz.length - at)
+    return bo.toByteArray()
+  }
+
+  public static void main(String[] args) {
+    String[] names = { "EMPTY", "ONE", "HELLO", "TEXT", "COMP" }
+
+    // ---------- this library's own round trips ----------
+    for (int i = 0 : i < 5 : i++) {
+      byte[] in = inp(i)
+      byte[] z = gzip(in)
+      byte[] back = gunzip(z)
+      p("round trip " + names[i] + " " + java.util.Arrays.equals(in, back) + " crc=" + crc32(back))
+    }
+
+    // ---------- the two blobs, each read by both programs ----------
+    for (int i = 0 : i < 5 : i++) {
+      byte[] jb = gunzip(unhex(JAVA_GZ[i]))
+      p("java gz blob  " + names[i] + " " + java.util.Arrays.equals(inp(i), jb) + " crc=" + crc32(jb))
+      byte[] tb = gunzip(unhex(TEYRU_GZ[i]))
+      p("teyru gz blob " + names[i] + " " + java.util.Arrays.equals(inp(i), tb) + " crc=" + crc32(tb))
+    }
+
+    // ---------- the recorded bytes are what this writer still writes ----------
+    for (int i = 0 : i < 5 : i++) {
+      byte[] now = gzip(inp(i))
+      p("this writer reproduces its blob " + names[i] + " " + java.util.Arrays.equals(unhex(TEYRU_GZ[i]), now))
+      p("the two writers agree on " + names[i] + " " + java.util.Arrays.equals(unhex(JAVA_GZ[i]), unhex(TEYRU_GZ[i])))
+      p("header " + names[i] + " " + unhex(TEYRU_GZ[i])[0] + " " + unhex(TEYRU_GZ[i])[1] + " " + unhex(TEYRU_GZ[i])[2] +
+        " " + unhex(TEYRU_GZ[i])[9])
+    }
+
+    // ---------- the failures ----------
+    byte[] good = gzip(text(4000))
+    read("good", good)
+    read("empty input", new byte[0])
+    read("two bytes", new byte[]{ 0x1F, (byte) 0x8B })
+    byte[] magic = good.clone()
+    magic[0] = (byte) 0x1E
+    read("bad magic", magic)
+    byte[] method = good.clone()
+    method[2] = (byte) 9
+    read("bad method", method)
+    byte[] crc = good.clone()
+    crc[crc.length - 8] = (byte) (crc[crc.length - 8] ^ 1)
+    read("bad crc", crc)
+    byte[] size = good.clone()
+    size[size.length - 1] = (byte) (size[size.length - 1] ^ 1)
+    read("bad length", size)
+    read("truncated header", java.util.Arrays.copyOf(good, 8))
+    read("truncated body", java.util.Arrays.copyOf(good, good.length / 2))
+    read("truncated trailer", java.util.Arrays.copyOf(good, good.length - 4))
+    read("missing trailer", java.util.Arrays.copyOf(good, good.length - 8))
+
+    // ---------- the optional header fields ----------
+    read("fextra", headed(good, 0x04, new byte[]{ 2, 0, 7, 8 }))
+    read("fname", headed(good, 0x08, "name.txt\u0000".getBytes()))
+    read("fcomment", headed(good, 0x10, "a comment\u0000".getBytes()))
+    read("fhcrc", headed(good, 0x02, null))
+
+    // ---------- two members, and a member that is not the first ----------
+    ByteArrayOutputStream two = new ByteArrayOutputStream()
+    two.write(good, 0, good.length)
+    two.write(good, 0, good.length)
+    read("two members", two.toByteArray())
+
+    // ---------- writing after finish ----------
+    ByteArrayOutputStream bo = new ByteArrayOutputStream()
+    GZIPOutputStream g = new GZIPOutputStream(bo)
+    g.write("abc".getBytes(), 0, 3)
+    g.finish()
+    int len = bo.size()
+    g.close()
+    p("finish wrote the stream " + (len > 20))
+    try {
+      g.write("def".getBytes(), 0, 3)
+      p("write after finish accepted")
+    } catch (IOException e) {
+      p("write after finish IOException: " + e.getMessage())
+    }
+    // ---------- a stream that is flushed as it is written ----------
+    ByteArrayOutputStream fb = new ByteArrayOutputStream()
+    GZIPOutputStream fg = new GZIPOutputStream(fb, 512, true)
+    for (int i = 0 : i < 20 : i++) {
+      fg.write(text(500), 0, 500)
+      fg.flush()
+    }
+    fg.close()
+    byte[] flushed = gunzip(fb.toByteArray())
+    p("synced flush " + flushed.length + " " + crc32(flushed))
+    p("done")
+  }
+}

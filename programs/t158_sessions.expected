@@ -1,5 +1,5 @@
 first=count=1 new=true
-issued=true httpOnly=58 count=1
+issued=true httpOnly=true count=1
 anonymous=no session
 second=count=2 new=false
 show=count=2 names=1

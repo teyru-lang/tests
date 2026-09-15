@@ -1,0 +1,50 @@
+round trip EMPTY true crc=0
+round trip ONE true crc=3554254475
+round trip HELLO true crc=222957957
+round trip TEXT true crc=3963146669
+round trip COMP true crc=2833226495
+java gz blob  EMPTY true crc=0
+teyru gz blob EMPTY true crc=0
+java gz blob  ONE true crc=3554254475
+teyru gz blob ONE true crc=3554254475
+java gz blob  HELLO true crc=222957957
+teyru gz blob HELLO true crc=222957957
+java gz blob  TEXT true crc=3963146669
+teyru gz blob TEXT true crc=3963146669
+java gz blob  COMP true crc=2833226495
+teyru gz blob COMP true crc=2833226495
+this writer reproduces its blob EMPTY true
+the two writers agree on EMPTY true
+header EMPTY 31 -117 8 -1
+this writer reproduces its blob ONE true
+the two writers agree on ONE true
+header ONE 31 -117 8 -1
+this writer reproduces its blob HELLO true
+the two writers agree on HELLO true
+header HELLO 31 -117 8 -1
+this writer reproduces its blob TEXT true
+the two writers agree on TEXT false
+header TEXT 31 -117 8 -1
+this writer reproduces its blob COMP true
+the two writers agree on COMP false
+header COMP 31 -117 8 -1
+good ok len=4000 crc=3963146669
+empty input EOFException: null
+two bytes EOFException: null
+bad magic ZipException: Not in GZIP format
+bad method ZipException: Unsupported compression method
+bad crc ZipException: Corrupt GZIP trailer
+bad length ZipException: Corrupt GZIP trailer
+truncated header EOFException: null
+truncated body EOFException: Unexpected end of ZLIB input stream
+truncated trailer EOFException: null
+missing trailer EOFException: null
+fextra ok len=4000 crc=3963146669
+fname ok len=4000 crc=3963146669
+fcomment ok len=4000 crc=3963146669
+fhcrc ok len=4000 crc=3963146669
+two members ok len=8000 crc=1225941831
+finish wrote the stream true
+write after finish IOException: write beyond end of stream
+synced flush 10000 2569173129
+done
