@@ -1,0 +1,530 @@
+/* java.util.zip's ZipOutputStream and ZipInputStream, exercised against the
+   JDK in both directions. This is the same program as the javac 21 program in
+   t185_zip_archive.java.ref, whose output is t185_zip_archive.expected; the one
+   difference between the two sources is MY_ZIP, which names the archive each
+   one's own writer produces.
+
+   Two things are being checked, and they are different things.
+
+   The first is that an archive this library writes is one it can read. That is
+   the `own` section, and on its own it proves only self-consistency: a writer
+   and a reader that agree on the wrong byte order agree with each other.
+
+   The second is the format, and that needs the JDK. Two archives for the same
+   entry list are carried as data -- A JAVA_ZIP the JDK's ZipOutputStream wrote
+   and a TEYRU_ZIP this library's -- and both programs read both, so a run of
+   the Java program reads a Teyru archive and a run of this one reads a javac
+   archive. A third archive, STORED_ZIP, is the one both writers produce byte
+   for byte, and each program re-derives it at run time rather than trusting the
+   recording: STORED entries carry their size, compressed size and CRC-32 in the
+   local header, so none of them is the compressor's decision and a disagreement
+   there is a disagreement about the container. The DEFLATED archive is not
+   compared that way and cannot be: two deflaters may pick different matches and
+   both be right (lib/44_zip.teyru says where equality holds and where it does
+   not), which is also why no line below prints a compressed size for an archive
+   this program wrote.
+
+   The failures are the ones javac raises for, matched on class and on message:
+   the four ways an archive can be malformed enough to refuse, the three flag
+   bits that matter, a descriptor that disagrees with the data it describes, and
+   the writer's own refusals -- a duplicate name, a STORED entry without its
+   sizes, a write past the end of one, a DEFLATED entry whose caller promised
+   the wrong numbers. The class names are printed through kind(), which names
+   the JDK's classes and this library's by the same words, because
+   java.util.zip.ZipException and teyru.ZipException are two names for what the
+   program means. */
+
+package teyru
+
+class T185 {
+  static void p(String s) { System.out.println(s) }
+
+  static final String[] NAMES = {
+    "empty.txt", "hello.txt", "fox.txt", "utf8/檔案名稱.txt", "note.txt",
+  }
+
+  static byte[] text(int n) {
+    String unit = "The quick brown fox jumps over the lazy dog. "
+    byte[] out = new byte[n]
+    for (int i = 0 : i < n : i++) {
+      out[i] = (byte) unit.charAt(i % unit.length())
+    }
+    return out
+  }
+
+  static byte[] bin(int n) {
+    byte[] out = new byte[n]
+    for (int i = 0 : i < n : i++) {
+      out[i] = (byte) i
+    }
+    return out
+  }
+
+  // The bytes of entry i, the same in both programs.
+  static byte[] body(int i) {
+    if (i == 0) { return new byte[0] }
+    if (i == 1) { return "hello world\n".getBytes() }
+    if (i == 2) { return text(4000) }
+    if (i == 3) { return "Teyru 檔案\n".getBytes() }
+    return "a note\n".getBytes()
+  }
+
+  static long crc32(byte[] b) {
+    CRC32 c = new CRC32()
+    c.update(b)
+    return c.getValue()
+  }
+
+  static String hex(byte[] b) {
+    StringBuilder sb = new StringBuilder()
+    for (int i = 0 : i < b.length : i++) {
+      int v = b[i] & 0xFF
+      sb.append("0123456789abcdef".charAt(v >> 4))
+      sb.append("0123456789abcdef".charAt(v & 0xF))
+    }
+    return sb.toString()
+  }
+
+  static byte[] unhex(String s) {
+    byte[] out = new byte[s.length() / 2]
+    for (int i = 0 : i < out.length : i++) {
+      out[i] = (byte) Integer.parseInt(s.substring(i * 2, i * 2 + 2), 16)
+    }
+    return out
+  }
+
+  static String cat(String[] parts) {
+    StringBuilder sb = new StringBuilder()
+    for (int i = 0 : i < parts.length : i++) {
+      sb.append(parts[i])
+    }
+    return sb.toString()
+  }
+
+  // ------------------------------------------------------- the archives
+
+  static final String[] JAVA_ZIP = {
+  "504b0304140008080800a320432a00000000000000000000000009000000656d7074792e7478740300504b07080000000002000000000000",
+  "00504b0304140008080800a320432a0000000000000000000000000900000068656c6c6f2e747874cb48cdc9c95728cf2fca49e10200504b",
+  "07082d3b08af0e0000000c000000504b0304140008080800a320432a00000000000000000000000007000000666f782e747874edca470180",
+  "301045412b5f016a628092d0d910084d3d98e0f6ce33aef35a735f8faa929d8b825d1af21c37d9e193f68fa7f2b9d5585bc891c96432994c",
+  "2693c96432994cfe23bf504b0708add138ec47000000a00f0000504b0304140008080800a320432a00000000000000000000000015000000",
+  "757466382fe6aa94e6a188e5908de7a8b12e7478740b49ad2c2a5578b66acab3851d5c00504b0708f92f77860f0000000d000000504b0304",
+  "140008080800a320432a000000000000000000000000080008006e6f74652e74787499990400616263644b54c8cb2f49e50200504b070810",
+  "05e1590900000007000000504b01021400140008080800a320432a0000000002000000000000000900000000000000000000000000000000",
+  "00656d7074792e747874504b01021400140008080800a320432a2d3b08af0e0000000c000000090000000000000000000000000039000000",
+  "68656c6c6f2e747874504b01021400140008080800a320432aadd138ec47000000a00f000007000000000000000000000000007e00000066",
+  "6f782e747874504b01021400140008080800a320432af92f77860f0000000d0000001500000009000000000000000000fa00000075746638",
+  "2fe6aa94e6a188e5908de7a8b12e7478746120636f6d6d656e74504b01021400140008080800a320432a1005e15909000000070000000800",
+  "0800000000000000000000004c0100006e6f74652e7478749999040061626364504b050600000000050005002d010000930100001200616e",
+  "206172636869766520636f6d6d656e74",
+  }
+
+  static final String[] TEYRU_ZIP = {
+  "504b0304140008080800a320432a00000000000000000000000009000000656d7074792e7478740300504b07080000000002000000000000",
+  "00504b0304140008080800a320432a0000000000000000000000000900000068656c6c6f2e747874cb48cdc9c95728cf2fca49e10200504b",
+  "07082d3b08af0e0000000c000000504b0304140008080800a320432a00000000000000000000000007000000666f782e747874edca470180",
+  "301045412b5f016a3040091d1602a1a94f4ce4f6ce33e5e07484b199557b7b3675f66a0aeb7eca6ee775255eaaff536b7d2132994c2693c9",
+  "6432994c2693c9597204504b0708add138ec47000000a00f0000504b0304140008080800a320432a00000000000000000000000015000000",
+  "757466382fe6aa94e6a188e5908de7a8b12e7478740b49ad2c2a5578b66acab3851d5c00504b0708f92f77860f0000000d000000504b0304",
+  "140008080800a320432a000000000000000000000000080008006e6f74652e74787499990400616263644b54c8cb2f49e50200504b070810",
+  "05e1590900000007000000504b01021400140008080800a320432a0000000002000000000000000900000000000000000000000000000000",
+  "00656d7074792e747874504b01021400140008080800a320432a2d3b08af0e0000000c000000090000000000000000000000000039000000",
+  "68656c6c6f2e747874504b01021400140008080800a320432aadd138ec47000000a00f000007000000000000000000000000007e00000066",
+  "6f782e747874504b01021400140008080800a320432af92f77860f0000000d0000001500000009000000000000000000fa00000075746638",
+  "2fe6aa94e6a188e5908de7a8b12e7478746120636f6d6d656e74504b01021400140008080800a320432a1005e15909000000070000000800",
+  "0800000000000000000000004c0100006e6f74652e7478749999040061626364504b050600000000050005002d010000930100001200616e",
+  "206172636869766520636f6d6d656e74",
+  }
+
+  /* The blob whose bytes THIS program's writer still produces. */
+  static final String[] MY_ZIP = TEYRU_ZIP
+
+  static final String[] STORED_ZIP = {
+  "504b03040a0000080000a320432a738c052900010000000100000700000062696e2e646174000102030405060708090a0b0c0d0e0f101112",
+  "131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a",
+  "4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182",
+  "838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9ba",
+  "bbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2",
+  "f3f4f5f6f7f8f9fafbfcfdfeff504b03040a0000080000a320432a000000000000000000000000040000006469722f504b03040a00000800",
+  "00a320432a00000000000000000000000009000000656d7074792e747874504b03040a0000080000a320432a2d3b08af0c0000000c000000",
+  "0900000068656c6c6f2e74787468656c6c6f20776f726c640a504b01020a000a0000080000a320432a738c05290001000000010000070000",
+  "00000000000000000000000000000062696e2e646174504b01020a000a0000080000a320432a000000000000000000000000040000000000",
+  "0000000000000000250100006469722f504b01020a000a0000080000a320432a000000000000000000000000090000000000000000000000",
+  "000047010000656d7074792e747874504b01020a000a0000080000a320432a2d3b08af0c0000000c00000009000000000000000000000000",
+  "006e01000068656c6c6f2e747874504b05060000000004000400d5000000a10100000e0073746f7265642061726368697665",
+  }
+
+  // ------------------------------------------------------- writing
+
+  /* The entry list both writers produce, with the time of every entry fixed:
+     an archive with a current time in it is an archive whose bytes cannot be
+     recorded, and every size, offset and CRC-32 below is a function of it. */
+  static byte[] archive() {
+    ByteArrayOutputStream bo = new ByteArrayOutputStream()
+    ZipOutputStream z = new ZipOutputStream(bo)
+    z.setComment("an archive comment")
+    for (int i = 0 : i < NAMES.length : i++) {
+      ZipEntry e = new ZipEntry(NAMES[i])
+      e.setTimeLocal(LocalDateTime.of(2001, 2, 3, 4, 5, 6))
+      if (i == 3) {
+        e.setComment("a comment")
+      }
+      if (i == 4) {
+        e.setExtra(new byte[] { (byte) 0x99, (byte) 0x99, 4, 0, 'a', 'b', 'c', 'd' })
+      }
+      z.putNextEntry(e)
+      byte[] b = body(i)
+      z.write(b, 0, b.length)
+      z.closeEntry()
+    }
+    z.close()
+    return bo.toByteArray()
+  }
+
+  /* The archive both libraries write identically: a STORED entry carries its
+     size, its compressed size and its CRC-32 in the local header, so none of
+     them is the compressor's choice and a disagreement here is a disagreement
+     about the container rather than about deflate. */
+  static byte[] stored() {
+    ByteArrayOutputStream bo = new ByteArrayOutputStream()
+    ZipOutputStream z = new ZipOutputStream(bo)
+    z.setComment("stored archive")
+    z.setMethod(ZipOutputStream.STORED)
+    String[] names = { "bin.dat", "dir/", "empty.txt", "hello.txt" }
+    for (int i = 0 : i < names.length : i++) {
+      byte[] b = new byte[0]
+      if (i == 0) { b = bin(256) }
+      if (i == 3) { b = "hello world\n".getBytes() }
+      ZipEntry e = new ZipEntry(names[i])
+      e.setMethod(ZipEntry.STORED)
+      e.setTimeLocal(LocalDateTime.of(2001, 2, 3, 4, 5, 6))
+      e.setSize(b.length)
+      e.setCompressedSize(b.length)
+      e.setCrc(crc32(b))
+      z.putNextEntry(e)
+      z.write(b, 0, b.length)
+      z.closeEntry()
+    }
+    z.close()
+    return bo.toByteArray()
+  }
+
+  // ------------------------------------------------------- reading
+
+  static byte[] drain(ZipInputStream in) {
+    ByteArrayOutputStream bo = new ByteArrayOutputStream()
+    byte[] buf = new byte[512]
+    while (true) {
+      int n = in.read(buf, 0, buf.length)
+      if (n <= 0) {
+        break
+      }
+      bo.write(buf, 0, n)
+    }
+    return bo.toByteArray()
+  }
+
+  /* One line per entry, the same text from both programs. The compressed size is
+     printed only for an archive whose bytes are recorded: two deflaters may
+     legitimately disagree about it, so it is not a number this program may print
+     for an archive it just wrote. */
+  static String describe(ZipEntry e, byte[] data, boolean withCsize) {
+    String s = e.getName() + " m=" + e.getMethod() + " size=" + e.getSize()
+    if (withCsize) {
+      s = s + " csize=" + e.getCompressedSize()
+    }
+    return s + " crc=" + e.getCrc() + " time=" + e.getTimeLocal() +
+      " dir=" + e.isDirectory() +
+      " extra=" + (e.getExtra() == null ? -1 : e.getExtra().length) +
+      " cmt=" + e.getComment() + " data=" + data.length + "/" + crc32(data)
+  }
+
+  static void viaStream(String label, byte[] zip, boolean withCsize) {
+    ZipInputStream in = new ZipInputStream(new ByteArrayInputStream(zip))
+    while (true) {
+      ZipEntry e = in.getNextEntry()
+      if (e == null) {
+        break
+      }
+      p(label + " " + describe(e, drain(in), withCsize))
+    }
+    in.close()
+  }
+
+  /* The JDK's class names and this library's, by the same words: the exceptions
+     the two libraries raise are their own classes, and a test that printed them
+     would be printing the implementation. */
+  static String kind(Throwable e) {
+    if (e instanceof ZipException) {
+      return "ZipException"
+    }
+    if (e instanceof EOFException) {
+      return "EOFException"
+    }
+    if (e instanceof IllegalArgumentException) {
+      return "IllegalArgumentException"
+    }
+    if (e instanceof IllegalStateException) {
+      return "IllegalStateException"
+    }
+    if (e instanceof NullPointerException) {
+      return "NullPointerException"
+    }
+    return "Throwable"
+  }
+
+  /* What a reader did with an archive it had to refuse, as one line: the class
+     and the message, which is where an implementation's own vocabulary shows. */
+  static void read(String label, byte[] zip) {
+    try {
+      viaStream(label, zip, false)
+      p(label + " read to the end")
+    } catch (Throwable e) {
+      p(label + " " + kind(e) + ": " + e.getMessage())
+    }
+  }
+
+  public static void main(String[] args) {
+    // ---------- this library's own round trip ----------
+    viaStream("own", archive(), false)
+
+    // ---------- the recorded archives, each read by both programs ----------
+    byte[] javaZip = unhex(cat(JAVA_ZIP))
+    byte[] teyruZip = unhex(cat(TEYRU_ZIP))
+    viaStream("java", javaZip, true)
+    viaStream("teyru", teyruZip, true)
+    /* The first local header, and the end record with the file comment: every
+       field the two writers agree on is in these bytes. */
+    p("first header " + hex(Arrays.copyOf(javaZip, 30)))
+    p("first header here " + hex(Arrays.copyOf(archive(), 30)))
+    p("end record " + hex(Arrays.copyOfRange(javaZip, javaZip.length - 40, javaZip.length)))
+
+    // ---------- this writer still writes the bytes it recorded ----------
+    p("this writer reproduces its recorded blob " + Arrays.equals(archive(), unhex(cat(MY_ZIP))))
+    p("the two recorded blobs are the same bytes " + Arrays.equals(javaZip, teyruZip))
+
+    // ---------- the archive both writers agree on, byte for byte ----------
+    byte[] st = stored()
+    byte[] stBlob = unhex(cat(STORED_ZIP))
+    p("this writer reproduces the stored archive " + Arrays.equals(st, stBlob))
+    viaStream("stored", stBlob, false)
+
+    // ---------- the entry object ----------
+    ZipEntry e = new ZipEntry("dir/")
+    p("dir entry " + e.isDirectory() + " " + e.toString() + " " + e.getName() +
+      " method=" + e.getMethod() + " size=" + e.getSize() + " csize=" + e.getCompressedSize() +
+      " crc=" + e.getCrc() + " time=" + e.getTime() +
+      " extra=" + e.getExtra() + " comment=" + e.getComment())
+    e.setSize(12)
+    e.setCompressedSize(12)
+    e.setCrc(0xaf083b2dL)
+    e.setTime(981173106000L)
+    p("set time " + e.getTime() + " " + e.getTimeLocal() + " " + (e.getTime() == 981173106000L))
+    ZipEntry copy = new ZipEntry(e)
+    p("copy " + copy.getName() + " " + copy.getSize() + " " + copy.getCrc() + " " +
+      (copy.getTime() == e.getTime()))
+    /* A time before 1980 is NOT printed here. Both libraries write the earliest
+       MS-DOS date for it, 1980-01-01, but the JDK keeps the caller's
+       LocalDateTime beside it and reports that back, where this library reports
+       the field it would write; the note at the top of lib/45_zip_archive.teyru
+       says so. A line that printed the difference would be a line only one
+       implementation could produce. */
+
+    // A name longer than the field that carries it is refused where Java refuses
+    // it, at the constructor.
+    StringBuilder longName = new StringBuilder()
+    for (int i = 0 : i < 70000 : i++) {
+      longName.append('n')
+    }
+    try {
+      new ZipEntry(longName.toString())
+      p("long name accepted")
+    } catch (Throwable x) {
+      p("long name " + kind(x) + ": " + x.getMessage())
+    }
+
+    // ---------- reading what is not an archive ----------
+    read("empty input", new byte[0])
+    read("one byte", new byte[] { 0x50 })
+    read("text", "not a zip file at all".getBytes())
+    read("truncated archive", Arrays.copyOf(javaZip, 200))
+    read("truncated header", Arrays.copyOf(javaZip, 20))
+    read("truncated entry", Arrays.copyOf(javaZip, 100))
+    read("truncated stored", Arrays.copyOf(stBlob, 300))
+
+    /* The first local header's signature, then its general purpose flags: bit 0
+       is encryption, bit 3 says the sizes follow the data, bit 11 says the name
+       is UTF-8. Offsets into the recorded blob, which does not move. */
+    byte[] enc = javaZip.clone()
+    enc[6] = (byte) 0x09
+    read("encrypted", enc)
+
+    byte[] meth = javaZip.clone()
+    meth[8] = 9
+    read("bad method", meth)
+
+    /* The same method with the descriptor bit cleared: now the header is
+       accepted and the failure is at the read. */
+    byte[] methOnly = javaZip.clone()
+    methOnly[6] = 0x00
+    methOnly[8] = 9
+    read("bad method alone", methOnly)
+
+    byte[] crc = javaZip.clone()
+    crc[114] = (byte) (crc[114] ^ 0x01)
+    read("bad descriptor crc", crc)
+
+    byte[] size = javaZip.clone()
+    size[122] = (byte) (size[122] ^ 0x01)
+    read("bad descriptor size", size)
+
+    /* A byte of the first header's MS-DOS date, which both readers carry into
+       the entry they hand back. */
+    byte[] time = javaZip.clone()
+    time[12] = (byte) 0x30
+    read("bad header time", time)
+
+    // ---------- the writer's refusals ----------
+    try {
+      ByteArrayOutputStream bo = new ByteArrayOutputStream()
+      ZipOutputStream z = new ZipOutputStream(bo)
+      z.putNextEntry(new ZipEntry("x"))
+      z.closeEntry()
+      z.putNextEntry(new ZipEntry("x"))
+      p("duplicate accepted")
+    } catch (Throwable x) {
+      p("duplicate " + kind(x) + ": " + x.getMessage())
+    }
+    try {
+      ZipOutputStream z = new ZipOutputStream(new ByteArrayOutputStream())
+      ZipEntry x = new ZipEntry("x")
+      x.setMethod(12)
+      z.putNextEntry(x)
+      p("unsupported method accepted")
+    } catch (Throwable x) {
+      p("unsupported method " + kind(x) + ": " + x.getMessage())
+    }
+    try {
+      ZipOutputStream z = new ZipOutputStream(new ByteArrayOutputStream())
+      z.setMethod(12)
+      p("unsupported default accepted")
+    } catch (Throwable x) {
+      p("unsupported default " + kind(x) + ": " + x.getMessage())
+    }
+    try {
+      ZipOutputStream z = new ZipOutputStream(new ByteArrayOutputStream())
+      ZipEntry x = new ZipEntry("x")
+      x.setMethod(ZipEntry.STORED)
+      x.setSize(0)
+      z.putNextEntry(x)
+      p("stored without crc accepted")
+    } catch (Throwable x) {
+      p("stored without crc " + kind(x) + ": " + x.getMessage())
+    }
+    try {
+      ZipOutputStream z = new ZipOutputStream(new ByteArrayOutputStream())
+      ZipEntry x = new ZipEntry("x")
+      x.setMethod(ZipEntry.STORED)
+      x.setSize(3)
+      x.setCompressedSize(4)
+      x.setCrc(0)
+      z.putNextEntry(x)
+      p("stored size mismatch accepted")
+    } catch (Throwable x) {
+      p("stored size mismatch " + kind(x) + ": " + x.getMessage())
+    }
+    try {
+      ZipOutputStream z = new ZipOutputStream(new ByteArrayOutputStream())
+      ZipEntry x = new ZipEntry("x")
+      x.setMethod(ZipEntry.STORED)
+      x.setSize(2)
+      x.setCompressedSize(2)
+      x.setCrc(crc32("ab".getBytes()))
+      z.putNextEntry(x)
+      z.write("abc".getBytes(), 0, 3)
+      p("stored overrun accepted")
+    } catch (Throwable x) {
+      p("stored overrun " + kind(x) + ": " + x.getMessage())
+    }
+    try {
+      ZipOutputStream z = new ZipOutputStream(new ByteArrayOutputStream())
+      z.write("abc".getBytes(), 0, 3)
+      p("write without an entry accepted")
+    } catch (Throwable x) {
+      p("write without an entry " + kind(x) + ": " + x.getMessage())
+    }
+    /* A DEFLATED entry whose sizes were set up front: putNextEntry believes the
+       caller and closeEntry finds out. */
+    try {
+      ByteArrayOutputStream bo = new ByteArrayOutputStream()
+      ZipOutputStream z = new ZipOutputStream(bo)
+      ZipEntry x = new ZipEntry("x")
+      byte[] b = "hello world\n".getBytes()
+      x.setSize(11)
+      x.setCompressedSize(14)
+      x.setCrc(crc32(b))
+      z.putNextEntry(x)
+      z.write(b, 0, b.length)
+      z.closeEntry()
+      p("wrong size accepted")
+    } catch (Throwable x) {
+      p("wrong size " + kind(x) + ": " + x.getMessage())
+    }
+    try {
+      ByteArrayOutputStream bo = new ByteArrayOutputStream()
+      ZipOutputStream z = new ZipOutputStream(bo)
+      ZipEntry x = new ZipEntry("x")
+      byte[] b = "hello world\n".getBytes()
+      x.setSize(b.length)
+      x.setCompressedSize(14)
+      x.setCrc(0)
+      z.putNextEntry(x)
+      z.write(b, 0, b.length)
+      z.closeEntry()
+      p("wrong crc accepted")
+    } catch (Throwable x) {
+      p("wrong crc " + kind(x) + ": " + x.getMessage())
+    }
+    try {
+      new ZipOutputStream(new ByteArrayOutputStream()).setComment("x".repeat(70000))
+      p("long comment accepted")
+    } catch (Throwable x) {
+      p("long comment " + kind(x) + ": " + x.getMessage())
+    }
+
+    // ---------- an entry written with its sizes in the local header ----------
+    /* The other half of the writer's rule: when the caller has measured the
+       entry, the sizes go into the local header and no descriptor follows the
+       data. The compressed size is learned from a first pass rather than
+       guessed, because it is the compressor's to decide. */
+    byte[] mb = text(400)
+    ByteArrayOutputStream learnBo = new ByteArrayOutputStream()
+    ZipOutputStream lz = new ZipOutputStream(learnBo)
+    ZipEntry le = new ZipEntry("measured.txt")
+    le.setTimeLocal(LocalDateTime.of(2001, 2, 3, 4, 5, 6))
+    lz.putNextEntry(le)
+    lz.write(mb, 0, mb.length)
+    lz.closeEntry()
+    lz.close()
+    p("a descriptor is written " + ((learnBo.toByteArray()[6] & 0x08) != 0) +
+      " and closeEntry filled in size=" + le.getSize() + " crc=" + (le.getCrc() == crc32(mb)))
+
+    ByteArrayOutputStream measured = new ByteArrayOutputStream()
+    ZipOutputStream mz = new ZipOutputStream(measured)
+    ZipEntry me = new ZipEntry("measured.txt")
+    me.setTimeLocal(LocalDateTime.of(2001, 2, 3, 4, 5, 6))
+    me.setSize(mb.length)
+    me.setCompressedSize(le.getCompressedSize())
+    me.setCrc(crc32(mb))
+    mz.putNextEntry(me)
+    mz.write(mb, 0, mb.length)
+    mz.closeEntry()
+    mz.close()
+    byte[] measuredZip = measured.toByteArray()
+    p("a descriptor is written when the sizes are known " + ((measuredZip[6] & 0x08) != 0))
+    viaStream("measured", measuredZip, false)
+
+    p("done")
+  }
+}

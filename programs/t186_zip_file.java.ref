@@ -1,0 +1,385 @@
+/* The javac 21 program t186_zip_file.teyru is the same program as. Its output
+   is t186_zip_file.expected, produced by
+
+     javac -encoding UTF-8 -d . t186_zip_file.java.ref
+     java -Duser.timezone=UTC -Dstdout.encoding=UTF-8 T186
+
+   The two properties are part of the expectation: see t185_zip_archive.java.ref
+   for why the zone is pinned to UTC and the stdout charset to UTF-8.
+
+   java.util.zip.ZipFile is the reader that can look anywhere in an archive, and
+   what this program checks is the part of it that a stream reader cannot do:
+   the entry list taken from the central directory rather than from the local
+   headers, a lookup by name, and one entry's data at a time -- opened twice,
+   opened while another is open, and opened from an entry object that was not
+   the one the archive handed out. The archives it opens are a file this library
+   wrote, and JAVA_ZIP and TEYRU_ZIP, which are the JDK's archive and this
+   library's for the same entry list (see t185_zip_archive.java.ref): each
+   program opens both, so each ZipFile is asked for an archive the other
+   library's writer produced.
+
+   The last section is the same archive opened from its BYTES. java.util.zip has
+   no ZipFile(byte[]), so this file writes them to a second temporary file and
+   opens that; lib/45_zip_archive.teyru has the constructor, so the Teyru file
+   hands the array straight over. The lines printed are the same, which is the
+   point of the section: an archive is a sequence of bytes, and where it came
+   from is not part of what it means. */
+
+import java.io.ByteArrayOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.Enumeration;
+import java.util.zip.CRC32;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
+import java.util.zip.ZipFile;
+import java.util.zip.ZipOutputStream;
+
+public class T186 {
+  static void p(String s) { System.out.println(s); }
+
+  static final String[] NAMES = {
+    "bin.dat", "dir/", "hello.txt", "fox.txt", "utf8/檔案名稱.txt",
+  };
+
+  static byte[] text(int n) {
+    String unit = "The quick brown fox jumps over the lazy dog. ";
+    byte[] out = new byte[n];
+    for (int i = 0; i < n; i++) {
+      out[i] = (byte) unit.charAt(i % unit.length());
+    }
+    return out;
+  }
+
+  static byte[] bin(int n) {
+    byte[] out = new byte[n];
+    for (int i = 0; i < n; i++) {
+      out[i] = (byte) i;
+    }
+    return out;
+  }
+
+  static byte[] body(int i) {
+    if (i == 0) return bin(256);
+    if (i == 1) return new byte[0];
+    if (i == 2) return "hello world\n".getBytes();
+    if (i == 3) return text(4000);
+    return "Teyru 檔案\n".getBytes();
+  }
+
+  static int methodOf(int i) {
+    return i < 2 ? ZipEntry.STORED : ZipEntry.DEFLATED;
+  }
+
+  static long crc32(byte[] b) {
+    CRC32 c = new CRC32();
+    c.update(b);
+    return c.getValue();
+  }
+
+  static byte[] unhex(String s) {
+    byte[] out = new byte[s.length() / 2];
+    for (int i = 0; i < out.length; i++) {
+      out[i] = (byte) Integer.parseInt(s.substring(i * 2, i * 2 + 2), 16);
+    }
+    return out;
+  }
+
+  static String cat(String[] parts) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < parts.length; i++) {
+      sb.append(parts[i]);
+    }
+    return sb.toString();
+  }
+
+  static final String[] JAVA_ZIP = {
+  "504b0304140008080800a320432a00000000000000000000000009000000656d7074792e7478740300504b07080000000002000000000000",
+  "00504b0304140008080800a320432a0000000000000000000000000900000068656c6c6f2e747874cb48cdc9c95728cf2fca49e10200504b",
+  "07082d3b08af0e0000000c000000504b0304140008080800a320432a00000000000000000000000007000000666f782e747874edca470180",
+  "301045412b5f016a628092d0d910084d3d98e0f6ce33aef35a735f8faa929d8b825d1af21c37d9e193f68fa7f2b9d5585bc891c96432994c",
+  "2693c96432994cfe23bf504b0708add138ec47000000a00f0000504b0304140008080800a320432a00000000000000000000000015000000",
+  "757466382fe6aa94e6a188e5908de7a8b12e7478740b49ad2c2a5578b66acab3851d5c00504b0708f92f77860f0000000d000000504b0304",
+  "140008080800a320432a000000000000000000000000080008006e6f74652e74787499990400616263644b54c8cb2f49e50200504b070810",
+  "05e1590900000007000000504b01021400140008080800a320432a0000000002000000000000000900000000000000000000000000000000",
+  "00656d7074792e747874504b01021400140008080800a320432a2d3b08af0e0000000c000000090000000000000000000000000039000000",
+  "68656c6c6f2e747874504b01021400140008080800a320432aadd138ec47000000a00f000007000000000000000000000000007e00000066",
+  "6f782e747874504b01021400140008080800a320432af92f77860f0000000d0000001500000009000000000000000000fa00000075746638",
+  "2fe6aa94e6a188e5908de7a8b12e7478746120636f6d6d656e74504b01021400140008080800a320432a1005e15909000000070000000800",
+  "0800000000000000000000004c0100006e6f74652e7478749999040061626364504b050600000000050005002d010000930100001200616e",
+  "206172636869766520636f6d6d656e74",
+  };
+
+  static final String[] TEYRU_ZIP = {
+  "504b0304140008080800a320432a00000000000000000000000009000000656d7074792e7478740300504b07080000000002000000000000",
+  "00504b0304140008080800a320432a0000000000000000000000000900000068656c6c6f2e747874cb48cdc9c95728cf2fca49e10200504b",
+  "07082d3b08af0e0000000c000000504b0304140008080800a320432a00000000000000000000000007000000666f782e747874edca470180",
+  "301045412b5f016a3040091d1602a1a94f4ce4f6ce33e5e07484b199557b7b3675f66a0aeb7eca6ee775255eaaff536b7d2132994c2693c9",
+  "6432994c2693c9597204504b0708add138ec47000000a00f0000504b0304140008080800a320432a00000000000000000000000015000000",
+  "757466382fe6aa94e6a188e5908de7a8b12e7478740b49ad2c2a5578b66acab3851d5c00504b0708f92f77860f0000000d000000504b0304",
+  "140008080800a320432a000000000000000000000000080008006e6f74652e74787499990400616263644b54c8cb2f49e50200504b070810",
+  "05e1590900000007000000504b01021400140008080800a320432a0000000002000000000000000900000000000000000000000000000000",
+  "00656d7074792e747874504b01021400140008080800a320432a2d3b08af0e0000000c000000090000000000000000000000000039000000",
+  "68656c6c6f2e747874504b01021400140008080800a320432aadd138ec47000000a00f000007000000000000000000000000007e00000066",
+  "6f782e747874504b01021400140008080800a320432af92f77860f0000000d0000001500000009000000000000000000fa00000075746638",
+  "2fe6aa94e6a188e5908de7a8b12e7478746120636f6d6d656e74504b01021400140008080800a320432a1005e15909000000070000000800",
+  "0800000000000000000000004c0100006e6f74652e7478749999040061626364504b050600000000050005002d010000930100001200616e",
+  "206172636869766520636f6d6d656e74",
+  };
+
+  /* The archive this program writes to a file and then opens. STORED entries are
+     used where the point is the container -- their sizes and their CRC-32 are in
+     the local header -- and DEFLATED ones where the point is that a compressed
+     entry is read back through the same interface. */
+  static byte[] archive() throws Exception {
+    ByteArrayOutputStream bo = new ByteArrayOutputStream();
+    ZipOutputStream z = new ZipOutputStream(bo);
+    z.setComment("an archive comment");
+    for (int i = 0; i < NAMES.length; i++) {
+      byte[] b = body(i);
+      ZipEntry e = new ZipEntry(NAMES[i]);
+      e.setMethod(methodOf(i));
+      e.setTimeLocal(LocalDateTime.of(2001, 2, 3, 4, 5, 6));
+      if (i == 4) {
+        e.setComment("a comment");
+      }
+      if (i < 2) {
+        e.setSize(b.length);
+        e.setCompressedSize(b.length);
+        e.setCrc(crc32(b));
+      }
+      z.putNextEntry(e);
+      z.write(b, 0, b.length);
+      z.closeEntry();
+    }
+    z.close();
+    return bo.toByteArray();
+  }
+
+  static byte[] drain(java.io.InputStream in) throws Exception {
+    ByteArrayOutputStream bo = new ByteArrayOutputStream();
+    byte[] buf = new byte[512];
+    while (true) {
+      int n = in.read(buf, 0, buf.length);
+      if (n <= 0) {
+        break;
+      }
+      bo.write(buf, 0, n);
+    }
+    return bo.toByteArray();
+  }
+
+  static String describe(ZipEntry e, byte[] data, boolean withCsize) {
+    String s = e.getName() + " m=" + e.getMethod() + " size=" + e.getSize();
+    if (withCsize) {
+      s = s + " csize=" + e.getCompressedSize();
+    }
+    return s + " crc=" + e.getCrc() + " time=" + e.getTimeLocal() +
+      " dir=" + e.isDirectory() +
+      " extra=" + (e.getExtra() == null ? -1 : e.getExtra().length) +
+      " cmt=" + e.getComment() + " data=" + data.length + "/" + crc32(data);
+  }
+
+  static void list(String label, ZipFile zf, boolean withCsize) throws Exception {
+    Enumeration<? extends ZipEntry> en = zf.entries();
+    while (en.hasMoreElements()) {
+      ZipEntry e = en.nextElement();
+      p(label + " " + describe(e, drain(zf.getInputStream(e)), withCsize));
+    }
+  }
+
+  static String kind(Throwable e) {
+    if (e instanceof ZipException) {
+      return "ZipException";
+    }
+    if (e instanceof java.io.EOFException) {
+      return "EOFException";
+    }
+    if (e instanceof IllegalArgumentException) {
+      return "IllegalArgumentException";
+    }
+    if (e instanceof IllegalStateException) {
+      return "IllegalStateException";
+    }
+    if (e instanceof NullPointerException) {
+      return "NullPointerException";
+    }
+    if (e instanceof java.io.IOException) {
+      return "IOException";
+    }
+    return "Throwable";
+  }
+
+  static void bad(String label, String path) {
+    try {
+      ZipFile zf = new ZipFile(path);
+      p(label + " opened size=" + zf.size());
+      zf.close();
+    } catch (Throwable e) {
+      p(label + " " + kind(e) + ": " + e.getMessage());
+    }
+  }
+
+  static void badEntry(String label, ZipFile zf, String name) {
+    try {
+      p(label + " " + drain(zf.getInputStream(zf.getEntry(name))).length);
+    } catch (Throwable e) {
+      p(label + " " + kind(e) + ": " + e.getMessage());
+    }
+  }
+
+  public static void main(String[] args) throws Exception {
+    Path dir = Files.createTempDirectory("teyru-t186");
+    Path file = dir.resolve("archive.zip");
+    byte[] data = archive();
+    Files.write(file, data);
+
+    // ---------- the archive this library wrote, opened from a file ----------
+    ZipFile zf = new ZipFile(file.toFile());
+    ZipFile byName = new ZipFile(file.toString());
+    p("name is the path " + (zf.getName().equals(file.toString()) &&
+      byName.getName().equals(file.toString())));
+    p("size " + zf.size() + " comment " + zf.getComment() + " same " +
+      (byName.size() == zf.size()));
+    byName.close();
+    list("file", zf, false);
+
+    // ---------- looking an entry up ----------
+    p("find exact " + zf.getEntry("bin.dat").getName());
+    p("find dir " + zf.getEntry("dir").getName());
+    p("find dir slash " + zf.getEntry("dir/").getName());
+    p("find missing " + zf.getEntry("nothing.txt"));
+    try {
+      zf.getEntry(null);
+      p("find null accepted");
+    } catch (Throwable e) {
+      p("find null " + kind(e) + ": " + e.getMessage());
+    }
+
+    /* An entry object this archive never handed out, with a name that is in it:
+       the lookup is by name, as Java's is. */
+    p("find by copied entry " + drain(zf.getInputStream(new ZipEntry("bin.dat"))).length);
+
+    // ---------- two entries at once ----------
+    java.io.InputStream a = zf.getInputStream(zf.getEntry("bin.dat"));
+    java.io.InputStream b = zf.getInputStream(zf.getEntry("fox.txt"));
+    byte[] head = new byte[16];
+    int got = 0;
+    while (got < 16) {
+      int n = a.read(head, got, 16 - got);
+      if (n <= 0) {
+        break;
+      }
+      got += n;
+    }
+    byte[] rest = drain(a);
+    byte[] allOfB = drain(b);
+    p("interleaved " + got + "/" + crc32(head) + " then " + rest.length + " " +
+      allOfB.length + "/" + crc32(allOfB));
+
+    // ---------- the same entry twice ----------
+    p("twice " + drain(zf.getInputStream(zf.getEntry("fox.txt"))).length + " " +
+      drain(zf.getInputStream(zf.getEntry("fox.txt"))).length);
+
+    // ---------- the recorded archives, each opened by both programs ----------
+    Path javaFile = dir.resolve("java.zip");
+    Path teyruFile = dir.resolve("teyru.zip");
+    Files.write(javaFile, unhex(cat(JAVA_ZIP)));
+    Files.write(teyruFile, unhex(cat(TEYRU_ZIP)));
+    ZipFile javaZip = new ZipFile(javaFile.toString());
+    p("java size " + javaZip.size() + " comment " + javaZip.getComment());
+    list("java", javaZip, true);
+    ZipFile teyruZip = new ZipFile(teyruFile.toString());
+    p("teyru size " + teyruZip.size() + " comment " + teyruZip.getComment());
+    list("teyru", teyruZip, true);
+
+    /* An entry with a name in neither of them, and an entry from one archive
+       asked of the other: the answer is null, not an exception. */
+    p("cross archive " + (javaZip.getInputStream(zf.getEntry("bin.dat")) == null));
+
+    // ---------- the same archive, from its bytes ----------
+    Path bytesFile = dir.resolve("bytes.zip");
+    Files.write(bytesFile, data);
+    ZipFile fromBytes = new ZipFile(bytesFile.toString());
+    p("bytes size " + fromBytes.size() + " comment " + fromBytes.getComment());
+    list("bytes", fromBytes, false);
+    fromBytes.close();
+
+    // ---------- closing ----------
+    zf.close();
+    try {
+      zf.entries();
+      p("closed entries accepted");
+    } catch (Throwable e) {
+      p("closed entries " + kind(e) + ": " + e.getMessage());
+    }
+    try {
+      zf.getEntry("bin.dat");
+      p("closed lookup accepted");
+    } catch (Throwable e) {
+      p("closed lookup " + kind(e) + ": " + e.getMessage());
+    }
+
+    // ---------- what cannot be opened ----------
+    Path emptyFile = dir.resolve("empty.zip");
+    Files.write(emptyFile, new byte[0]);
+    bad("empty", emptyFile.toString());
+    Path textFile = dir.resolve("text.zip");
+    Files.writeString(textFile, "this is not an archive at all");
+    bad("text", textFile.toString());
+    Path shortFile = dir.resolve("short.zip");
+    Files.write(shortFile, Arrays.copyOf(data, 200));
+    bad("truncated", shortFile.toString());
+
+    /* A central directory whose first signature is gone, and one whose first
+       entry says it is encrypted: the two checks the central directory is read
+       through. The offsets are from the end of the archive, which is where the
+       central directory is found. */
+    byte[] cenBad = data.clone();
+    cenBad[cenBad.length - 327] = (byte) 0x4B;
+    cenBad[cenBad.length - 326] = (byte) 0x4B;
+    Path cenFile = dir.resolve("cenbad.zip");
+    Files.write(cenFile, cenBad);
+    bad("bad central directory", cenFile.toString());
+
+    byte[] cenEnc = data.clone();
+    cenEnc[cenEnc.length - 319] = (byte) 0x01;
+    Path encFile = dir.resolve("enc.zip");
+    Files.write(encFile, cenEnc);
+    bad("encrypted central directory", encFile.toString());
+
+    /* The local header of an entry is read when its data is asked for, and a
+       signature that is not there is the answer to that question. */
+    byte[] locBad = data.clone();
+    locBad[0] = (byte) 0x4B;
+    locBad[1] = (byte) 0x4B;
+    Path locFile = dir.resolve("locbad.zip");
+    Files.write(locFile, locBad);
+    ZipFile locZip = new ZipFile(locFile.toString());
+    p("bad local header size " + locZip.size());
+    badEntry("bad local header", locZip, "bin.dat");
+    locZip.close();
+
+    // ---------- and the entry that is not there ----------
+    ZipFile plain = new ZipFile(file.toString());
+    badEntry("missing entry", plain, "nothing.txt");
+    p("missing entry stream " + (plain.getEntry("nothing.txt") == null));
+    plain.close();
+
+    Files.delete(bytesFile);
+    Files.delete(cenFile);
+    Files.delete(encFile);
+    Files.delete(emptyFile);
+    Files.delete(javaFile);
+    Files.delete(locFile);
+    Files.delete(shortFile);
+    Files.delete(teyruFile);
+    Files.delete(textFile);
+    Files.delete(file);
+    Files.delete(dir);
+    p("cleaned " + (!Files.exists(dir)));
+    p("done");
+  }
+}

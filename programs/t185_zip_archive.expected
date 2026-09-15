@@ -1,0 +1,67 @@
+own empty.txt m=8 size=0 crc=0 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=0/0
+own hello.txt m=8 size=12 crc=2936552237 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=12/2936552237
+own fox.txt m=8 size=4000 crc=3963146669 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=4000/3963146669
+own utf8/檔案名稱.txt m=8 size=13 crc=2255958009 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=13/2255958009
+own note.txt m=8 size=7 crc=1507919120 time=2001-02-03T04:05:06 dir=false extra=8 cmt=null data=7/1507919120
+java empty.txt m=8 size=0 csize=2 crc=0 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=0/0
+java hello.txt m=8 size=12 csize=14 crc=2936552237 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=12/2936552237
+java fox.txt m=8 size=4000 csize=71 crc=3963146669 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=4000/3963146669
+java utf8/檔案名稱.txt m=8 size=13 csize=15 crc=2255958009 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=13/2255958009
+java note.txt m=8 size=7 csize=9 crc=1507919120 time=2001-02-03T04:05:06 dir=false extra=8 cmt=null data=7/1507919120
+teyru empty.txt m=8 size=0 csize=2 crc=0 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=0/0
+teyru hello.txt m=8 size=12 csize=14 crc=2936552237 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=12/2936552237
+teyru fox.txt m=8 size=4000 csize=71 crc=3963146669 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=4000/3963146669
+teyru utf8/檔案名稱.txt m=8 size=13 csize=15 crc=2255958009 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=13/2255958009
+teyru note.txt m=8 size=7 csize=9 crc=1507919120 time=2001-02-03T04:05:06 dir=false extra=8 cmt=null data=7/1507919120
+first header 504b0304140008080800a320432a00000000000000000000000009000000
+first header here 504b0304140008080800a320432a00000000000000000000000009000000
+end record 504b050600000000050005002d010000930100001200616e206172636869766520636f6d6d656e74
+this writer reproduces its recorded blob true
+the two recorded blobs are the same bytes false
+this writer reproduces the stored archive true
+stored bin.dat m=0 size=256 crc=688229491 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=256/688229491
+stored dir/ m=0 size=0 crc=0 time=2001-02-03T04:05:06 dir=true extra=-1 cmt=null data=0/0
+stored empty.txt m=0 size=0 crc=0 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=0/0
+stored hello.txt m=0 size=12 crc=2936552237 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=12/2936552237
+dir entry true dir/ dir/ method=-1 size=-1 csize=-1 crc=-1 time=-1 extra=null comment=null
+set time 981173106000 2001-02-03T04:05:06 true
+copy dir/ 12 2936552237 true
+long name IllegalArgumentException: entry name too long
+empty input read to the end
+one byte read to the end
+text read to the end
+truncated archive empty.txt m=8 size=0 crc=0 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=0/0
+truncated archive hello.txt m=8 size=12 crc=2936552237 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=12/2936552237
+truncated archive EOFException: Unexpected end of ZLIB input stream
+truncated header read to the end
+truncated entry empty.txt m=8 size=0 crc=0 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=0/0
+truncated entry EOFException: Unexpected end of ZLIB input stream
+truncated stored bin.dat m=0 size=256 crc=688229491 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=256/688229491
+truncated stored read to the end
+encrypted ZipException: encrypted ZIP entry not supported
+bad method ZipException: only DEFLATED entries can have EXT descriptor
+bad method alone ZipException: invalid compression method
+bad descriptor crc empty.txt m=8 size=0 crc=0 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=0/0
+bad descriptor crc ZipException: invalid entry CRC (expected 0xaf083b2c but got 0xaf083b2d)
+bad descriptor size empty.txt m=8 size=0 crc=0 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=0/0
+bad descriptor size ZipException: invalid entry size (expected 13 but got 12 bytes)
+bad header time empty.txt m=8 size=0 crc=0 time=2001-01-16T04:05:06 dir=false extra=-1 cmt=null data=0/0
+bad header time hello.txt m=8 size=12 crc=2936552237 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=12/2936552237
+bad header time fox.txt m=8 size=4000 crc=3963146669 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=4000/3963146669
+bad header time utf8/檔案名稱.txt m=8 size=13 crc=2255958009 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=13/2255958009
+bad header time note.txt m=8 size=7 crc=1507919120 time=2001-02-03T04:05:06 dir=false extra=8 cmt=null data=7/1507919120
+bad header time read to the end
+duplicate ZipException: duplicate entry: x
+unsupported method IllegalArgumentException: invalid compression method
+unsupported default IllegalArgumentException: invalid compression method
+stored without crc ZipException: STORED entry missing size, compressed size, or crc-32
+stored size mismatch ZipException: STORED entry where compressed != uncompressed size
+stored overrun ZipException: attempt to write past end of STORED entry
+write without an entry ZipException: no current ZIP entry
+wrong size ZipException: invalid entry size (expected 11 but got 12 bytes)
+wrong crc ZipException: invalid entry CRC-32 (expected 0x0 but got 0xaf083b2d)
+long comment IllegalArgumentException: ZIP file comment too long
+a descriptor is written true and closeEntry filled in size=400 crc=true
+a descriptor is written when the sizes are known false
+measured measured.txt m=8 size=400 crc=69002091 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=400/69002091
+done

@@ -1,0 +1,47 @@
+name is the path true
+size 5 comment an archive comment same true
+file bin.dat m=0 size=256 crc=688229491 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=256/688229491
+file dir/ m=0 size=0 crc=0 time=2001-02-03T04:05:06 dir=true extra=-1 cmt=null data=0/0
+file hello.txt m=8 size=12 crc=2936552237 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=12/2936552237
+file fox.txt m=8 size=4000 crc=3963146669 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=4000/3963146669
+file utf8/檔案名稱.txt m=8 size=13 crc=2255958009 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=a comment data=13/2255958009
+find exact bin.dat
+find dir dir/
+find dir slash dir/
+find missing null
+find null NullPointerException: name
+find by copied entry 256
+interleaved 16/3469664904 then 240 4000/3963146669
+twice 4000 4000
+java size 5 comment an archive comment
+java empty.txt m=8 size=0 csize=2 crc=0 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=0/0
+java hello.txt m=8 size=12 csize=14 crc=2936552237 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=12/2936552237
+java fox.txt m=8 size=4000 csize=71 crc=3963146669 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=4000/3963146669
+java utf8/檔案名稱.txt m=8 size=13 csize=15 crc=2255958009 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=a comment data=13/2255958009
+java note.txt m=8 size=7 csize=9 crc=1507919120 time=2001-02-03T04:05:06 dir=false extra=8 cmt=null data=7/1507919120
+teyru size 5 comment an archive comment
+teyru empty.txt m=8 size=0 csize=2 crc=0 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=0/0
+teyru hello.txt m=8 size=12 csize=14 crc=2936552237 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=12/2936552237
+teyru fox.txt m=8 size=4000 csize=71 crc=3963146669 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=4000/3963146669
+teyru utf8/檔案名稱.txt m=8 size=13 csize=15 crc=2255958009 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=a comment data=13/2255958009
+teyru note.txt m=8 size=7 csize=9 crc=1507919120 time=2001-02-03T04:05:06 dir=false extra=8 cmt=null data=7/1507919120
+cross archive true
+bytes size 5 comment an archive comment
+bytes bin.dat m=0 size=256 crc=688229491 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=256/688229491
+bytes dir/ m=0 size=0 crc=0 time=2001-02-03T04:05:06 dir=true extra=-1 cmt=null data=0/0
+bytes hello.txt m=8 size=12 crc=2936552237 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=12/2936552237
+bytes fox.txt m=8 size=4000 crc=3963146669 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=null data=4000/3963146669
+bytes utf8/檔案名稱.txt m=8 size=13 crc=2255958009 time=2001-02-03T04:05:06 dir=false extra=-1 cmt=a comment data=13/2255958009
+closed entries IllegalStateException: zip file closed
+closed lookup IllegalStateException: zip file closed
+empty ZipException: zip file is empty
+text ZipException: zip END header not found
+truncated ZipException: zip END header not found
+bad central directory ZipException: invalid CEN header (bad signature)
+encrypted central directory ZipException: invalid CEN header (encrypted entry)
+bad local header size 5
+bad local header ZipException: ZipFile invalid LOC header (bad signature)
+missing entry NullPointerException: entry
+missing entry stream true
+cleaned true
+done
