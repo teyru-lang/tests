@@ -1,0 +1,200 @@
+package teyru
+
+/* The policy side of the zone layer: which ids a database has, what a bad id
+   does, where the files are read from, which zone is the default, and the two
+   answers that come from the file rather than from a JVM (the abbreviation a
+   file designates, and the negative DST of Europe/Dublin).
+
+   Almost nothing here is Java's answer, and that is the point of the file. The
+   id list is the *system's* list, so it is read from the search path rather than
+   compared against a compiled-in one; the refusals are this library's (a
+   traversal id, a host with no tzdata); TZDIR and TZ are honoured the way the C
+   library honours them, which is not the way a JVM does; and the abbreviations
+   are the designations the files carry, which java.time has no API for at all.
+   The one line that is a JVM's answer is marked as such below -- the message for
+   an id the database does not have -- and everything else is either this
+   library's policy or the files' own data. The id list itself is the system's, so
+   only its shape is asserted (sorted, not empty, a Set that agrees with the
+   array) and never its contents.
+
+   What the expectations depend on: the host's tzdata (this is a test of a reader
+   of the host's files) and this host's environment. Everything printed is either
+   derived from the database at run time -- lengths and containment rather than
+   the list itself, which would only pass on the machine that produced it -- or
+   an answer that holds for any host with a current tzdata. The one environmental
+   question, whether the suite is run with TZ or TZDIR set, is asked rather than
+   assumed: the two "policy" lines below print true either way and are false if
+   the library ignores the variable. */
+
+class T189 {
+  static void p(String s) {
+    System.out.println(s)
+  }
+
+  // One zone's file answers for one instant: what the designation table (or the
+  // footer rule, for an instant past it) says, which is not what a JVM's
+  // formatter would say.
+  static void zone(String label, String id, long second) {
+    ZoneId z = ZoneId.of(id)
+    Instant instant = Instant.ofEpochSecond(second)
+    ZoneRules r = z.getRules()
+    String dst = r.isDaylightSavings(instant) ? "dst" : "std"
+    p(label + " " + r.getOffset(instant) + " " + dst + " " + r.getAbbreviation(instant))
+  }
+
+  public static void main(String[] args) {
+    // ---------- the list of ids is the system's, and sorted ----------
+    String[] ids = ZoneId.getAvailableIDs()
+    p("ids is not empty: " + (ids.length > 0))
+    boolean sorted = true
+    for (int i = 1 : i < ids.length : i++) {
+      if (ids[i - 1].compareTo(ids[i]) >= 0) {
+        sorted = false
+      }
+    }
+    p("ids is sorted: " + sorted)
+    p("ids has Asia/Taipei and UTC: " + (ZoneId.getAvailableZoneIds().contains("Asia/Taipei") && ZoneId.getAvailableZoneIds().contains("UTC")))
+    p("ids has no alternate tree: " + (ZoneId.getAvailableZoneIds().contains("posix/UTC") == false && ZoneId.getAvailableZoneIds().contains("right/UTC") == false))
+    // The Set java.time has and the array java.util.TimeZone has are the same
+    // list, and the Set's size is the array's length.
+    p("the set and the array agree: " + (ZoneId.getAvailableZoneIds().size() == ids.length))
+
+    // ---------- where the files come from ----------
+    String dir = ZoneId.getZoneInfoDir()
+    String tzdir = System.getenv("TZDIR")
+    String wantDir = tzdir == null || tzdir.length() == 0 ? "/usr/share/zoneinfo" : tzdir
+    p("TZDIR honoured for the search path: " + dir.equals(wantDir))
+
+    // TZ, which a JVM ignores and the C library does not: when it names a zone
+    // in the database, the default zone is that zone. When it is a rule, or
+    // nonsense, there is nothing here to compare -- the rule form is parsed by
+    // the same code the footers go through, and t190 pins that directly.
+    String tz = System.getenv("TZ")
+    boolean tzPolicy = true
+    if (tz != null && tz.length() > 0) {
+      String want = tz.startsWith(":") ? tz.substring(1) : tz
+      try {
+        ZoneId.of(want)
+        tzPolicy = ZoneId.systemDefault().getId().equals(want)
+      } catch (DateTimeException e) {
+        tzPolicy = true
+      }
+    }
+    p("TZ honoured for the default zone: " + tzPolicy)
+
+    // ---------- a database of our own ----------
+    // The search path is what makes the reader a reader of the system's data
+    // rather than of a table compiled into it, and pointing it somewhere else is
+    // how that is shown: a directory holding two zones and nothing else answers
+    // with two zones and nothing else.
+    Path tmp = Files.createTempDirectory("teyru-t189")
+    Files.createDirectories(tmp.resolve("Asia"))
+    Files.write(tmp.resolve("Asia/Taipei"), Files.readAllBytes(dir + "/Asia/Taipei"))
+    Files.write(tmp.resolve("UTC"), Files.readAllBytes(dir + "/UTC"))
+    String elsewhere = ids[ids.length - 1]
+    ZoneId.setZoneInfoDir(tmp.toString())
+    String[] mine = ZoneId.getAvailableIDs()
+    p("the ids of a database of our own: " + mine.length + " " + String.join(",", mine))
+    p("its Asia/Taipei is +08:00: " + ZoneId.of("Asia/Taipei").getRules().getOffset(Instant.ofEpochSecond(1782993600L)))
+    boolean refused = false
+    try {
+      ZoneId.of(elsewhere)
+    } catch (ZoneRulesException e) {
+      refused = true
+    }
+    p("a zone the database does not have is refused: " + refused)
+    p("a fixed offset needs no database: " + ZoneId.of("+08:00") + " " + ZoneId.of("GMT"))
+    ZoneId.setZoneInfoDir(null)
+    p("the search path goes back: " + ZoneId.getZoneInfoDir().equals(dir))
+
+    // ---------- the refusals ----------
+    // The JVM's own message, for the id the JVM also cannot find.
+    try {
+      ZoneId.of("Not/AZone")
+      p("an unknown id was accepted")
+    } catch (ZoneRulesException e) {
+      p("unknown id: " + e.getMessage())
+    }
+    // This library's message, for the two ids that are a path traversal: an id
+    // that starts with '/' would leave the search directory and one holding ".."
+    // could walk out of it, and neither is a zone name. Java refuses neither --
+    // it admits ".." and fails the lookup afterwards -- so this is ours.
+    String[] traversal = { "/etc/passwd", "../etc/passwd", "Asia/../../../etc/passwd", "Etc/.." }
+    for (int i = 0 : i < traversal.length : i++) {
+      try {
+        ZoneId.of(traversal[i])
+        p("traversal was accepted: " + traversal[i])
+      } catch (ZoneRulesException e) {
+        p("traversal " + traversal[i] + ": " + e.getMessage())
+      }
+    }
+    // A host with no tzdata has no zones, and says so instead of guessing UTC.
+    ZoneId.setZoneInfoDir("/nonexistent/teyru-tz")
+    try {
+      ZoneId.of("Asia/Taipei")
+      p("a missing database was accepted")
+    } catch (ZoneRulesException e) {
+      p("no database: " + e.getMessage())
+    }
+    p("with no database, UTC still works: " + ZoneId.of("UTC") + " " + ZoneId.of("-05:30"))
+    ZoneId.setZoneInfoDir(null)
+
+    // ---------- the default zone ----------
+    ZoneId first = ZoneId.systemDefault()
+    p("the default zone resolves: " + (first.getRules().getOffset(Instant.ofEpochSecond(0)).getTotalSeconds() >= -64800))
+    p("the default zone is stable: " + first.getId().equals(ZoneId.systemDefault().getId()))
+    ZoneId.setSystemDefault(ZoneId.of("Europe/Moscow"))
+    p("the default zone can be set: " + ZoneId.systemDefault())
+    ZoneId.setSystemDefault(null)
+    p("and put back: " + first.getId().equals(ZoneId.systemDefault().getId()))
+
+    // ---------- the abbreviations: the file's designations ----------
+    // Each of these is the string in the file's designation table for the type in
+    // force, or the name on the rule's side of the footer, which is where a
+    // zone's own data puts its abbreviation. A JVM cannot be asked for any of
+    // them: DateTimeFormatter's "z" answers CLDR's name, which is "NPT" for
+    // Kathmandu where the file says "+0545" and "CST" for the era of Taipei in
+    // which the file says "JST". glibc's tm_zone does answer the file, and the
+    // value of all 599 zones' abbreviations at every transition of their history
+    // was checked against it while this file was written: see the note at the end
+    // of t190.
+    zone("new york 1800", "America/New_York", -5364662400L)
+    zone("new york 2026 jan", "America/New_York", 1768478400L)
+    zone("new york 2026 jul", "America/New_York", 1782993600L)
+    zone("new york 2050 jul", "America/New_York", 2540289600L)
+    zone("taipei 1900", "Asia/Taipei", -2208988800L)
+    zone("taipei 1940", "Asia/Taipei", -933638400L)
+    zone("taipei 1946", "Asia/Taipei", -744336000L)
+    zone("taipei 1975", "Asia/Taipei", 173404800L)
+    zone("taipei 2050", "Asia/Taipei", 2540289600L)
+    zone("kathmandu 1980", "Asia/Kathmandu", 315532800L)
+    zone("kathmandu 2026", "Asia/Kathmandu", 1782993600L)
+    zone("sydney 2021 jan", "Australia/Sydney", 1610668800L)
+    zone("sydney 2021 jul", "Australia/Sydney", 1626307200L)
+    zone("sydney 2050 jan", "Australia/Sydney", 2525860800L)
+    zone("moscow 2010 jul", "Europe/Moscow", 1277942400L)
+    zone("moscow 2016", "Europe/Moscow", 1451606400L)
+    zone("nuuk 2050 jan", "America/Nuuk", 2525860800L)
+    zone("nuuk 2050 jul", "America/Nuuk", 2540289600L)
+    zone("kiritimati 2050", "Pacific/Kiritimati", 2540289600L)
+    zone("etc gmt-8", "Etc/GMT-8", 2540289600L)
+
+    // ---------- negative DST: the file's answer, and the JVM's ----------
+    /* tzdata models Ireland's winter as daylight saving with minus one hour: the
+       winter type of Europe/Dublin is marked isdst and its footer is
+       IST-1GMT0,M10.5.0,M3.5.0/1, so the DST half of the year is the winter. The
+       JVM's copy of the database flattens that (it answers dst false in January
+       and calls the winter the standard offset), which is the one place t188
+       cannot be asked about this zone. glibc agrees with the file here, and
+       `zdump -v Europe/Dublin` prints the same "isdst=1 gmtoff=0" for January
+       that this test asserts. */
+    zone("dublin 2026 jan", "Europe/Dublin", 1768478400L)
+    zone("dublin 2026 jul", "Europe/Dublin", 1784116800L)
+    zone("dublin 2050 jan", "Europe/Dublin", 2525860800L)
+    ZoneRules dublin = ZoneId.of("Europe/Dublin").getRules()
+    Instant winter = Instant.ofEpochSecond(1768478400L)
+    Instant summer = Instant.ofEpochSecond(1784116800L)
+    p("dublin winter dst " + dublin.isDaylightSavings(winter) + " offset " + dublin.getOffset(winter) + " standard " + dublin.getStandardOffset(winter))
+    p("dublin summer dst " + dublin.isDaylightSavings(summer) + " offset " + dublin.getOffset(summer) + " standard " + dublin.getStandardOffset(summer))
+  }
+}

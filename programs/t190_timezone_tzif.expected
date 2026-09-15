@@ -1,0 +1,68 @@
+v1 before its first transition +01:00 std LMT
+v1 at its only transition +02:00 std STD
+v1 after the last transition +02:00 std STD
+v1 has no transitions after its own: true
+v1 is not a fixed offset zone: true
+v2 in 1950 (the v1 block would say +11:00) +02:00 std SYN
+v2 after its second transition +03:00 dst SYD
+v2 2060 january (the footer) +02:00 std SYN
+v2 2060 july (the footer) +03:00 dst SYD
+v2 is a version 2 file: true
+with indicators, 1950 +02:00 std SYN
+with indicators, 2060 july +03:00 dst SYD
+an empty footer leaves the last type in force +03:00 dst SYD
+a DST half with no rules refused with its reason: true
+a version 2 file with no footer refused with its reason: true
+a footer with no closing newline refused with its reason: true
+a footer with a month of 13 refused with its reason: true
+a footer with a sixth week refused with its reason: true
+a footer with a 168 hour transition time refused with its reason: true
+a footer with a one letter name refused with its reason: true
+a footer with an unclosed quoted name refused with its reason: true
+jn 2060 february 29 +02:00 std TST
+jn 2060 march 1 +03:00 dst TDT
+jn 2060 october 26 +03:00 dst TDT
+jn 2060 october 27 +02:00 std TST
+jn 2061 february 28 +02:00 std TST
+day of year 2060 february 28 +02:00 std TST
+day of year 2060 february 29 +03:00 dst TDT
+day of year 2060 october 26 +02:00 std TST
+day of year 2061 february 28 +02:00 std TST
+a file with a leap-second record refused with its reason: true
+a file that is not a TZif file refused with its reason: true
+a file with an unknown version octet refused with its reason: true
+cairo 2060 before its start +02:00 std EET
+cairo 2060 at its start +03:00 dst EEST
+cairo 2060 before its end +03:00 dst EEST
+cairo 2060 at its end +02:00 std EET
+gaza 2060 before its start +02:00 std EET
+gaza 2060 at its start +03:00 dst EEST
+gaza 2060 at its end +02:00 std EET
+chatham 2060 at its end +12:45 std +1245
+chatham 2060 at its start +13:45 dst +1345
+santiago 2060 at its end -04:00 std -04
+santiago 2060 at its start -03:00 dst -03
+nuuk 2060 before its start -02:00 std -02
+nuuk 2060 at its start -01:00 dst -01
+nuuk 2060 at its end -02:00 std -02
+lord howe 2060 at its end +10:30 std +1030
+lord howe 2060 at its start +11:00 dst +11
+norfolk 2060 at its end +11:00 std +11
+norfolk 2060 at its start +12:00 dst +12
+casablanca 2060 in its +00 period Z dst +00
+casablanca 2060 in its +01 period +01:00 std +01
+tehran 2060 +03:30 std +0330
+tehran has no transitions left: true
+kathmandu 1986 before its gap +05:30 [+05:30] null 1985-12-31T23:59:59+05:30[Asia/Kathmandu]
+kathmandu 1986 in its 15 minute gap +05:30 [] Transition[Gap at 1986-01-01T00:00+05:30 to +05:45] 1986-01-01T00:15+05:45[Asia/Kathmandu]
+kathmandu 1986 after its gap +05:45 [+05:45] null 1986-01-01T00:15+05:45[Asia/Kathmandu]
+casablanca 2087 past its last row +01:00 [+01:00] null 2087-05-11T03:00+01:00[Africa/Casablanca]
+casablanca 2087 in the table's last gap Z [] Transition[Gap at 2087-05-11T02:00Z to +01:00] 2087-05-11T03:59:59+01:00[Africa/Casablanca]
+dublin 2050 in the rule's gap Z [] Transition[Gap at 2050-03-27T01:00Z to +01:00] 2050-03-27T02:30+01:00[Europe/Dublin]
+dublin 2050 in the rule's overlap +01:00 [+01:00, Z] Transition[Overlap at 2050-10-30T02:00+01:00 to Z] 2050-10-30T01:30+01:00[Europe/Dublin]
+lord howe 2060 in its half hour gap +10:30 [] Transition[Gap at 2060-10-03T02:00+10:30 to +11:00] 2060-10-03T02:45+11:00[Australia/Lord_Howe]
+ny 2060 next transition Transition[Gap at 2060-03-14T02:00-05:00 to -04:00]
+ny 2060 previous transition Transition[Gap at 2060-03-14T02:00-05:00 to -04:00]
+lord howe 2060 gap Transition[Gap at 2060-10-03T02:00+10:30 to +11:00]
+nuuk 2060 gap Transition[Gap at 2060-03-27T23:00-02:00 to -01:00]
+cairo 2060 gap Transition[Gap at 2060-04-30T00:00+02:00 to +03:00]

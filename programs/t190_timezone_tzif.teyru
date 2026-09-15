@@ -1,0 +1,372 @@
+package teyru
+
+/* The TZif reader itself: the blocks, the footer rule's grammar, and the
+   refusals. Where t188 asks a JVM whether the answers are right and t189 asks
+   the host's database, this test writes the files it reads, so the format's own
+   corners can be held still: a version 1 file, whose transitions are 32 bits
+   wide and which has no footer at all; a version 2 file whose two blocks
+   deliberately disagree, so that reading the wrong one is caught rather than
+   merely slow; a file whose footer is empty, one whose footer is a DST half with
+   no rules, one whose footer is malformed, a file with leap-second records, and
+   a file with the standard/wall and UT/local indicator series present.
+
+   The second half of the test reads the host's own database at instants past
+   every transition table in it, which is where the footer rule decides and where
+   the odd rules live: Africa/Cairo's last-Friday-of-April at 00:00 and
+   last-Thursday-of-October at 24:00 (M4.5.5/0 and M10.5.4/24), Asia/Gaza's rule
+   with a transition time of 50 hours, Pacific/Chatham's 45 minutes past the
+   hour (M9.5.0/2:45), America/Santiago's Saturday rule at 24:00 (M9.1.6/24),
+   America/Nuuk's negative transition time (M3.5.0/-1), Australia/Lord_Howe's
+   half-hour of DST, Pacific/Norfolk's explicit DST offset (<+11>-11<+12>), a
+   zone whose footer is a single permanent offset (Africa/Casablanca, <+01>-1),
+   and one with no DST at all (Asia/Tehran, <+0330>-3:30).
+
+   The instants are the transitions `zdump -v <zone>` prints for 2060, on both
+   sides of each one, converted from its UT timestamps; the values the test
+   expects are what it prints for them (gmtoff, isdst and the abbreviation), and
+   they were checked against this reader for every transition of all 599 zones
+   and every two years from 1890 to 2060 while this file was written: 175777
+   instants, no difference. */
+
+// ---------------------------------------------------------------- building a file
+
+/* A byte buffer and the pieces of a TZif file. It exists so that this test's
+   files are written field by field in the order RFC 8536 lays them out: a test
+   that built them with some other tool would be testing that tool as much as
+   this reader. */
+final class TzFile {
+  private byte[] data
+  private int n
+
+  public TzFile() {
+    data = new byte[1024]
+    n = 0
+  }
+
+  private void room(int k) {
+    if (n + k <= data.length) {
+      return
+    }
+    int size = data.length
+    while (size < n + k) {
+      size = size * 2
+    }
+    byte[] bigger = new byte[size]
+    for (int i = 0 : i < n : i++) {
+      bigger[i] = data[i]
+    }
+    data = bigger
+  }
+
+  // Every multi-octet number in the format is big-endian, so these are.
+  public void u8(int v) {
+    room(1)
+    data[n] = (byte) v
+    n = n + 1
+  }
+
+  public void i32(int v) {
+    u8(v >>> 24)
+    u8((v >>> 16) & 0xFF)
+    u8((v >>> 8) & 0xFF)
+    u8(v & 0xFF)
+  }
+
+  public void i64(long v) {
+    i32((int) (v >>> 32))
+    i32((int) v)
+  }
+
+  public void ascii(String s) {
+    for (int i = 0 : i < s.length() : i++) {
+      u8(s.charAt(i))
+    }
+  }
+
+  public void header(int version, int isutcnt, int isstdcnt, int leapcnt, int timecnt, int typecnt, int charcnt) {
+    ascii("TZif")
+    u8(version)
+    for (int i = 0 : i < 15 : i++) {
+      u8(0)
+    }
+    i32(isutcnt)
+    i32(isstdcnt)
+    i32(leapcnt)
+    i32(timecnt)
+    i32(typecnt)
+    i32(charcnt)
+  }
+
+  // One local time type record: the offset, the isdst octet, and the index of
+  // the designation it names.
+  public void type(int utoff, int isdst, int desig) {
+    i32(utoff)
+    u8(isdst)
+    u8(desig)
+  }
+
+  public byte[] toArray() {
+    byte[] out = new byte[n]
+    for (int i = 0 : i < n : i++) {
+      out[i] = data[i]
+    }
+    return out
+  }
+}
+
+// ---------------------------------------------------------------- the test
+
+class T190 {
+  static void p(String s) {
+    System.out.println(s)
+  }
+
+  /* A version 1 file: two types, one 32-bit transition, and no footer, which is
+     the whole of what a version 1 file has. The transition is at the earliest
+     instant a 32-bit signed number can hold -- 1901-12-13T20:45:52Z, the floor
+     RFC 8536 gives the format -- which is also the reason the later versions
+     exist. The type before the first transition is type 0 (the first type that
+     is not DST) and the type after the last one is the last, because with no
+     footer there is nothing else for it to be. */
+  static byte[] version1() {
+    TzFile f = new TzFile()
+    f.header(0, 0, 0, 0, 1, 2, 8)
+    f.i32((int) -2147483648L)
+    f.u8(1)
+    f.type(3600, 0, 0)
+    f.type(7200, 0, 4)
+    f.ascii("LMT")
+    f.u8(0)
+    f.ascii("STD")
+    f.u8(0)
+    return f.toArray()
+  }
+
+  /* A version 2 file whose two blocks disagree. The version 1 block says +11:00
+     for every instant and the version 2 block says +02:00 and +03:00, so a
+     reader that stops at the first block answers the wrong number rather than
+     merely a slower one -- which is what makes this a test of *which* block was
+     read, and not only of how many were. `tail` is appended after the version 2
+     block as it stands: a footer is a newline, the TZ string, and a newline, and
+     each of the failures below passes a tail that is wrong in one specific way.
+     `indicators` adds the standard/wall and UT/local series, which a real file
+     from zic carries and which a reader has to step over. */
+  static byte[] version2(String tail, boolean indicators, int leapCount) {
+    TzFile f = new TzFile()
+    f.header(50, 0, 0, 0, 1, 1, 6)
+    f.i32((int) -2208988800L)
+    f.u8(0)
+    f.type(39600, 0, 0)
+    f.ascii("WRONG")
+    f.u8(0)
+    f.header(50, indicators ? 2 : 0, indicators ? 2 : 0, leapCount, 2, 2, 8)
+    f.i64(-2208988800L)
+    f.i64(1500000000)
+    f.u8(0)
+    f.u8(1)
+    f.type(7200, 0, 0)
+    f.type(10800, 1, 4)
+    f.ascii("SYN")
+    f.u8(0)
+    f.ascii("SYD")
+    f.u8(0)
+    if (leapCount > 0) {
+      f.i64(78796800)
+      f.i32(1)
+    }
+    if (indicators) {
+      f.u8(1)
+      f.u8(1)
+      f.u8(1)
+      f.u8(1)
+    }
+    if (tail != null) {
+      f.ascii(tail)
+    }
+    return f.toArray()
+  }
+
+  static void put(String dir, String id, byte[] data) {
+    Path f = Path.of(dir).resolve(id)
+    Files.createDirectories(f.getParent())
+    Files.write(f, data)
+  }
+
+  // One zone's answer for one instant, from the file rather than from a JVM.
+  static void zone(String label, String id, long second) {
+    ZoneId z = ZoneId.of(id)
+    Instant instant = Instant.ofEpochSecond(second)
+    ZoneRules r = z.getRules()
+    String dst = r.isDaylightSavings(instant) ? "dst" : "std"
+    p(label + " " + r.getOffset(instant) + " " + dst + " " + r.getAbbreviation(instant))
+  }
+
+  /* A local date-time's answer in a zone: the offset Java picks for it, the
+     offsets that are valid for it (none in a gap, two in an overlap), the
+     transition that explains it, and the zoned date-time all of that adds up to.
+     `localSecond` is the local date-time read as if it were UT, so both this and
+     the JVM's own program are handed the same local time without either side
+     comparing a wall clock to an instant. These lines are the JVM's answers, the
+     way t188's are: the values below were taken from `java` for the same zones
+     and local times. */
+  static void localZone(String label, String id, long localSecond) {
+    ZoneId z = ZoneId.of(id)
+    long day = Math.floorDiv(localSecond, 86400L)
+    long sec = Math.floorMod(localSecond, 86400L)
+    LocalTime time = LocalTime.of((int) (sec / 3600), (int) ((sec % 3600) / 60), (int) (sec % 60), 0)
+    LocalDateTime ldt = LocalDateTime.of(LocalDate.ofEpochDay(day), time)
+    ZoneRules r = z.getRules()
+    p(label + " " + r.getOffset(ldt) + " " + r.getValidOffsets(ldt) + " " + r.getTransition(ldt) + " " + ZonedDateTime.of(ldt, z))
+  }
+
+  /* Whether reading a zone raises ZoneRulesException with a given phrase in it.
+     The phrase rather than the whole message, because these files live in a
+     temporary directory whose name is not part of the expectation. */
+  static void refuses(String label, String id, String phrase) {
+    boolean refused = false
+    boolean said = false
+    try {
+      ZoneId.of(id).getRules().getOffset(Instant.ofEpochSecond(0))
+    } catch (ZoneRulesException e) {
+      refused = true
+      said = e.getMessage().contains(phrase)
+    }
+    p(label + " refused with its reason: " + (refused && said))
+  }
+
+  public static void main(String[] args) {
+    ZoneId.setZoneInfoDir(Files.createTempDirectory("teyru-t190").toString())
+    String dir = ZoneId.getZoneInfoDir()
+
+    // ---------- a version 1 file ----------
+    put(dir, "Syn/Version1", version1())
+    zone("v1 before its first transition", "Syn/Version1", -2147483649L)
+    zone("v1 at its only transition", "Syn/Version1", -2147483648L)
+    zone("v1 after the last transition", "Syn/Version1", 2841393600L)
+    p("v1 has no transitions after its own: " + (ZoneId.of("Syn/Version1").getRules().getTransitions().size() == 1))
+    p("v1 is not a fixed offset zone: " + (ZoneId.of("Syn/Version1").getRules().isFixedOffset() == false))
+
+    // ---------- a version 2 file, and which block is read ----------
+    put(dir, "Syn/Version2", version2("\nSYN-2SYD,M3.5.0,M10.5.0/3\n", false, 0))
+    zone("v2 in 1950 (the v1 block would say +11:00)", "Syn/Version2", -631152000L)
+    zone("v2 after its second transition", "Syn/Version2", 1500000000L)
+    zone("v2 2060 january (the footer)", "Syn/Version2", 2841393600L)
+    zone("v2 2060 july (the footer)", "Syn/Version2", 2855908800L)
+    p("v2 is a version 2 file: " + (TzifData.parse(version2("\nSYN-2\n", false, 0), "x").version == 2))
+
+    // ---------- the indicators, which a reader has to step over ----------
+    put(dir, "Syn/Indicators", version2("\nSYN-2SYD,M3.5.0,M10.5.0/3\n", true, 0))
+    zone("with indicators, 1950", "Syn/Indicators", -631152000L)
+    zone("with indicators, 2060 july", "Syn/Indicators", 2855908800L)
+
+    // ---------- the footer's own failures ----------
+    put(dir, "Syn/Empty", version2("\n\n", false, 0))
+    zone("an empty footer leaves the last type in force", "Syn/Empty", 2855908800L)
+    put(dir, "Syn/NoRules", version2("\nSYN-2SYD\n", false, 0))
+    refuses("a DST half with no rules", "Syn/NoRules", "no transition rules")
+    put(dir, "Syn/NoFooter", version2(null, false, 0))
+    refuses("a version 2 file with no footer", "Syn/NoFooter", "does not begin with a newline")
+    put(dir, "Syn/BadFooter", version2("\nSYN-2SYD,M3.5.0", false, 0))
+    refuses("a footer with no closing newline", "Syn/BadFooter", "does not end with a newline")
+    put(dir, "Syn/BadMonth", version2("\nSYN-2SYD,M13.5.0,M10.5.0\n", false, 0))
+    refuses("a footer with a month of 13", "Syn/BadMonth", "month outside 1..12")
+    put(dir, "Syn/BadWeek", version2("\nSYN-2SYD,M3.6.0,M10.5.0\n", false, 0))
+    refuses("a footer with a sixth week", "Syn/BadWeek", "week outside 1..5")
+    put(dir, "Syn/BadTime", version2("\nSYN-2SYD,M3.5.0/168,M10.5.0\n", false, 0))
+    refuses("a footer with a 168 hour transition time", "Syn/BadTime", "more than 167 hours")
+    put(dir, "Syn/BadDst", version2("\nS-2D,M3.5.0,M10.5.0\n", false, 0))
+    refuses("a footer with a one letter name", "Syn/BadDst", "shorter than three letters")
+    put(dir, "Syn/BadQuote", version2("\n<SYN-2SYD,M3.5.0,M10.5.0\n", false, 0))
+    refuses("a footer with an unclosed quoted name", "Syn/BadQuote", "not closed")
+
+    /* The two rule forms the database itself never uses, held against glibc
+       reading the same file: Jn counts January 1 as 1 and never counts February
+       29, and the bare day-of-year form counts February 29 like any other day.
+       The two files built here differ in nothing but that, so in a leap year they
+       disagree about February 29 -- and glibc's answer for each is a shell away
+       (`TZ=/path/to/the/file date -d @2845240200 +'%z %Z'`), which is where the
+       numbers this test expects for them came from. */
+    put(dir, "Syn/Jn", version2("\nTST-2TDT,J60/2,J300/2\n", false, 0))
+    zone("jn 2060 february 29", "Syn/Jn", 2845240200L)
+    zone("jn 2060 march 1", "Syn/Jn", 2845326600L)
+    zone("jn 2060 october 26", "Syn/Jn", 2866055400L)
+    zone("jn 2060 october 27", "Syn/Jn", 2866062600L)
+    zone("jn 2061 february 28", "Syn/Jn", 2876855400L)
+    put(dir, "Syn/DayOfYear", version2("\nTST-2TDT,59/2,299/2\n", false, 0))
+    zone("day of year 2060 february 28", "Syn/DayOfYear", 2845233000L)
+    zone("day of year 2060 february 29", "Syn/DayOfYear", 2845240200L)
+    zone("day of year 2060 october 26", "Syn/DayOfYear", 2866055400L)
+    zone("day of year 2061 february 28", "Syn/DayOfYear", 2876855400L)
+
+    // ---------- leap seconds, and files that are not TZif files ----------
+    put(dir, "Syn/Leap", version2("\nSYN-2\n", false, 1))
+    refuses("a file with a leap-second record", "Syn/Leap", "leap-second records")
+    put(dir, "Syn/NotTzif", "hello: this is a note about a zone file and not one, and it is long enough to have a header".getBytes())
+    refuses("a file that is not a TZif file", "Syn/NotTzif", "magic is not TZif")
+    TzFile bad = new TzFile()
+    bad.header(57, 0, 0, 0, 0, 1, 4)
+    bad.type(0, 0, 0)
+    bad.ascii("BAD")
+    bad.u8(0)
+    put(dir, "Syn/BadVersion", bad.toArray())
+    refuses("a file with an unknown version octet", "Syn/BadVersion", "version octet is 57")
+
+    ZoneId.setZoneInfoDir(null)
+
+    // ---------- the host's own rules, past the end of every table ----------
+    // Every one of these is the footer rule deciding, since the tables of these
+    // zones all end in 2037 or before. The values are what zdump prints for the
+    // same instants.
+    zone("cairo 2060 before its start", "Africa/Cairo", 2850501599L)
+    zone("cairo 2060 at its start", "Africa/Cairo", 2850501600L)
+    zone("cairo 2060 before its end", "Africa/Cairo", 2866222799L)
+    zone("cairo 2060 at its end", "Africa/Cairo", 2866222800L)
+    zone("gaza 2060 before its start", "Asia/Gaza", 2847571199L)
+    zone("gaza 2060 at its start", "Asia/Gaza", 2847571200L)
+    zone("gaza 2060 at its end", "Asia/Gaza", 2866316400L)
+    zone("chatham 2060 at its end", "Pacific/Chatham", 2848226400L)
+    zone("chatham 2060 at its start", "Pacific/Chatham", 2863346400L)
+    zone("santiago 2060 at its end", "America/Santiago", 2848273200L)
+    zone("santiago 2060 at its start", "America/Santiago", 2861582400L)
+    zone("nuuk 2060 before its start", "America/Nuuk", 2847661199L)
+    zone("nuuk 2060 at its start", "America/Nuuk", 2847661200L)
+    zone("nuuk 2060 at its end", "America/Nuuk", 2866410000L)
+    zone("lord howe 2060 at its end", "Australia/Lord_Howe", 2848230000L)
+    zone("lord howe 2060 at its start", "Australia/Lord_Howe", 2863956600L)
+    zone("norfolk 2060 at its end", "Pacific/Norfolk", 2848230000L)
+    zone("norfolk 2060 at its start", "Pacific/Norfolk", 2863954800L)
+    zone("casablanca 2060 in its +00 period", "Africa/Casablanca", 2842826400L)
+    zone("casablanca 2060 in its +01 period", "Africa/Casablanca", 2845850400L)
+    zone("tehran 2060", "Asia/Tehran", 2855908800L)
+    p("tehran has no transitions left: " + (ZoneId.of("Asia/Tehran").getRules().nextTransition(Instant.ofEpochSecond(2855908800L)) == null))
+
+    /* A local time in a gap and one that exists twice, on both sides of the
+       database: in the table (Kathmandu's fifteen-minute jump of 1986, which is
+       a gap smaller than the hour a reader that assumes whole hours would expect,
+       and the last row of Casablanca's table) and after it (Dublin's rule-era
+       pair, whose offsets are the ones the JVM computes even though the JVM
+       calls the other half of the year the standard one, and Lord Howe's
+       half-hour gap). A footer with no DST half at all -- Casablanca's <+01>-1 --
+       is the case a reader that assumed every rule has two halves gets wrong:
+       there is no transition out there at all, and a local time past the table's
+       last row is simply that offset. */
+    localZone("kathmandu 1986 before its gap", "Asia/Kathmandu", 504921599L)
+    localZone("kathmandu 1986 in its 15 minute gap", "Asia/Kathmandu", 504921600L)
+    localZone("kathmandu 1986 after its gap", "Asia/Kathmandu", 504922500L)
+    localZone("casablanca 2087 past its last row", "Africa/Casablanca", 3703460400L)
+    localZone("casablanca 2087 in the table's last gap", "Africa/Casablanca", 3703460399L)
+    localZone("dublin 2050 in the rule's gap", "Europe/Dublin", 2531957400L)
+    localZone("dublin 2050 in the rule's overlap", "Europe/Dublin", 2550706200L)
+    localZone("lord howe 2060 in its half hour gap", "Australia/Lord_Howe", 2863995300L)
+
+    // The two rules a reader has to compute rather than read: the last Sunday of
+    // March at 02:00 standard time, and the first Sunday of November at 02:00
+    // DST, which is what the same footer's transitions are.
+    ZoneRules ny = ZoneId.of("America/New_York").getRules()
+    p("ny 2060 next transition " + ny.nextTransition(Instant.ofEpochSecond(2841393600L)))
+    p("ny 2060 previous transition " + ny.previousTransition(Instant.ofEpochSecond(2855908800L)))
+    p("lord howe 2060 gap " + ZoneId.of("Australia/Lord_Howe").getRules().getTransition(LocalDateTime.of(2060, 10, 3, 2, 15, 0)))
+    p("nuuk 2060 gap " + ZoneId.of("America/Nuuk").getRules().getTransition(LocalDateTime.of(2060, 3, 27, 23, 30, 0)))
+    p("cairo 2060 gap " + ZoneId.of("Africa/Cairo").getRules().getTransition(LocalDateTime.of(2060, 4, 30, 0, 30, 0)))
+  }
+}

@@ -1,0 +1,182 @@
+ny jul offset -04:00
+ny jul standard -05:00
+ny jul dst true
+ny jan offset -05:00
+ny jan standard -05:00
+ny jan dst false
+tp jul offset +08:00
+tp jul standard +08:00
+tp jul dst false
+tp 1975 offset +09:00
+tp 1975 dst true
+tp 1975 standard +08:00
+ny spr before 2021-03-14T01:59:59-05:00[America/New_York]
+ny spr after 2021-03-14T03:00-04:00[America/New_York]
+ny spr 01:30 2021-03-14T01:30-05:00[America/New_York]
+ny spr 02:30 2021-03-14T03:30-04:00[America/New_York]
+ny spr 03:30 2021-03-14T03:30-04:00[America/New_York]
+ny spr valid []
+ny spr offset of local -05:00
+ny spr transition Transition[Gap at 2021-03-14T02:00-05:00 to -04:00]
+ny fall before 2021-11-07T01:59:59-04:00[America/New_York]
+ny fall after 2021-11-07T01:00-05:00[America/New_York]
+ny fall 00:30 2021-11-07T00:30-04:00[America/New_York]
+ny fall 01:30 2021-11-07T01:30-04:00[America/New_York]
+ny fall 02:30 2021-11-07T02:30-05:00[America/New_York]
+ny fall valid [-04:00, -05:00]
+ny fall offset of local -04:00
+ny fall transition Transition[Overlap at 2021-11-07T02:00-04:00 to -05:00]
+ny fall gap duration PT1H
+ny fall gap isGap true
+ny fall overlap isOverlap true
+ny fall overlap before 2021-11-07T02:00
+ny fall overlap after 2021-11-07T01:00
+ny fall gap valid -5 false
+transition of Transition[Gap at 2021-03-14T02:00-05:00 to -04:00]
+transition from the local time 1615705200
+transition duration PT1H
+sy jan 2021-01-15T11:00+11:00[Australia/Sydney]
+sy jul 2021-07-15T10:00+10:00[Australia/Sydney]
+sy jan dst true
+sy jan standard +10:00
+sy jul dst false
+sy gap 2021-10-03T03:30+11:00[Australia/Sydney]
+sy overlap 2021-04-04T02:30+11:00[Australia/Sydney]
+sy overlap valid [+11:00, +10:00]
+kt jul 2026-07-02T17:45+05:45[Asia/Kathmandu]
+kt jul offset +05:45
+kt 1980 1980-01-01T05:30+05:30[Asia/Kathmandu]
+kt 1988 1988-01-01T05:45+05:45[Asia/Kathmandu]
+tp 1900 1900-01-01T08:00+08:00[Asia/Taipei]
+tp 1937 1937-06-01T08:00+08:00[Asia/Taipei]
+tp 1940 1940-06-01T09:00+09:00[Asia/Taipei]
+tp 1946 1946-06-01T09:00+09:00[Asia/Taipei]
+ms 2010 2010-07-01T04:00+04:00[Europe/Moscow]
+ms 2010 dst true
+ms 2012 2012-01-01T04:00+04:00[Europe/Moscow]
+ms 2016 2016-01-01T03:00+03:00[Europe/Moscow]
+kiev 1980 1980-01-01T03:00+03:00[Europe/Kiev]
+kyiv 1980 1980-01-01T03:00+03:00[Europe/Kyiv]
+kyiv 2020 2020-01-01T02:00+02:00[Europe/Kyiv]
+kiev id Europe/Kiev
+kyiv id Europe/Kyiv
+ny 1800 1799-12-31T19:03:58-04:56:02[America/New_York]
+ny 1800 offset -04:56:02
+ny 1800 standard -04:56:02
+ny 1883 1883-11-16T19:03:58-04:56:02[America/New_York]
+ny first transition Transition[Overlap at 1883-11-18T12:03:58-04:56:02 to -05:00]
+ny 2050 jul 2050-07-01T08:00-04:00[America/New_York]
+ny 2050 dec 2050-12-01T07:00-05:00[America/New_York]
+ny 2050 jul dst true
+ny 2050 dec dst false
+tp 2050 2050-07-01T20:00+08:00[Asia/Taipei]
+kt 2050 2050-07-01T17:45+05:45[Asia/Kathmandu]
+ms 2050 2050-07-01T15:00+03:00[Europe/Moscow]
+sy 2050 jan 2050-01-15T23:00+11:00[Australia/Sydney]
+sy 2050 jul 2050-07-15T22:00+10:00[Australia/Sydney]
+sy 2050 jul dst false
+nu 2050 jul 2050-07-01T11:00-01:00[America/Nuuk]
+nu 2050 jul dst true
+nu 2050 jul standard -02:00
+nu 2050 jan 2050-01-15T10:00-02:00[America/Nuuk]
+nu 2026 jul dst true
+du 2050 jan 2050-01-15T12:00Z[Europe/Dublin]
+du 2050 jul 2050-07-15T13:00+01:00[Europe/Dublin]
+du 2026 jul 2026-07-15T13:00+01:00[Europe/Dublin]
+du 2026 jan 2026-01-15T12:00Z[Europe/Dublin]
+ldn 2050 jul 2050-07-01T13:00+01:00[Europe/London]
+tok 2050 jul 2050-07-01T21:00+09:00[Asia/Tokyo]
+ny 2050 next Transition[Overlap at 2050-11-06T02:00-04:00 to -05:00]
+ny 2050 previous Transition[Overlap at 2049-11-07T02:00-04:00 to -05:00]
+ny 2026 next Transition[Overlap at 2026-11-01T02:00-04:00 to -05:00]
+ny 2026 previous Transition[Gap at 2026-03-08T02:00-05:00 to -04:00]
+ny 1800 next Transition[Overlap at 1883-11-18T12:03:58-04:56:02 to -05:00]
+ny 1800 previous null
+tp 2050 next null
+tp 2050 previous Transition[Overlap at 1979-10-01T00:00+09:00 to +08:00]
+sy 2050 previous Transition[Gap at 2049-10-03T02:00+10:00 to +11:00]
+ny 2050 gap valid []
+ny 2050 gap zdt 2050-03-13T03:30-04:00[America/New_York]
+ny 2050 overlap zdt 2050-11-06T01:30-04:00[America/New_York]
+noon 2021-03-13T12:00-05:00[America/New_York]
+noon plusDays 2021-03-14T12:00-04:00[America/New_York]
+noon plusHours24 2021-03-14T13:00-04:00[America/New_York]
+noon plusDays hours 23
+noonFB 2021-11-06T12:00-04:00[America/New_York]
+noonFB plusDays 2021-11-07T12:00-05:00[America/New_York]
+noonFB plusDays hours 25
+noonFB 01:30 plusDays 2021-11-07T01:30-04:00[America/New_York]
+noonFB 01:30 plusDays2 2021-11-08T01:30-05:00[America/New_York]
+spr 02:30 plusDays 2021-03-14T03:30-04:00[America/New_York]
+spr 01:30 plusSeconds 2021-03-14T03:30-04:00[America/New_York]
+sy noon plusDays 2021-04-04T12:00+10:00[Australia/Sydney]
+sy noon plusDays hours 25
+noon plusMonths 2021-04-13T12:00-04:00[America/New_York]
+noon plusMonths3 2022-02-13T12:00-05:00[America/New_York]
+noon minusDays 2021-03-13T12:00-05:00[America/New_York]
+at 2021-03-14T03:30-04:00[America/New_York]
+at toInstant 2021-03-14T07:30:00Z
+at toLocalDateTime 2021-03-14T03:30
+at toLocalDate 2021-03-14
+at toLocalTime 03:30
+at offset -04:00
+at zone America/New_York
+at year 2021
+at month MARCH 3
+at day 14 SUNDAY
+at hour 3:30:0
+at of parts 2021-03-14T03:30-04:00[America/New_York]
+at ofInstant 2021-03-14T03:30:00.123-04:00[America/New_York]
+at nanos 2021-03-14T03:30:00.500-04:00[America/New_York]
+at millis 2021-03-14T03:30:00.123-04:00[America/New_York]
+at same instant UTC 2021-03-14T07:30Z[UTC]
+at same instant Z 2021-03-14T07:30Z
+at same local 2021-03-14T03:30+08:00
+at fixed zone 2021-03-14T03:30+05:45
+at utc zone 2021-03-14T03:30Z[UTC]
+at after false
+at before true
+at equal true
+at equals false
+at compare -1
+at zone id America/New_York
+at earlier offset 2021-03-14T03:30-04:00[America/New_York]
+overlap later offset 2021-11-07T01:30-05:00[America/New_York]
+overlap later instant 2021-11-07T06:30:00Z
+gap earlier offset 2021-03-14T03:30-04:00[America/New_York]
+gap later offset 2021-03-14T03:30-04:00[America/New_York]
+plain earlier offset 2021-06-01T12:00-04:00[America/New_York]
+zo +08:00 +08:00 28800
+zo +0800 +08:00
+zo +8 +08:00
+zo Z Z
+zo +080000 +08:00
+zo +08:00:00 +08:00
+zo +08:00:30 28830
+zo ofHours +08:00 -05:00
+zo ofHoursMinutes +05:45
+zo ofHoursMinutesSeconds -05:45:30
+zo ofTotalSeconds +08:00 -00:00:30 +00:01:30
+zo UTC Z 0
+zo MIN MAX -18:00 +18:00
+zi Z Z true
+zi UTC UTC Z
+zi GMT GMT UT
+zi UTC+08:00 UTC+08:00 +08:00
+zi GMT-05:00 GMT-05:00 -05:00
+zi +08:00 +08:00 true
+zi -05:30 -05:30
+zi fixed true false
+zi etc -08:00
+zi equals false true
+unknown Unknown time-zone ID: Not/AZone
+malformed Invalid ID for region-based ZoneId, invalid format: Asia Taipei
+offset 19 Zone offset hours not in valid range: value 19 is not in the range -18 to 18
+offset 60 Zone offset minutes not in valid range: value 60 is not in the range -59 to 59
+offset z Invalid ID for ZoneOffset, invalid format: z
+offset 70000 Zone offset not in valid range: -18:00 to +18:00
+hours 19 Zone offset hours not in valid range: value 19 is not in the range -18 to 18
+sign -1 30 Zone offset minutes and seconds must be negative because hours is negative
+sign 0 30 -1 Zone offset minutes and seconds must have the same sign
+utc+19 Invalid ID for offset-based ZoneId: UTC+19:00
+null id zoneId

@@ -1,0 +1,297 @@
+import java.time.*;
+import java.time.zone.*;
+import java.util.List;
+
+/* The javac 21 program tests/programs/t188_timezone.teyru is the same program
+   as. Its output is tests/programs/t188_timezone.expected: every expectation in
+   that file is the JVM's answer, not this repository's.
+
+   The zones and the instants are chosen so that the JVM's compiled copy of the
+   time zone database and the host's TZif files agree on them: every one is a
+   fixed instant from the historical record, and the zones whose rules changed
+   recently are avoided for the present day. The regions the offsets come from
+   are the three a reader has to get right -- the type table of the file (2026 in
+   New York, 2012 in Moscow, 1940 in Taipei), the footer rule that decides every
+   instant after a file's last transition (2050 in New York, Sydney, Nuuk,
+   Dublin, Moscow and Taipei), and the first type, for an instant before the
+   first transition (1800 in New York).
+
+   Two answers are the JVM's and not the tzfile's, and neither is in this
+   program: the abbreviation (the JVM answers a CLDR name where the file carries
+   a designation) and the negative-DST flag of Europe/Dublin. t189 asserts those
+   against the file instead. */
+
+public class T188 {
+  static void p(String s) { System.out.println(s); }
+
+  public static void main(String[] args) {
+    ZoneId ny = ZoneId.of("America/New_York");
+    ZoneId tp = ZoneId.of("Asia/Taipei");
+    ZoneId sy = ZoneId.of("Australia/Sydney");
+    ZoneId kt = ZoneId.of("Asia/Kathmandu");
+    ZoneId ms = ZoneId.of("Europe/Moscow");
+    ZoneId ky = ZoneId.of("Europe/Kyiv");
+    ZoneId nu = ZoneId.of("America/Nuuk");
+    ZoneId du = ZoneId.of("Europe/Dublin");
+
+    Instant jul = Instant.ofEpochSecond(1782993600L);   // 2026-07-02T12:00:00Z
+    Instant jan = Instant.ofEpochSecond(1768478400L);   // 2026-01-15T12:00:00Z
+
+    // ---------- a zone with DST in force, and one without ----------
+    p("ny jul offset " + ny.getRules().getOffset(jul));
+    p("ny jul standard " + ny.getRules().getStandardOffset(jul));
+    p("ny jul dst " + ny.getRules().isDaylightSavings(jul));
+    p("ny jan offset " + ny.getRules().getOffset(jan));
+    p("ny jan standard " + ny.getRules().getStandardOffset(jan));
+    p("ny jan dst " + ny.getRules().isDaylightSavings(jan));
+    p("tp jul offset " + tp.getRules().getOffset(jul));
+    p("tp jul standard " + tp.getRules().getStandardOffset(jul));
+    p("tp jul dst " + tp.getRules().isDaylightSavings(jul));
+    p("tp 1975 offset " + tp.getRules().getOffset(Instant.ofEpochSecond(173404800L)));
+    p("tp 1975 dst " + tp.getRules().isDaylightSavings(Instant.ofEpochSecond(173404800L)));
+    p("tp 1975 standard " + tp.getRules().getStandardOffset(Instant.ofEpochSecond(173404800L)));
+
+    // ---------- a spring forward: the hour that does not exist ----------
+    p("ny spr before " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1615705199L), ny));
+    p("ny spr after " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1615705200L), ny));
+    p("ny spr 01:30 " + ZonedDateTime.of(2021, 3, 14, 1, 30, 0, 0, ny));
+    p("ny spr 02:30 " + ZonedDateTime.of(2021, 3, 14, 2, 30, 0, 0, ny));
+    p("ny spr 03:30 " + ZonedDateTime.of(2021, 3, 14, 3, 30, 0, 0, ny));
+    LocalDateTime gap = LocalDateTime.of(2021, 3, 14, 2, 30, 0);
+    p("ny spr valid " + ny.getRules().getValidOffsets(gap));
+    p("ny spr offset of local " + ny.getRules().getOffset(gap));
+    p("ny spr transition " + ny.getRules().getTransition(gap));
+
+    // ---------- a fall back: the hour that happens twice ----------
+    p("ny fall before " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1636264799L), ny));
+    p("ny fall after " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1636264800L), ny));
+    p("ny fall 00:30 " + ZonedDateTime.of(2021, 11, 7, 0, 30, 0, 0, ny));
+    p("ny fall 01:30 " + ZonedDateTime.of(2021, 11, 7, 1, 30, 0, 0, ny));
+    p("ny fall 02:30 " + ZonedDateTime.of(2021, 11, 7, 2, 30, 0, 0, ny));
+    LocalDateTime overlap = LocalDateTime.of(2021, 11, 7, 1, 30, 0);
+    p("ny fall valid " + ny.getRules().getValidOffsets(overlap));
+    p("ny fall offset of local " + ny.getRules().getOffset(overlap));
+    p("ny fall transition " + ny.getRules().getTransition(overlap));
+    p("ny fall gap duration " + ny.getRules().getTransition(gap).getDuration());
+    p("ny fall gap isGap " + ny.getRules().getTransition(gap).isGap());
+    p("ny fall overlap isOverlap " + ny.getRules().getTransition(overlap).isOverlap());
+    p("ny fall overlap before " + ny.getRules().getTransition(overlap).getDateTimeBefore());
+    p("ny fall overlap after " + ny.getRules().getTransition(overlap).getDateTimeAfter());
+    p("ny fall gap valid -5 " + ny.getRules().getTransition(gap).isValidOffset(ZoneOffset.ofHours(-5)));
+    p("transition of " + ZoneOffsetTransition.of(LocalDateTime.of(2021, 3, 14, 2, 0), ZoneOffset.ofHours(-5), ZoneOffset.ofHours(-4)));
+    p("transition from the local time " + ZoneOffsetTransition.of(LocalDateTime.of(2021, 3, 14, 2, 0), ZoneOffset.ofHours(-5), ZoneOffset.ofHours(-4)).toEpochSecond());
+    p("transition duration " + ZoneOffsetTransition.of(LocalDateTime.of(2021, 3, 14, 2, 0), ZoneOffset.ofHours(-5), ZoneOffset.ofHours(-4)).getDuration());
+
+    // ---------- a southern hemisphere zone, whose DST is inverted ----------
+    p("sy jan " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1610668800L), sy));
+    p("sy jul " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1626307200L), sy));
+    p("sy jan dst " + sy.getRules().isDaylightSavings(Instant.ofEpochSecond(1610668800L)));
+    p("sy jan standard " + sy.getRules().getStandardOffset(Instant.ofEpochSecond(1610668800L)));
+    p("sy jul dst " + sy.getRules().isDaylightSavings(Instant.ofEpochSecond(1626307200L)));
+    p("sy gap " + ZonedDateTime.of(2021, 10, 3, 2, 30, 0, 0, sy));
+    p("sy overlap " + ZonedDateTime.of(2021, 4, 4, 2, 30, 0, 0, sy));
+    p("sy overlap valid " + sy.getRules().getValidOffsets(LocalDateTime.of(2021, 4, 4, 2, 30, 0)));
+
+    // ---------- a standard offset that is not a whole hour ----------
+    p("kt jul " + ZonedDateTime.ofInstant(jul, kt));
+    p("kt jul offset " + kt.getRules().getOffset(jul));
+    p("kt 1980 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(315532800L), kt));
+    p("kt 1988 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(567993600L), kt));
+
+    // ---------- a zone that changed its name and its offset ----------
+    p("tp 1900 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(-2208988800L), tp));
+    p("tp 1937 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(-1028332800L), tp));
+    p("tp 1940 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(-933638400L), tp));
+    p("tp 1946 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(-744336000L), tp));
+    p("ms 2010 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1277942400L), ms));
+    p("ms 2010 dst " + ms.getRules().isDaylightSavings(Instant.ofEpochSecond(1277942400L)));
+    p("ms 2012 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1325376000L), ms));
+    p("ms 2016 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1451606400L), ms));
+    p("kiev 1980 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(315532800L), ZoneId.of("Europe/Kiev")));
+    p("kyiv 1980 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(315532800L), ky));
+    p("kyiv 2020 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1577836800L), ky));
+    p("kiev id " + ZoneId.of("Europe/Kiev").getId());
+    p("kyiv id " + ky.getId());
+
+    // ---------- before the first transition of a file ----------
+    p("ny 1800 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(-5364662400L), ny));
+    p("ny 1800 offset " + ny.getRules().getOffset(Instant.ofEpochSecond(-5364662400L)));
+    p("ny 1800 standard " + ny.getRules().getStandardOffset(Instant.ofEpochSecond(-5364662400L)));
+    p("ny 1883 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(-2717798400L), ny));
+    p("ny first transition " + ny.getRules().getTransitions().get(0));
+
+    // ---------- after the last transition: the footer rule ----------
+    Instant f2050j = Instant.ofEpochSecond(2540289600L);   // 2050-07-01T12:00:00Z
+    Instant f2050d = Instant.ofEpochSecond(2553508800L);   // 2050-12-01T12:00:00Z
+    p("ny 2050 jul " + ZonedDateTime.ofInstant(f2050j, ny));
+    p("ny 2050 dec " + ZonedDateTime.ofInstant(f2050d, ny));
+    p("ny 2050 jul dst " + ny.getRules().isDaylightSavings(f2050j));
+    p("ny 2050 dec dst " + ny.getRules().isDaylightSavings(f2050d));
+    p("tp 2050 " + ZonedDateTime.ofInstant(f2050j, tp));
+    p("kt 2050 " + ZonedDateTime.ofInstant(f2050j, kt));
+    p("ms 2050 " + ZonedDateTime.ofInstant(f2050j, ms));
+    p("sy 2050 jan " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(2525860800L), sy));
+    p("sy 2050 jul " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(2541499200L), sy));
+    p("sy 2050 jul dst " + sy.getRules().isDaylightSavings(Instant.ofEpochSecond(2541499200L)));
+    p("nu 2050 jul " + ZonedDateTime.ofInstant(f2050j, nu));
+    p("nu 2050 jul dst " + nu.getRules().isDaylightSavings(f2050j));
+    p("nu 2050 jul standard " + nu.getRules().getStandardOffset(f2050j));
+    p("nu 2050 jan " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(2525860800L), nu));
+    p("nu 2026 jul dst " + nu.getRules().isDaylightSavings(jul));
+    p("du 2050 jan " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(2525860800L), du));
+    p("du 2050 jul " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(2541499200L), du));
+    p("du 2026 jul " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1784116800L), du));
+    p("du 2026 jan " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1768478400L), du));
+    p("ldn 2050 jul " + ZonedDateTime.ofInstant(f2050j, ZoneId.of("Europe/London")));
+    p("tok 2050 jul " + ZonedDateTime.ofInstant(f2050j, ZoneId.of("Asia/Tokyo")));
+    p("ny 2050 next " + ny.getRules().nextTransition(f2050j));
+    p("ny 2050 previous " + ny.getRules().previousTransition(Instant.ofEpochSecond(2525860800L)));
+    p("ny 2026 next " + ny.getRules().nextTransition(jul));
+    p("ny 2026 previous " + ny.getRules().previousTransition(jul));
+    p("ny 1800 next " + ny.getRules().nextTransition(Instant.ofEpochSecond(-5364662400L)));
+    p("ny 1800 previous " + ny.getRules().previousTransition(Instant.ofEpochSecond(-5364662400L)));
+    p("tp 2050 next " + tp.getRules().nextTransition(Instant.ofEpochSecond(2525860800L)));
+    p("tp 2050 previous " + tp.getRules().previousTransition(Instant.ofEpochSecond(2525860800L)));
+    p("sy 2050 previous " + sy.getRules().previousTransition(Instant.ofEpochSecond(2525860800L)));
+    p("ny 2050 gap valid " + ny.getRules().getValidOffsets(LocalDateTime.of(2050, 3, 13, 2, 30, 0)));
+    p("ny 2050 gap zdt " + ZonedDateTime.of(2050, 3, 13, 2, 30, 0, 0, ny));
+    p("ny 2050 overlap zdt " + ZonedDateTime.of(2050, 11, 6, 1, 30, 0, 0, ny));
+
+    // ---------- the arithmetic across a boundary ----------
+    ZonedDateTime noon = ZonedDateTime.of(2021, 3, 13, 12, 0, 0, 0, ny);
+    p("noon " + noon);
+    p("noon plusDays " + noon.plusDays(1));
+    p("noon plusHours24 " + noon.plusHours(24));
+    p("noon plusDays hours " + Duration.between(noon.toInstant(), noon.plusDays(1).toInstant()).toHours());
+    ZonedDateTime noonFB = ZonedDateTime.of(2021, 11, 6, 12, 0, 0, 0, ny);
+    p("noonFB " + noonFB);
+    p("noonFB plusDays " + noonFB.plusDays(1));
+    p("noonFB plusDays hours " + Duration.between(noonFB.toInstant(), noonFB.plusDays(1).toInstant()).toHours());
+    p("noonFB 01:30 plusDays " + ZonedDateTime.of(2021, 11, 6, 1, 30, 0, 0, ny).plusDays(1));
+    p("noonFB 01:30 plusDays2 " + ZonedDateTime.of(2021, 11, 6, 1, 30, 0, 0, ny).plusDays(2));
+    p("spr 02:30 plusDays " + ZonedDateTime.of(2021, 3, 13, 2, 30, 0, 0, ny).plusDays(1));
+    p("spr 01:30 plusSeconds " + ZonedDateTime.of(2021, 3, 14, 1, 30, 0, 0, ny).plusSeconds(3600));
+    p("sy noon plusDays " + ZonedDateTime.of(2021, 4, 3, 12, 0, 0, 0, sy).plusDays(1));
+    p("sy noon plusDays hours " + Duration.between(ZonedDateTime.of(2021, 4, 3, 12, 0, 0, 0, sy).toInstant(), ZonedDateTime.of(2021, 4, 3, 12, 0, 0, 0, sy).plusDays(1).toInstant()).toHours());
+    p("noon plusMonths " + noon.plusMonths(1));
+    p("noon plusMonths3 " + ZonedDateTime.of(2021, 11, 13, 12, 0, 0, 0, ny).plusMonths(3));
+    p("noon minusDays " + ZonedDateTime.of(2021, 3, 14, 12, 0, 0, 0, ny).minusDays(1));
+
+    // ---------- the parts of a zoned date ----------
+    ZonedDateTime at = ZonedDateTime.of(2021, 3, 14, 3, 30, 0, 0, ny);
+    p("at " + at);
+    p("at toInstant " + at.toInstant());
+    p("at toLocalDateTime " + at.toLocalDateTime());
+    p("at toLocalDate " + at.toLocalDate());
+    p("at toLocalTime " + at.toLocalTime());
+    p("at offset " + at.getOffset());
+    p("at zone " + at.getZone());
+    p("at year " + at.getYear());
+    p("at month " + at.getMonth() + " " + at.getMonthValue());
+    p("at day " + at.getDayOfMonth() + " " + at.getDayOfWeek());
+    p("at hour " + at.getHour() + ":" + at.getMinute() + ":" + at.getSecond());
+    p("at of parts " + ZonedDateTime.of(LocalDate.of(2021, 3, 14), LocalTime.of(2, 30), ny));
+    p("at ofInstant " + ZonedDateTime.ofInstant(Instant.ofEpochMilli(1615707000123L), ny));
+    p("at nanos " + ZonedDateTime.of(2021, 3, 14, 3, 30, 0, 500000000, ny));
+    p("at millis " + ZonedDateTime.of(2021, 3, 14, 3, 30, 0, 123000000, ny));
+    p("at same instant UTC " + at.withZoneSameInstant(ZoneId.of("UTC")));
+    p("at same instant Z " + at.withZoneSameInstant(ZoneOffset.UTC));
+    p("at same local " + at.withZoneSameLocal(ZoneOffset.ofHours(8)));
+    p("at fixed zone " + ZonedDateTime.of(2021, 3, 14, 3, 30, 0, 0, ZoneId.of("+05:45")));
+    p("at utc zone " + ZonedDateTime.of(2021, 3, 14, 3, 30, 0, 0, ZoneId.of("UTC")));
+    p("at after " + at.isAfter(ZonedDateTime.of(2021, 3, 14, 3, 30, 0, 0, ZoneOffset.ofHours(-5))));
+    p("at before " + at.isBefore(ZonedDateTime.of(2021, 3, 14, 3, 30, 0, 0, ZoneOffset.ofHours(-5))));
+    p("at equal " + at.isEqual(ZonedDateTime.of(2021, 3, 14, 7, 30, 0, 0, ZoneOffset.UTC)));
+    p("at equals " + at.equals(ZonedDateTime.of(2021, 3, 14, 7, 30, 0, 0, ZoneOffset.UTC)));
+    p("at compare " + at.compareTo(ZonedDateTime.of(2021, 3, 14, 3, 30, 0, 0, ZoneOffset.ofHours(-5))));
+    p("at zone id " + at.getZone().getId());
+    p("at earlier offset " + at.withEarlierOffsetAtOverlap());
+    p("overlap later offset " + ZonedDateTime.of(2021, 11, 7, 1, 30, 0, 0, ny).withLaterOffsetAtOverlap());
+    p("overlap later instant " + ZonedDateTime.of(2021, 11, 7, 1, 30, 0, 0, ny).withLaterOffsetAtOverlap().toInstant());
+    p("gap earlier offset " + ZonedDateTime.of(2021, 3, 14, 3, 30, 0, 0, ny).withEarlierOffsetAtOverlap());
+    p("gap later offset " + ZonedDateTime.of(2021, 3, 14, 3, 30, 0, 0, ny).withLaterOffsetAtOverlap());
+    p("plain earlier offset " + ZonedDateTime.of(2021, 6, 1, 12, 0, 0, 0, ny).withEarlierOffsetAtOverlap());
+
+    // ---------- fixed offsets and the built-in zones ----------
+    p("zo +08:00 " + ZoneOffset.of("+08:00") + " " + ZoneOffset.of("+08:00").getTotalSeconds());
+    p("zo +0800 " + ZoneOffset.of("+0800"));
+    p("zo +8 " + ZoneOffset.of("+8"));
+    p("zo Z " + ZoneOffset.of("Z"));
+    p("zo +080000 " + ZoneOffset.of("+080000"));
+    p("zo +08:00:00 " + ZoneOffset.of("+08:00:00"));
+    p("zo +08:00:30 " + ZoneOffset.of("+08:00:30").getTotalSeconds());
+    p("zo ofHours " + ZoneOffset.ofHours(8) + " " + ZoneOffset.ofHours(-5));
+    p("zo ofHoursMinutes " + ZoneOffset.ofHoursMinutes(5, 45));
+    p("zo ofHoursMinutesSeconds " + ZoneOffset.ofHoursMinutesSeconds(-5, -45, -30));
+    p("zo ofTotalSeconds " + ZoneOffset.ofTotalSeconds(28800) + " " + ZoneOffset.ofTotalSeconds(-30) + " " + ZoneOffset.ofTotalSeconds(90));
+    p("zo UTC " + ZoneOffset.UTC + " " + ZoneOffset.UTC.getTotalSeconds());
+    p("zo MIN MAX " + ZoneOffset.MIN + " " + ZoneOffset.MAX);
+    p("zi Z " + ZoneId.of("Z") + " " + (ZoneId.of("Z") instanceof ZoneOffset));
+    p("zi UTC " + ZoneId.of("UTC") + " " + ZoneId.of("UTC").normalized());
+    p("zi GMT " + ZoneId.of("GMT") + " " + ZoneId.of("UT"));
+    p("zi UTC+08:00 " + ZoneId.of("UTC+08:00") + " " + ZoneId.of("UTC+08:00").getRules().getOffset(jul));
+    p("zi GMT-05:00 " + ZoneId.of("GMT-05:00") + " " + ZoneId.of("GMT-05:00").getRules().getOffset(jul));
+    p("zi +08:00 " + ZoneId.of("+08:00") + " " + (ZoneId.of("+08:00") instanceof ZoneOffset));
+    p("zi -05:30 " + ZoneId.of("-05:30"));
+    p("zi fixed " + ZoneId.of("UTC").getRules().isFixedOffset() + " " + ny.getRules().isFixedOffset());
+    p("zi etc " + ZoneId.of("Etc/GMT+8").getRules().getOffset(jul));
+    p("zi equals " + ZoneId.of("UTC").equals(ZoneOffset.UTC) + " " + ZoneId.of("UTC").equals(ZoneId.of("UTC")));
+
+    // ---------- the failures ----------
+    try {
+      p("unknown " + ZoneId.of("Not/AZone"));
+    } catch (ZoneRulesException e) {
+      p("unknown " + e.getMessage());
+    }
+    try {
+      p("malformed " + ZoneId.of("Asia Taipei"));
+    } catch (DateTimeException e) {
+      p("malformed " + e.getMessage());
+    }
+    try {
+      p("offset 19 " + ZoneOffset.of("+19:00"));
+    } catch (DateTimeException e) {
+      p("offset 19 " + e.getMessage());
+    }
+    try {
+      p("offset 60 " + ZoneOffset.of("+08:60"));
+    } catch (DateTimeException e) {
+      p("offset 60 " + e.getMessage());
+    }
+    try {
+      p("offset z " + ZoneOffset.of("z"));
+    } catch (DateTimeException e) {
+      p("offset z " + e.getMessage());
+    }
+    try {
+      p("offset 70000 " + ZoneOffset.ofTotalSeconds(70000));
+    } catch (DateTimeException e) {
+      p("offset 70000 " + e.getMessage());
+    }
+    try {
+      p("hours 19 " + ZoneOffset.ofHours(19));
+    } catch (DateTimeException e) {
+      p("hours 19 " + e.getMessage());
+    }
+    try {
+      p("sign -1 30 " + ZoneOffset.ofHoursMinutesSeconds(-1, 30, 0));
+    } catch (DateTimeException e) {
+      p("sign -1 30 " + e.getMessage());
+    }
+    try {
+      p("sign 0 30 -1 " + ZoneOffset.ofHoursMinutesSeconds(0, 30, -1));
+    } catch (DateTimeException e) {
+      p("sign 0 30 -1 " + e.getMessage());
+    }
+    try {
+      p("utc+19 " + ZoneId.of("UTC+19:00"));
+    } catch (DateTimeException e) {
+      p("utc+19 " + e.getMessage());
+    }
+    try {
+      p("null id " + ZoneId.of(null));
+    } catch (NullPointerException e) {
+      p("null id " + e.getMessage());
+    }
+  }
+}

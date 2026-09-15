@@ -1,0 +1,48 @@
+ids is not empty: true
+ids is sorted: true
+ids has Asia/Taipei and UTC: true
+ids has no alternate tree: true
+the set and the array agree: true
+TZDIR honoured for the search path: true
+TZ honoured for the default zone: true
+the ids of a database of our own: 2 Asia/Taipei,UTC
+its Asia/Taipei is +08:00: +08:00
+a zone the database does not have is refused: true
+a fixed offset needs no database: +08:00 GMT
+the search path goes back: true
+unknown id: Unknown time-zone ID: Not/AZone
+traversal /etc/passwd: Invalid zone id: /etc/passwd (a zone id is a path under the zone directory, so it cannot be absolute)
+traversal ../etc/passwd: Invalid zone id: ../etc/passwd (a zone id is a path under the zone directory, so it cannot contain "..")
+traversal Asia/../../../etc/passwd: Invalid zone id: Asia/../../../etc/passwd (a zone id is a path under the zone directory, so it cannot contain "..")
+traversal Etc/..: Invalid zone id: Etc/.. (a zone id is a path under the zone directory, so it cannot contain "..")
+no database: no time zone database: /nonexistent/teyru-tz is not a directory (this library reads the system's own TZif files; install tzdata, or set TZDIR to where they are)
+with no database, UTC still works: UTC -05:30
+the default zone resolves: true
+the default zone is stable: true
+the default zone can be set: Europe/Moscow
+and put back: true
+new york 1800 -04:56:02 std LMT
+new york 2026 jan -05:00 std EST
+new york 2026 jul -04:00 dst EDT
+new york 2050 jul -04:00 dst EDT
+taipei 1900 +08:00 std CST
+taipei 1940 +09:00 std JST
+taipei 1946 +09:00 dst CDT
+taipei 1975 +09:00 dst CDT
+taipei 2050 +08:00 std CST
+kathmandu 1980 +05:30 std +0530
+kathmandu 2026 +05:45 std +0545
+sydney 2021 jan +11:00 dst AEDT
+sydney 2021 jul +10:00 std AEST
+sydney 2050 jan +11:00 dst AEDT
+moscow 2010 jul +04:00 dst MSD
+moscow 2016 +03:00 std MSK
+nuuk 2050 jan -02:00 std -02
+nuuk 2050 jul -01:00 dst -01
+kiritimati 2050 +14:00 std +14
+etc gmt-8 +08:00 std +08
+dublin 2026 jan Z dst GMT
+dublin 2026 jul +01:00 std IST
+dublin 2050 jan Z dst GMT
+dublin winter dst true offset Z standard +01:00
+dublin summer dst false offset +01:00 standard +01:00
