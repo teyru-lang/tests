@@ -1,0 +1,9 @@
+import java.util.function.Supplier
+
+class Main {
+  int n() { return 3 }
+  public static void main(String[] args) {
+    Supplier<Integer> s = () -> n() + 1
+    System.out.println(s.get())
+  }
+}

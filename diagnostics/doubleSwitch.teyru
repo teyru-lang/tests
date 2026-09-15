@@ -1,0 +1,9 @@
+class Main {
+  public static void main(String[] args) {
+    double d = 0.5
+    switch (d) {
+      case 1.5 -> System.out.println("x")
+      default -> System.out.println("y")
+    }
+  }
+}

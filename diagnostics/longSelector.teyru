@@ -1,0 +1,9 @@
+class Main {
+  public static void main(String[] args) {
+    long v = 1
+    switch (v) {
+      case 1 -> System.out.println("one")
+      default -> System.out.println("other")
+    }
+  }
+}

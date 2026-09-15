@@ -1,0 +1,7 @@
+abstract class B {
+  abstract int f()
+}
+class A extends B {
+  public static void main(String[] args) {
+  }
+}

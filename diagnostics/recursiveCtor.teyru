@@ -1,0 +1,13 @@
+class A {
+  A(int n) {
+    this(1)
+  }
+  A() {
+    this(2)
+  }
+}
+class Main {
+  public static void main(String[] args) {
+    new A()
+  }
+}

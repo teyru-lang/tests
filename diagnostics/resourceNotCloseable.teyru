@@ -1,0 +1,8 @@
+class P {
+  public void close() { }
+}
+class Main {
+  public static void main(String[] args) {
+    try (P p = new P()) { System.out.println("in") }
+  }
+}

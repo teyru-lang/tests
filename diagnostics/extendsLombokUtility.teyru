@@ -1,0 +1,13 @@
+import lombok.experimental.UtilityClass
+
+@UtilityClass
+class U {
+  int f() { return 1 }
+}
+class Ext extends U {
+}
+class Main {
+  public static void main(String[] args) {
+    System.out.println(U.f())
+  }
+}

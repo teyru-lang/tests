@@ -1,0 +1,10 @@
+class F {
+  public final int k = 1
+}
+class Main {
+  public static void main(String[] args) {
+    F o = new F()
+    o.k += 1
+    System.out.println(o.k)
+  }
+}

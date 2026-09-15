@@ -1,0 +1,6 @@
+import com.example.Nothing
+
+class Main {
+  public static void main(String[] args) {
+  }
+}

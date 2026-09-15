@@ -1,0 +1,13 @@
+class C {
+  private int v {
+    get { return field + 7 }
+    set { field = value }
+  }
+}
+class Main {
+  public static void main(String[] args) {
+    C c = new C()
+    c.v = 3
+    System.out.println(c.v)
+  }
+}
