@@ -1,0 +1,50 @@
+/* The same program in Java, which is where t182_widening.expected comes from:
+     javac -d /tmp Widening.java && java -cp /tmp Widening
+   (the file is named after its public class; rename it to match when re-running) */
+public class Widening {
+  public static void main(String[] args) {
+    byte b = 55;
+    short s = 65;
+    char c = 66;
+
+    System.out.println(String.valueOf(b) + " " + String.valueOf(s) + " " + String.valueOf(c));
+
+    int ib = b;
+    short sb = b;
+    long lb = b;
+    float fb = b;
+    double db = b;
+    System.out.println(ib + " " + sb + " " + lb + " " + fb + " " + db);
+
+    int is = s;
+    long ls = s;
+    System.out.println(is + " " + ls);
+
+    int ic = c;
+    long lc = c;
+    double dc = c;
+    System.out.println(ic + " " + lc + " " + dc);
+
+    int i = 7;
+    long l = i;
+    float f = i;
+    double d = i;
+    System.out.println(l + " " + f + " " + d);
+
+    long big = 9007199254740993L;
+    float bf = big;
+    double bd = big;
+    System.out.println(bf + " " + bd);
+
+    float small = 0.1f;
+    double wide = small;
+    System.out.println(wide);
+
+    System.out.println(b + s + c + i + l);
+    System.out.println(b * 2 + " " + (c + 1) + " " + (s - 5));
+
+    byte neg = -1;
+    char max = 65535;
+    System.out.println((int) neg + " " + (int) max + " " + ((int) neg & 0xFFFF));
+  }
+}

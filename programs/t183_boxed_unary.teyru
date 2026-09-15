@@ -1,0 +1,104 @@
+// The unary operators on a boxed value. Java unboxes the operand, works in the
+// promoted type -- byte, short and char become int, the rest keep their own --
+// and for `++`/`--` boxes the result into a *new* wrapper, because a wrapper is
+// immutable and another variable may be holding the one being updated. The
+// bounds are here because those are the cases C leaves undefined and Java
+// defines: -Integer.MIN_VALUE is Integer.MIN_VALUE, Long.MAX_VALUE++ is
+// Long.MIN_VALUE, and -0.0 negates to 0.0.
+//
+// t182_boxed_unary.java.ref beside this file is the same program; its output,
+// printed by javac 21 and the JVM, is t182_boxed_unary.expected.
+class Main {
+  public static void main(String[] args) {
+    // negation and promotion, one operand type each
+    Byte b = 3
+    Short s = 300
+    Integer i = 5
+    Long l = 7L
+    Character c = 'a'
+    Float f = 2.5f
+    Double d = 1.5
+    System.out.println(-b + " " + (+b) + " " + (-s) + " " + (-i) + " " + (-l) + " " + (-c))
+    System.out.println(-f + " " + (-d) + " " + (+d) + " " + (-0.0) + " " + (-0.0f))
+
+    // the promoted type is the one the checker gives: these assignments only
+    // compile if -b is an int, -l a long, -f a float and -d a double
+    int ib = -b
+    int is = -s
+    int ic = -c
+    long ll = -l
+    float ff = -f
+    double dd = -d
+    System.out.println(ib + " " + is + " " + ic + " " + ll + " " + ff + " " + dd)
+
+    // the bounds: Java wraps, C does not define the negation of the minimum
+    System.out.println(-Integer.MIN_VALUE + " " + -Integer.MAX_VALUE)
+    System.out.println(-Long.MIN_VALUE + " " + -Long.MAX_VALUE)
+    System.out.println(-Short.MIN_VALUE + " " + -Byte.MIN_VALUE + " " + -Character.MIN_VALUE)
+    System.out.println(-Double.MAX_VALUE + " " + -Float.MIN_VALUE + " " + -Double.MIN_VALUE)
+
+    // prefix and postfix, and the value of each expression
+    Integer n = 5
+    System.out.println(n++ + " " + n + " " + ++n + " " + n-- + " " + n + " " + --n + " " + n)
+    Long ln = Long.MAX_VALUE
+    System.out.println(ln++ + " " + ln + " " + --ln)
+    Byte bn = 127
+    System.out.println(bn++ + " " + bn)
+    Double dn = 1.5
+    System.out.println(dn++ + " " + dn)
+    Character cn = 'z'
+    cn++
+    int ci = cn
+    System.out.println(ci)
+
+    // a wrapper is immutable: updating one variable does not touch the wrapper
+    // another variable is holding
+    Integer a = 5
+    Integer same = a
+    a++
+    System.out.println(a + " " + same + " " + (a == same))
+
+    // the same operators on a field and on an array element
+    Box box = new Box()
+    System.out.println(box.v++ + " " + box.v + " " + --box.v)
+    Integer[] xs = new Integer[2]
+    xs[0] = 10
+    xs[1] = 20
+    System.out.println(xs[0]++ + " " + xs[0] + " " + ++xs[1] + " " + xs[1])
+
+    // ! on a boxed Boolean, which is the other unary operator a wrapper carries
+    Boolean yes = true
+    Boolean no = false
+    boolean n1 = !yes
+    boolean n2 = !no
+    System.out.println(n1 + " " + n2 + " " + (!yes) + " " + (!no))
+
+    // a null wrapper raises NullPointerException for every one of them
+    Integer nil = null
+    try {
+      System.out.println(-nil)
+    } catch (NullPointerException e) {
+      System.out.println("npe negate")
+    }
+    try {
+      System.out.println(+nil)
+    } catch (NullPointerException e) {
+      System.out.println("npe promote")
+    }
+    try {
+      nil++
+    } catch (NullPointerException e) {
+      System.out.println("npe update")
+    }
+    Double nilD = null
+    try {
+      System.out.println(-nilD)
+    } catch (NullPointerException e) {
+      System.out.println("npe negate double")
+    }
+  }
+}
+
+class Box {
+  Integer v = 42
+}

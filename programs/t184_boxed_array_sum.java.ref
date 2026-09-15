@@ -1,0 +1,37 @@
+/* The same program in Java, which is where t184_boxed_array_sum.expected comes
+   from: javac -d /tmp BoxedArraySum.java && java -cp /tmp BoxedArraySum */
+public class BoxedArraySum {
+  public static void main(String[] args) {
+    int n = 1 << 16;
+    Integer[] boxes = new Integer[n];
+    Long[] longs = new Long[n];
+    Short[] shorts = new Short[n];
+    for (int i = 0; i < n; i++) {
+      boxes[i] = Integer.valueOf(i * 7 + 1);
+      longs[i] = Long.valueOf(i * 1000003L + 5L);
+      shorts[i] = Short.valueOf((short)(i % 1000));
+    }
+
+    long acc = 0;
+    for (int r = 0; r < 500; r++) {
+      for (int i = 0; i < n; i++) {
+        acc += boxes[i].intValue();
+      }
+    }
+    System.out.println(acc);
+
+    long lacc = 0;
+    for (int i = 0; i < n; i++) {
+      lacc += longs[i].longValue();
+    }
+    System.out.println(lacc);
+
+    long sacc = 0;
+    for (int i = 0; i < n; i++) {
+      sacc += shorts[i].shortValue();
+    }
+    System.out.println(sacc);
+
+    System.out.println(boxes[65535].toString() + " " + longs[0].toString() + " " + shorts[123].toString());
+  }
+}

@@ -1,0 +1,7 @@
+class Main {
+  public static void main(String[] args) {
+    byte b = 55
+    char c = b
+    System.out.println(c)
+  }
+}

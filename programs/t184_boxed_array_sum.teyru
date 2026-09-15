@@ -1,0 +1,47 @@
+/* Boxes that escape into an array, summed in a loop. This shape exists because
+ * it is one the compiler used to get *wrong*: with the wrappers' value semantics
+ * still in the runtime, a hello-world-sized program summing 32.8M boxed values
+ * answered 14091627138000 where Java answers 7516110848000 -- the loop, the
+ * unboxing and the accumulation all folded into a constant that was not the sum.
+ * Nothing in the suite covered it, because every existing boxing test computes a
+ * value small enough to check by eye.
+ *
+ * The expectation is javac's output for the same program (the .java.ref beside
+ * this file), and the value is chosen so that a wrong fold cannot land on it. */
+class Main {
+  public static void main(String[] args) {
+    int n = 1 << 16
+    Integer[] boxes = new Integer[n]
+    Long[] longs = new Long[n]
+    Short[] shorts = new Short[n]
+    for (int i = 0 : i < n : i++) {
+      boxes[i] = Integer.valueOf(i * 7 + 1)
+      longs[i] = Long.valueOf(i * 1000003L + 5L)
+      shorts[i] = Short.valueOf((short)(i % 1000))
+    }
+
+    long acc = 0
+    for (int r = 0 : r < 500 : r++) {
+      for (int i = 0 : i < n : i++) {
+        acc += boxes[i].intValue()
+      }
+    }
+    System.out.println(acc)
+
+    long lacc = 0
+    for (int i = 0 : i < n : i++) {
+      lacc += longs[i].longValue()
+    }
+    System.out.println(lacc)
+
+    long sacc = 0
+    for (int i = 0 : i < n : i++) {
+      sacc += shorts[i].shortValue()
+    }
+    System.out.println(sacc)
+
+    // and the same values read back as text, which goes through the wrappers'
+    // toString rather than their accessors
+    System.out.println(boxes[65535].toString() + " " + longs[0].toString() + " " + shorts[123].toString())
+  }
+}

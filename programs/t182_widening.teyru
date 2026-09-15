@@ -1,0 +1,63 @@
+/* Which primitive conversions happen without a cast, which is JLS 5.1.2's list
+ * and not an ordering of the kinds. The difference that matters: a byte or a
+ * short does not widen to char (char is unsigned, so Java wants a cast), and an
+ * ordering that puts byte below char gets both of those wrong -- and with them
+ * which overload of String.valueOf applies, so a byte printed its character
+ * instead of its number.
+ *
+ * The expectation is the same program compiled by javac:
+ *   javac -d /tmp Tests.java && java -cp /tmp Tests          (see the .java.ref) */
+class Main {
+  public static void main(String[] args) {
+    byte b = 55
+    short s = 65
+    char c = 66
+
+    // the overloads: the byte and the short take valueOf(int), the char takes
+    // valueOf(char)
+    System.out.println(String.valueOf(b) + " " + String.valueOf(s) + " " + String.valueOf(c))
+
+    // byte and short widen to everything above them except char
+    int ib = b
+    short sb = b
+    long lb = b
+    float fb = b
+    double db = b
+    System.out.println(ib + " " + sb + " " + lb + " " + fb + " " + db)
+
+    int is = s
+    long ls = s
+    System.out.println(is + " " + ls)
+
+    // char widens to int (its code point, not its character) and beyond
+    int ic = c
+    long lc = c
+    double dc = c
+    System.out.println(ic + " " + lc + " " + dc)
+
+    // int to long, float, double; long to float, double; float to double
+    int i = 7
+    long l = i
+    float f = i
+    double d = i
+    System.out.println(l + " " + f + " " + d)
+
+    long big = 9007199254740993L
+    float bf = big
+    double bd = big
+    System.out.println(bf + " " + bd)
+
+    float small = 0.1f
+    double wide = small
+    System.out.println(wide)
+
+    // and the arithmetic promotions the same table drives
+    System.out.println(b + s + c + i + l)
+    System.out.println(b * 2 + " " + (c + 1) + " " + (s - 5))
+
+    // a byte is signed, a char is not: the same bit pattern, two numbers
+    byte neg = -1
+    char max = 65535
+    System.out.println((int) neg + " " + (int) max + " " + ((int) neg & 0xFFFF))
+  }
+}
