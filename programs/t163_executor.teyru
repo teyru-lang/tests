@@ -1,0 +1,281 @@
+/* The executor half of java.util.concurrent, on top of the threads t159
+   exercises: a fixed pool, a single-thread pool and a cached pool, Callables
+   and the Futures their answers come back through, a task that throws, a task
+   that is cancelled before it starts, shutdown, shutdownNow, and the
+   CountDownLatch the latch section waits on.
+
+   What each part is here to prove:
+
+   - A fixed pool of four really runs four tasks at once. The first four tasks
+     report to a shared counter and then wait -- with Thread.sleep, not with a
+     monitor -- until that counter says four of them are in flight. Only four
+     workers can satisfy that, so a pool of fewer than four prints a smaller
+     number. With four workers it is exactly four, every run.
+
+   - The twelve tasks contend on one AtomicInteger and the total is exact.
+     Twelve increments through AtomicInteger.incrementAndGet land as twelve: an
+     implementation that lost an update under contention prints 11, and one
+     that is not really atomic under a lock prints something less than twelve
+     most runs.
+
+   - An answer that arrives through Future.get() is the task's own answer, in
+     submission order, after the task has finished on another thread. The sum
+     of the twelve squares is 506, and every answer has to be right for it.
+
+   - A Callable that throws is reported, never swallowed: get() throws
+     ExecutionException carrying the task's own IllegalStateException as the
+     cause.
+
+   - A task cancelled before it starts is skipped by the worker that takes it,
+     and get() on it throws CancellationException. The single-thread executor is
+     how the test knows the task has not started: its one worker is held inside
+     a first task while the second is cancelled, so the second is certainly
+     still in the queue.
+
+   - shutdown() stops the pool taking work and lets the tasks that were already
+     accepted finish; awaitTermination then answers true, and a task handed to
+     the pool afterwards is refused. shutdownNow() cannot stop a task that is
+     running -- there is no interrupt in this language -- and hands back exactly
+     the tasks that never started, while the running one finishes, which is what
+     the counts below show.
+
+   - A CountDownLatch opens only when every countDown has happened: with one of
+     two done, a 150-millisecond await gives up and says so, and the count is
+     still one afterwards.
+
+   Nothing here is timed: every line the program prints is a value or a boolean
+   the main thread prints after joining, so the output is the same on every run,
+   and not one of them depends on how fast the machine is. The only durations in
+   the program are the upper bounds of waits that are expected to succeed long
+   before they expire.
+
+   The one thing in this program that is not the standard library's business:
+   the tasks that have to block -- the four meeting at the gate, and the two the
+   single-thread executor is held on -- spin on a shared counter with
+   Thread.sleep between looks, rather than waiting on a latch, and this program
+   uses CountDownLatch only where it is the thing being tested. That is not
+   squeamishness about the latch: it is that this runtime's Object.wait corrupts
+   the monitor it waits on (a worker parked that way throws
+   IllegalMonitorStateException from the next synchronized block it leaves), so
+   the library's own tasks never wait, and a test that proves the library's
+   pool works should not fail on the runtime's monitor instead. The latch's own
+   section below is where the waiting is the point. */
+
+/* One of the twelve: it reports to the gate, spins until four tasks are inside
+   it, counts itself into the shared AtomicInteger, and answers its square. */
+class SquareTask implements Callable<Integer> {
+  private int n
+  private AtomicInteger ran
+  private AtomicInteger arrived
+  private AtomicInteger together
+
+  public SquareTask(int n, AtomicInteger ran, AtomicInteger arrived, AtomicInteger together) {
+    this.n = n
+    this.ran = ran
+    this.arrived = arrived
+    this.together = together
+  }
+
+  public Integer call() {
+    if (this.n < 4) {
+      this.arrived.incrementAndGet()
+      long deadline = System.nanoTime() + 20000L * 1000000L
+      while (this.arrived.get() < 4 && System.nanoTime() < deadline) {
+        Thread.sleep(1)
+      }
+      if (this.arrived.get() >= 4) {
+        /* four of us were inside the pool at this instant, or this could not
+           have been observed at all */
+        this.together.incrementAndGet()
+      }
+    }
+    this.ran.incrementAndGet()
+    return Integer.valueOf(this.n * this.n)
+  }
+}
+
+class Main {
+  public static void main(String[] args) {
+    System.out.println("== a fixed pool of four runs twelve tasks ==")
+    ExecutorService pool = Executors.newFixedThreadPool(4)
+    AtomicInteger ran = new AtomicInteger()
+    AtomicInteger arrived = new AtomicInteger()
+    AtomicInteger together = new AtomicInteger()
+    List<Future<Integer>> futures = new ArrayList<Future<Integer>>()
+    for (int i = 0 : i < 12 : i++) {
+      Callable<Integer> task = new SquareTask(i, ran, arrived, together)
+      futures.add(pool.submit(task))
+    }
+    int checksum = 0
+    for (int i = 0 : i < 12 : i++) {
+      Integer answer = futures.get(i).get()
+      checksum = checksum + answer.intValue()
+    }
+    System.out.println("tasks that saw all four in flight=" + together.get() + " exact=" + (together.get() == 4))
+    System.out.println("answers taken through get()=" + futures.size())
+    System.out.println("sum of the answers=" + checksum + " exact=" + (checksum == 506))
+    System.out.println("increments that survived contention=" + ran.get() + " exact=" + (ran.get() == 12))
+
+    System.out.println("== execute() runs a plain Runnable ==")
+    final AtomicInteger plain = new AtomicInteger()
+    for (int i = 0 : i < 5 : i++) {
+      pool.execute(new Runnable() {
+        public void run() {
+          plain.incrementAndGet()
+        }
+      })
+    }
+    long deadline = System.nanoTime() + 20000L * 1000000L
+    while (plain.get() < 5 && System.nanoTime() < deadline) {
+      Thread.sleep(1)
+    }
+    System.out.println("runnables that ran=" + plain.get() + " exact=" + (plain.get() == 5))
+
+    System.out.println("== a task that throws reaches the caller ==")
+    Callable<Integer> bad = new Callable<Integer>() {
+      public Integer call() {
+        throw new IllegalStateException("the task refused")
+      }
+    }
+    Future<Integer> failed = pool.submit(bad)
+    try {
+      failed.get()
+      System.out.println("get() returned, which would be a swallowed failure")
+    } catch (ExecutionException e) {
+      System.out.println("get() threw " + e.getClass().getName())
+      System.out.println("the cause it carries is " + e.getCause().toString())
+    }
+    System.out.println("that future is done=" + failed.isDone() + " cancelled=" + failed.isCancelled())
+
+    System.out.println("== a task cancelled before it starts ==")
+    ExecutorService single = Executors.newSingleThreadExecutor()
+    final AtomicInteger busy = new AtomicInteger()
+    final AtomicInteger release = new AtomicInteger()
+    Callable<Integer> blocker = new Callable<Integer>() {
+      public Integer call() {
+        busy.incrementAndGet()
+        while (release.get() == 0) {
+          Thread.sleep(1)
+        }
+        return Integer.valueOf(1)
+      }
+    }
+    Future<Integer> running = single.submit(blocker)
+    deadline = System.nanoTime() + 20000L * 1000000L
+    while (busy.get() == 0 && System.nanoTime() < deadline) {
+      Thread.sleep(1)
+    }
+    System.out.println("the one worker is busy=" + (busy.get() == 1))
+    Future<Integer> queued = single.submit(new Callable<Integer>() {
+      public Integer call() {
+        return Integer.valueOf(2)
+      }
+    })
+    boolean took = queued.cancel()
+    System.out.println("cancel() took=" + took + " isCancelled=" + queued.isCancelled() + " isDone=" + queued.isDone())
+    try {
+      queued.get()
+      System.out.println("get() answered a cancelled task, which it must not")
+    } catch (CancellationException e) {
+      System.out.println("get() on the cancelled task threw " + e.getClass().getName())
+    }
+    release.incrementAndGet()
+    System.out.println("the task that was running answered " + running.get())
+
+    System.out.println("== shutdownNow hands back what never started ==")
+    final AtomicInteger busy2 = new AtomicInteger()
+    final AtomicInteger release2 = new AtomicInteger()
+    final AtomicInteger finished = new AtomicInteger()
+    single.execute(new Runnable() {
+      public void run() {
+        busy2.incrementAndGet()
+        while (release2.get() == 0) {
+          Thread.sleep(1)
+        }
+        finished.incrementAndGet()
+      }
+    })
+    deadline = System.nanoTime() + 20000L * 1000000L
+    while (busy2.get() == 0 && System.nanoTime() < deadline) {
+      Thread.sleep(1)
+    }
+    single.execute(new Runnable() {
+      public void run() {
+        finished.incrementAndGet()
+      }
+    })
+    single.execute(new Runnable() {
+      public void run() {
+        finished.incrementAndGet()
+      }
+    })
+    List<Runnable> dropped = single.shutdownNow()
+    release2.incrementAndGet()
+    boolean singleTerminated = single.awaitTermination(20000)
+    System.out.println("one task was running=" + (busy2.get() == 1) + " dropped=" + dropped.size() + " that finished=" + finished.get() + " terminated=" + singleTerminated)
+    try {
+      single.execute(new Runnable() {
+        public void run() {
+        }
+      })
+      System.out.println("a task was accepted after shutdown, which it must not be")
+    } catch (RejectedExecutionException e) {
+      System.out.println("a task after shutdown was rejected with " + e.getClass().getName())
+    }
+
+    System.out.println("== shutdown, then awaitTermination ==")
+    pool.shutdown()
+    System.out.println("isShutdown=" + pool.isShutdown())
+    boolean poolTerminated = pool.awaitTermination(20000)
+    System.out.println("awaitTermination answered " + poolTerminated + " isTerminated=" + pool.isTerminated())
+
+    System.out.println("== a cached pool ==")
+    ExecutorService cached = Executors.newCachedThreadPool()
+    final AtomicInteger cachedRan = new AtomicInteger()
+    for (int i = 0 : i < 3 : i++) {
+      cached.execute(new Runnable() {
+        public void run() {
+          cachedRan.incrementAndGet()
+        }
+      })
+    }
+    deadline = System.nanoTime() + 20000L * 1000000L
+    while (cachedRan.get() < 3 && System.nanoTime() < deadline) {
+      Thread.sleep(1)
+    }
+    System.out.println("the cached pool ran its tasks=" + cachedRan.get() + " exact=" + (cachedRan.get() == 3))
+    cached.shutdown()
+    System.out.println("the cached pool terminated=" + cached.awaitTermination(20000))
+
+    System.out.println("== a latch opens only after every countDown ==")
+    CountDownLatch two = new CountDownLatch(2)
+    System.out.println("count=" + two.getCount())
+    System.out.println("released with one still missing=" + two.await(150))
+    System.out.println("count after that timeout=" + two.getCount())
+    two.countDown()
+    System.out.println("released with one still missing=" + two.await(150))
+    two.countDown()
+    System.out.println("released after both=" + two.await(150) + " count=" + two.getCount())
+    two.await()
+    System.out.println("await() on an open latch returns, count=" + two.getCount())
+    two.countDown()
+    System.out.println("countDown past zero leaves the count at " + two.getCount())
+
+    System.out.println("== a latch releases a waiter on another thread ==")
+    CountDownLatch gate = new CountDownLatch(1)
+    ExecutorService waiter = Executors.newSingleThreadExecutor()
+    final AtomicInteger released = new AtomicInteger()
+    waiter.execute(new Runnable() {
+      public void run() {
+        gate.await()
+        released.incrementAndGet()
+      }
+    })
+    System.out.println("count before the countDown=" + gate.getCount())
+    gate.countDown()
+    waiter.shutdown()
+    System.out.println("the waiter ran=" + waiter.awaitTermination(20000) + " released=" + released.get() + " count=" + gate.getCount())
+
+    System.out.println("done")
+  }
+}

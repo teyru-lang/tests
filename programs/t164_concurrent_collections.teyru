@@ -1,0 +1,135 @@
+/* ConcurrentHashMap, AtomicInteger and AtomicLong under four threads at once.
+
+   What each part is here to prove:
+
+   - Four threads putting a thousand keys each into one ConcurrentHashMap, and
+     counting each key into one AtomicInteger and one AtomicLong, leave a map of
+     exactly 4000 entries, a counter of exactly 4000 and a total of exactly
+     4000. Every one of those is a monitor in this standard library and not a
+     CAS: a put that was not serialized with the others loses a key (the map
+     comes back short), and an increment that was not atomic loses an update
+     (the counter comes back short). None of them does here, three rounds
+     running, with a fresh map, counter and pool of threads each round.
+
+   - The spot checks read back what went in: a key from each end of the range,
+     a key that was never put, a remove that answers the value it removed.
+
+   - keys() answers every key that is in the map -- 3999 of them once one has
+     been removed -- and the enumeration is over a snapshot taken under the
+     map's monitor, so counting it while other threads are done putting is
+     exact.
+
+   - A null key is refused on the way in and on the way out, as Java's
+     ConcurrentHashMap refuses it.
+
+   - The atomic wrappers answer what Java's answer: getAndSet returns the old
+     value, getAndIncrement returns the value before the step, incrementAndGet
+     and addAndGet return the value after it, and compareAndSet takes only when
+     the value is the one it was given.
+
+   Every line is printed by the main thread after joining the four putters, so
+   the output is the same on every run: no worker prints, and nothing here is
+   timed. The joins are plain Thread.join, and nothing in this program waits on
+   a monitor, so no part of it depends on the runtime's Object.wait. */
+
+/* One of the four: it puts its own thousand keys, and counts each of them into
+   the two shared counters. The keys are named after the thread, so no two
+   putters ever write the same key. */
+class Putter implements Runnable {
+  private ConcurrentHashMap<String, Integer> map
+  private AtomicInteger total
+  private AtomicLong grand
+  private int id
+  private int count
+
+  public Putter(ConcurrentHashMap<String, Integer> map, AtomicInteger total, AtomicLong grand, int id, int count) {
+    this.map = map
+    this.total = total
+    this.grand = grand
+    this.id = id
+    this.count = count
+  }
+
+  public String key(int i) {
+    return "t" + this.id + "-" + i
+  }
+
+  public void run() {
+    for (int i = 0 : i < this.count : i++) {
+      this.map.put(this.key(i), Integer.valueOf(i))
+      this.total.incrementAndGet()
+      this.grand.addAndGet(1L)
+    }
+  }
+}
+
+class Main {
+  public static void main(String[] args) {
+    System.out.println("== four threads, four thousand keys, three rounds ==")
+    for (int round = 1 : round <= 3 : round++) {
+      ConcurrentHashMap<String, Integer> map = new ConcurrentHashMap<String, Integer>()
+      AtomicInteger total = new AtomicInteger()
+      AtomicLong grand = new AtomicLong()
+      List<Thread> threads = new ArrayList<Thread>()
+      for (int t = 0 : t < 4 : t++) {
+        Thread thread = new Thread(new Putter(map, total, grand, t, 1000), "putter-" + t)
+        threads.add(thread)
+        thread.start()
+      }
+      for (Thread thread : threads) {
+        thread.join()
+      }
+      boolean exact = (map.size() == 4000) && (total.get() == 4000) && (grand.get() == 4000L)
+      System.out.println("round=" + round + " size=" + map.size() + " total=" + total.get() + " grand=" + grand.get() + " exact=" + exact)
+      System.out.println("  containsKey(t0-0)=" + map.containsKey("t0-0") + " get(t3-999)=" + map.get("t3-999") + " get(t2-1000)=" + map.get("t2-1000"))
+      Integer gone = map.remove("t0-0")
+      int keys = 0
+      Enumeration<String> all = map.keys()
+      while (all.hasMoreElements()) {
+        String k = all.nextElement()
+        keys = keys + 1
+      }
+      System.out.println("  isEmpty=" + map.isEmpty() + " remove(t0-0)=" + gone + " containsKey(t0-0)=" + map.containsKey("t0-0") + " size=" + map.size() + " keys()=" + keys)
+    }
+
+    System.out.println("== the atomic wrappers ==")
+    AtomicInteger counter = new AtomicInteger(10)
+    System.out.println("get=" + counter.get() + " getAndSet(20)=" + counter.getAndSet(20) + " now=" + counter.get())
+    counter.set(5)
+    System.out.println("after set(5) get=" + counter.get())
+    System.out.println("getAndIncrement=" + counter.getAndIncrement() + " now=" + counter.get())
+    System.out.println("incrementAndGet=" + counter.incrementAndGet() + " addAndGet(10)=" + counter.addAndGet(10) + " now=" + counter.get())
+    System.out.println("compareAndSet(17, 1)=" + counter.compareAndSet(17, 1) + " now=" + counter.get())
+    System.out.println("compareAndSet(18, 8)=" + counter.compareAndSet(18, 8) + " now=" + counter.get())
+    System.out.println("toString=" + counter.toString())
+
+    AtomicLong wide = new AtomicLong(6L)
+    System.out.println("get=" + wide.get() + " getAndSet(12L)=" + wide.getAndSet(12L) + " now=" + wide.get())
+    wide.set(3L)
+    System.out.println("after set(3L) get=" + wide.get())
+    System.out.println("getAndIncrement=" + wide.getAndIncrement() + " now=" + wide.get())
+    System.out.println("incrementAndGet=" + wide.incrementAndGet() + " addAndGet(4L)=" + wide.addAndGet(4L) + " now=" + wide.get())
+    System.out.println("compareAndSet(9L, 1L)=" + wide.compareAndSet(9L, 1L) + " now=" + wide.get())
+    System.out.println("compareAndSet(1L, 7L)=" + wide.compareAndSet(1L, 7L) + " now=" + wide.get())
+    System.out.println("toString=" + wide.toString())
+
+    System.out.println("== nulls, and an empty map ==")
+    ConcurrentHashMap<String, String> small = new ConcurrentHashMap<String, String>()
+    System.out.println("a fresh map is " + small + " and holds " + small.size() + " isEmpty=" + small.isEmpty())
+    small.put("k", "v")
+    System.out.println("after put: " + small + " get=" + small.get("k") + " toString=" + small.toString())
+    try {
+      small.put(null, "v")
+      System.out.println("a null key was accepted, which it must not be")
+    } catch (NullPointerException e) {
+      System.out.println("a null key was refused with " + e.getClass().getName())
+    }
+    try {
+      small.get(null)
+      System.out.println("a null lookup was accepted, which it must not be")
+    } catch (NullPointerException e) {
+      System.out.println("a null lookup was refused with " + e.getClass().getName())
+    }
+    System.out.println("done")
+  }
+}

@@ -1,0 +1,31 @@
+== four threads, four thousand keys, three rounds ==
+round=1 size=4000 total=4000 grand=4000 exact=true
+  containsKey(t0-0)=true get(t3-999)=999 get(t2-1000)=null
+  isEmpty=false remove(t0-0)=0 containsKey(t0-0)=false size=3999 keys()=3999
+round=2 size=4000 total=4000 grand=4000 exact=true
+  containsKey(t0-0)=true get(t3-999)=999 get(t2-1000)=null
+  isEmpty=false remove(t0-0)=0 containsKey(t0-0)=false size=3999 keys()=3999
+round=3 size=4000 total=4000 grand=4000 exact=true
+  containsKey(t0-0)=true get(t3-999)=999 get(t2-1000)=null
+  isEmpty=false remove(t0-0)=0 containsKey(t0-0)=false size=3999 keys()=3999
+== the atomic wrappers ==
+get=10 getAndSet(20)=10 now=20
+after set(5) get=5
+getAndIncrement=5 now=6
+incrementAndGet=7 addAndGet(10)=17 now=17
+compareAndSet(17, 1)=true now=1
+compareAndSet(18, 8)=false now=1
+toString=1
+get=6 getAndSet(12L)=6 now=12
+after set(3L) get=3
+getAndIncrement=3 now=4
+incrementAndGet=5 addAndGet(4L)=9 now=9
+compareAndSet(9L, 1L)=true now=1
+compareAndSet(1L, 7L)=true now=7
+toString=7
+== nulls, and an empty map ==
+a fresh map is {} and holds 0 isEmpty=true
+after put: {k=v} get=v toString={k=v}
+a null key was refused with teyru.NullPointerException
+a null lookup was refused with teyru.NullPointerException
+done

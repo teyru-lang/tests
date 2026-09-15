@@ -1,0 +1,37 @@
+== a fixed pool of four runs twelve tasks ==
+tasks that saw all four in flight=4 exact=true
+answers taken through get()=12
+sum of the answers=506 exact=true
+increments that survived contention=12 exact=true
+== execute() runs a plain Runnable ==
+runnables that ran=5 exact=true
+== a task that throws reaches the caller ==
+get() threw teyru.ExecutionException
+the cause it carries is teyru.IllegalStateException: the task refused
+that future is done=true cancelled=false
+== a task cancelled before it starts ==
+the one worker is busy=true
+cancel() took=true isCancelled=true isDone=true
+get() on the cancelled task threw teyru.CancellationException
+the task that was running answered 1
+== shutdownNow hands back what never started ==
+one task was running=true dropped=2 that finished=1 terminated=true
+a task after shutdown was rejected with teyru.RejectedExecutionException
+== shutdown, then awaitTermination ==
+isShutdown=true
+awaitTermination answered true isTerminated=true
+== a cached pool ==
+the cached pool ran its tasks=3 exact=true
+the cached pool terminated=true
+== a latch opens only after every countDown ==
+count=2
+released with one still missing=false
+count after that timeout=2
+released with one still missing=false
+released after both=true count=0
+await() on an open latch returns, count=0
+countDown past zero leaves the count at 0
+== a latch releases a waiter on another thread ==
+count before the countDown=1
+the waiter ran=true released=1 count=0
+done
