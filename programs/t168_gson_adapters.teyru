@@ -1,0 +1,238 @@
+// JsonSerializer, JsonDeserializer, registerTypeAdapter and @JsonAdapter.
+//
+// An adapter is how a program hands one type over to its own code: the binding
+// asks the Gson for an adapter for the type it is about to bind (and for the
+// type a field declares, and for the element class of a container), and what it
+// finds reads and writes the whole value. The context an adapter is handed
+// delegates back to the binding with the same configuration, which is what lets
+// an adapter wrap the binding's own answer for the value inside.
+//
+// The registration is checked where it is written, as in Gson: a type registered
+// with something that implements neither interface is refused rather than
+// ignored until the first value.
+
+import teyru.*
+
+class Money {
+  long cents
+}
+
+class Person {
+  String name
+}
+
+class Wrapped {
+  Person inner
+}
+
+@JsonAdapter("TagAdapter")
+class Tag {
+  String text
+}
+
+// A serializer and a deserializer for Money: the document carries cents as
+// "#123", which the binding cannot know about.
+class MoneyAdapter implements JsonSerializer<Money>, JsonDeserializer<Money> {
+  public JsonElement serialize(Money src, Class typeOfSrc, JsonSerializationContext context) {
+    return new JsonPrimitive("#" + src.cents)
+  }
+
+  public Money deserialize(JsonElement json, Class typeOfT, JsonDeserializationContext context) {
+    Money m = new Money()
+    m.cents = Long.parseLong(json.getAsString().substring(1))
+    return m
+  }
+}
+
+// The same type, written a different way: a field that names this one with
+// @JsonAdapter gets it instead of whatever the Gson has registered.
+class HexAdapter implements JsonSerializer<Money>, JsonDeserializer<Money> {
+  public JsonElement serialize(Money src, Class typeOfSrc, JsonSerializationContext context) {
+    return new JsonPrimitive("0x" + Long.toHexString(src.cents))
+  }
+
+  public Money deserialize(JsonElement json, Class typeOfT, JsonDeserializationContext context) {
+    long v = 0
+    String hex = json.getAsString().substring(2)
+    for (int i = 0 : i < hex.length() : i++) {
+      v = v * 16 + digit(hex.charAt(i))
+    }
+    Money m = new Money()
+    m.cents = v
+    return m
+  }
+
+  private static int digit(char c) {
+    if (c >= '0' && c <= '9') {
+      return c - '0'
+    }
+    return c - 'a' + 10
+  }
+}
+
+// @JsonAdapter on a class: every use of Tag, whichever Gson binds it, goes
+// through this pair.
+class TagAdapter implements JsonSerializer<Tag>, JsonDeserializer<Tag> {
+  public JsonElement serialize(Tag src, Class typeOfSrc, JsonSerializationContext context) {
+    return new JsonPrimitive("tag:" + src.text)
+  }
+
+  public Tag deserialize(JsonElement json, Class typeOfT, JsonDeserializationContext context) {
+    Tag t = new Tag()
+    t.text = json.getAsString().substring(4)
+    return t
+  }
+}
+
+// An adapter that delegates: what it writes for the value inside is the
+// binding's own answer, reached through the context, and what it reads is read
+// back the same way.
+class WrappedAdapter implements JsonSerializer<Wrapped>, JsonDeserializer<Wrapped> {
+  public JsonElement serialize(Wrapped src, Class typeOfSrc, JsonSerializationContext context) {
+    JsonObject o = new JsonObject()
+    o.add("kind", new JsonPrimitive("wrapped"))
+    o.add("value", context.serialize(src.inner))
+    return o
+  }
+
+  public Wrapped deserialize(JsonElement json, Class typeOfT, JsonDeserializationContext context) {
+    Wrapped w = new Wrapped()
+    w.inner = (Person) context.deserialize(json.getAsJsonObject().get("value"), Person.class)
+    return w
+  }
+}
+
+// A hierarchy adapter answers for a base type and every subtype of it.
+class Animal {
+  String kind
+}
+
+class Dog extends Animal {
+}
+
+class AnimalAdapter implements JsonSerializer<Animal>, JsonDeserializer<Animal> {
+  public JsonElement serialize(Animal src, Class typeOfSrc, JsonSerializationContext context) {
+    return new JsonPrimitive("animal:" + src.kind)
+  }
+
+  public Animal deserialize(JsonElement json, Class typeOfT, JsonDeserializationContext context) {
+    Animal a = new Dog()
+    a.kind = json.getAsString().substring(7)
+    return a
+  }
+}
+
+class Invoice {
+  Money total
+  @JsonAdapter("HexAdapter") Money hexTotal
+  Tag tag
+  Wrapped wrapped
+  List<Money> prices
+  Dog pet
+  String note
+}
+
+class Main {
+  static Gson configured() {
+    GsonBuilder b = new GsonBuilder()
+    b.registerTypeAdapter(Money.class, new MoneyAdapter())
+    b.registerTypeAdapter(Wrapped.class, new WrappedAdapter())
+    b.registerTypeHierarchyAdapter(Animal.class, new AnimalAdapter())
+    return b.create()
+  }
+
+  public static void main(String[] args) {
+    Gson plain = new Gson()
+    Gson gson = configured()
+
+    // a registered adapter is used in both directions, for the type it names
+    Invoice i = new Invoice()
+    i.total = money(125)
+    i.hexTotal = money(255)
+    i.tag = tag("hot")
+    i.wrapped = wrap("ann")
+    i.prices = new ArrayList<Money>()
+    i.prices.add(money(7))
+    i.prices.add(money(9))
+    i.pet = dog("rex")
+    i.note = "n"
+    System.out.println("written=" + gson.toJson(i))
+
+    // ... and read back through the same adapters, including the one a field
+    // names itself and the one a container's element type reaches
+    Invoice back = gson.fromJson(gson.toJson(i), Invoice.class)
+    System.out.println("read=" + back.total.cents + "/" + back.hexTotal.cents + "/" + back.tag.text +
+        "/" + back.wrapped.inner.name + "/" + back.note)
+    StringBuilder prices = new StringBuilder()
+    for (Money m : back.prices) {
+      if (prices.length() > 0) {
+        prices.append(",")
+      }
+      prices.append(m.cents)
+    }
+    System.out.println("prices=" + prices.toString() + " pet=" + back.pet.kind +
+        " as " + animalClass(back.pet))
+
+    // the type's own @JsonAdapter is used by a Gson that never heard of it, and
+    // a field's @JsonAdapter wins over a registration for the same type: the
+    // two members below hold the same value and are written by two adapters
+    System.out.println("plain-tag=" + plain.toJson(tag("cold")))
+    Invoice both = new Invoice()
+    both.total = money(255)
+    both.hexTotal = money(255)
+    System.out.println("field-wins=" + gson.toJson(both))
+
+    // an adapter only answers for what it was registered for
+    System.out.println("unregistered=" + plain.toJson(money(3)))
+
+    // the context delegates back to the binding: what the adapter did not write
+    // is what the binding wrote for that field
+    Wrapped w = gson.fromJson("{\"kind\":\"wrapped\",\"value\":{\"name\":\"bo\"}}", Wrapped.class)
+    System.out.println("delegated=" + w.inner.name)
+
+    // the registration is checked where it is written
+    try {
+      new GsonBuilder().registerTypeAdapter(Money.class, "not an adapter")
+      System.out.println("registration: accepted")
+    } catch (IllegalArgumentException e) {
+      System.out.println("registration: " + e.getMessage())
+    }
+
+    // an adapter for the type answers for the whole type, so a container of that
+    // type is a container of what the adapter reads
+    List<Money> list = new ArrayList<Money>()
+    list.add(money(100))
+    System.out.println("list=" + gson.toJson(list))
+  }
+
+  static Money money(long cents) {
+    Money m = new Money()
+    m.cents = cents
+    return m
+  }
+
+  static Tag tag(String text) {
+    Tag t = new Tag()
+    t.text = text
+    return t
+  }
+
+  static Wrapped wrap(String name) {
+    Wrapped w = new Wrapped()
+    Person p = new Person()
+    p.name = name
+    w.inner = p
+    return w
+  }
+
+  static Dog dog(String kind) {
+    Dog d = new Dog()
+    d.kind = kind
+    return d
+  }
+
+  static String animalClass(Dog d) {
+    Object o = d
+    return o.getClass().getName()
+  }
+}

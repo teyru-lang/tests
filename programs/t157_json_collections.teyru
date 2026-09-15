@@ -1,13 +1,19 @@
 // Collections, arrays and maps in the Gson binding.
 //
 // Gson binds a field declared List<X>, Set<X>, Map<String,X> or X[] by asking
-// the field's generic type what its elements are. This binding gets the erased
-// type from java.lang.reflect and nothing more -- lib/26_reflect.teyru has no
-// generic types, and every array type in a program is one class -- so the shape
-// of the document is what says what an element is, and only an element that
-// carries its own type can be built. This program is what that buys, and where
-// it stops: every element the binding cannot answer for is refused with the
-// member named rather than placed and left to fault at the use site.
+// the field's generic type what its elements are. The declared type is what this
+// binding reads too, from the compiler rather than from java.lang.reflect:
+// reflection erases it -- a `List<Item>` field is a field of class teyru.List --
+// so the compiler writes the element class into the field's descriptor and
+// Field.getElementType answers it, which is what makes an element that is an
+// object, or an array of them, bind as the class the member named.
+//
+// What is left refused is the declaration that names no class: an element
+// declared Object (which is what a raw List erases to as well), and a container
+// inside a container, whose own element type is erased again. Those are answered
+// from the document's shape, and an element that is an object or an array there
+// is refused with the member named rather than placed and left to fault at the
+// use site.
 
 import teyru.*
 
@@ -141,15 +147,36 @@ class Main {
     System.out.println("empty=" + empty.tags.size() + " " + empty.ids.size() + " " +
         empty.counts.size() + " " + empty.words.length + " " + empty.many.length)
 
-    // an element that is an object cannot be built, because the element type the
-    // member declared is erased and this language does not check the cast a use
-    // of it makes: the binding refuses and names the member
+    // an element that is an object is bound as the class the member declared,
+    // which is the element type the compiler wrote into the field's descriptor
+    Bag single = gson.fromJson("{\"items\":[{\"name\":\"x\",\"qty\":1}]}", Bag.class)
+    Item it = single.items.get(0)
+    System.out.println("items: " + it.name + "/" + it.qty + " as " + classOf(single.items.get(0)))
+
+    // an array is built from its component class, so an Item[] holds Items and a
+    // String[] holds the strings the document carried, with the length the
+    // document had
+    Bag arrays = gson.fromJson("{\"words\":[\"w1\",\"w2\"],\"many\":[{\"name\":\"x\",\"qty\":2}]}",
+        Bag.class)
+    System.out.println("words: " + arrays.words[0] + "," + arrays.words[1] + " len=" + arrays.words.length)
+    System.out.println("many: " + arrays.many[0].name + "/" + arrays.many[0].qty + " len=" + arrays.many.length)
+
+    // a number where a String was declared is the text the document carried,
+    // which is Gson's answer for a String member
+    Bag numbers = gson.fromJson("{\"words\":[1,2]}", Bag.class)
+    System.out.println("numbers: " + numbers.words[0] + "," + numbers.words[1])
+
+    // what is still refused is the declaration that names no class: an element
+    // declared Object, and a container inside a container whose own element type
+    // is erased again
     System.out.println("--- refusals ---")
-    System.out.println("items: " + why(gson, "{\"items\":[{\"name\":\"x\",\"qty\":1}]}"))
     System.out.println("nested: " + why(gson, "{\"nested\":[[\"a\"]]}"))
     System.out.println("mixed: " + why(gson, "{\"mixed\":{\"o\":{\"in\":1}}}"))
-    System.out.println("words: " + why(gson, "{\"words\":[\"w1\"]}"))
-    System.out.println("many: " + why(gson, "{\"many\":[{\"name\":\"x\"}]}"))
-    System.out.println("numbers: " + why(gson, "{\"words\":[1,2]}"))
+  }
+
+  // classOf is the class of an element read out of a container, which is what
+  // says whether the element was built or left as a tree
+  static String classOf(Object o) {
+    return o.getClass().getName()
   }
 }

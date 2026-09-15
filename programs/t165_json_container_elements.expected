@@ -1,0 +1,42 @@
+people=ann/31,bo/24 size=2
+element=Person Person
+crew=cy/40 as Person
+byName=lead=di,deputy=ed
+map value=di/18 as Person
+queue=fi/60
+team=t1 ho/80
+points=1,2 3,4 as Point
+many=ik/jo len=2
+nums=1,2,3 len=3
+words=a,b len=2
+ids=5,7
+many is teyru.Array of Person
+null in int[]: cannot bind null at $.nums[1]: the array's element type is int, which has no null
+null in Person[]: null
+field people: teyru.List -> Person
+field crew: teyru.Set -> Person
+field byName: teyru.Map -> Person
+field queue: teyru.Deque -> Person
+field plain: teyru.ArrayList -> Person
+field teams: teyru.List -> Team
+field points: teyru.List -> Point
+field many: teyru.Array -> Person
+field nums: teyru.Array -> int
+field words: teyru.Array -> teyru.String
+field ids: teyru.List -> teyru.Integer
+field loose: teyru.List -> teyru.Object
+field mixed: teyru.Map -> teyru.Object
+field nested: teyru.List -> teyru.List
+field raw: teyru.List -> teyru.Object
+field grid: teyru.Array -> teyru.Array
+[{"name":"ann","age":31},{"name":"bo","age":24}]
+{"lead":{"name":"di","age":18},"deputy":{"name":"ed","age":50}}
+[{"name":"ik","age":90},{"name":"jo","age":100}]
+[1,2,3]
+[{"title":"t1","members":[{"name":"ho","age":80}]}]
+--- refusals ---
+mixed: cannot bind the JSON object at $.mixed.o: a container's element type is erased at run time, and this language does not check the cast that reads an element, so a tree placed where the program declared a class would be read as that class instead of being reported. Bind the member with @JsonAdapter, which names the whole member's element type
+nested: cannot bind the JSON array at $.nested[0]: a container's element type is erased at run time, and this language does not check the cast that reads an element, so a tree placed where the program declared a class would be read as that class instead of being reported. Bind the member with @JsonAdapter, which names the whole member's element type
+raw: cannot bind the JSON object at $.raw[0]: a container's element type is erased at run time, and this language does not check the cast that reads an element, so a tree placed where the program declared a class would be read as that class instead of being reported. Bind the member with @JsonAdapter, which names the whole member's element type
+grid: cannot bind the JSON array at $.grid[0]: a container's element type is erased at run time, and this language does not check the cast that reads an element, so a tree placed where the program declared a class would be read as that class instead of being reported. Bind the member with @JsonAdapter, which names the whole member's element type
+loose: cannot bind the JSON object at $.loose[0]: a container's element type is erased at run time, and this language does not check the cast that reads an element, so a tree placed where the program declared a class would be read as that class instead of being reported. Bind the member with @JsonAdapter, which names the whole member's element type

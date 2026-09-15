@@ -1,0 +1,27 @@
+peek=BEGIN_OBJECT
+name=root
+n=7
+big=90000000000
+half=1.5
+ok=true
+none=null
+list=1,2,3 next=NAME
+deep=5
+skip=skipped next=END_OBJECT
+end=END_DOCUMENT hasNext=false
+tree={"a":[{"b":2},{"b":3}]}
+lenient=a=3 b=x c=bare
+escaped=aAb"q" len=6 peek=END_DOCUMENT
+strict: expected a name at line 1 column 8
+misuse: expected END_ARRAY but was NUMBER
+fraction: expected a whole number but was 1.5
+written={"a":"s","b":3,"c":1.5,"d":true,"e":null,"f":[1,2],"g":{"h":"i"}}
+pretty=[
+  1,
+  {
+    "k": "v"
+  }
+]
+nulls={"a":"s","gone":null}
+dropped={}
+names=a,b,c,d,e,f,g END_DOCUMENT

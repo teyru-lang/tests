@@ -22,10 +22,10 @@ real=[{"name":"made","qty":4}]
 byName={"k":{"name":"made","qty":4}}
 array=[1,2,3] ["a","b"] [{"name":"made","qty":4}]
 empty=0 0 0 0 0
+items: x/1 as Item
+words: w1,w2 len=2
+many: x/2 len=1
+numbers: 1,2
 --- refusals ---
-items: cannot bind the JSON object at $.items[0]: a container's element type is erased at run time, and this language does not check the cast that reads an element, so a tree placed where the program declared a class would be read as that class instead of being reported. Bind the member with @JsonAdapter, which names the whole member's element type
 nested: cannot bind the JSON array at $.nested[0]: a container's element type is erased at run time, and this language does not check the cast that reads an element, so a tree placed where the program declared a class would be read as that class instead of being reported. Bind the member with @JsonAdapter, which names the whole member's element type
 mixed: cannot bind the JSON object at $.mixed.o: a container's element type is erased at run time, and this language does not check the cast that reads an element, so a tree placed where the program declared a class would be read as that class instead of being reported. Bind the member with @JsonAdapter, which names the whole member's element type
-words: cannot bind the array at $.words: an array's element class is not available at run time -- every array type in a program is one class, so nothing tells an int[] from a String[] and an array built with the wrong element kind reads the wrong words instead of failing. Declare the member as a List, or bind it with @JsonAdapter
-many: cannot bind the array at $.many: an array's element class is not available at run time -- every array type in a program is one class, so nothing tells an int[] from a String[] and an array built with the wrong element kind reads the wrong words instead of failing. Declare the member as a List, or bind it with @JsonAdapter
-numbers: cannot bind the array at $.words: an array's element class is not available at run time -- every array type in a program is one class, so nothing tells an int[] from a String[] and an array built with the wrong element kind reads the wrong words instead of failing. Declare the member as a List, or bind it with @JsonAdapter

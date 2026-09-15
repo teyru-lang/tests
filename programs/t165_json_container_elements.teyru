@@ -1,0 +1,200 @@
+// Object elements inside containers, and arrays.
+//
+// A container field's element type is erased by reflection -- `List<Person>` is
+// a field of class teyru.List to everything that reads it at run time -- so the
+// binding used to answer an element from the document's shape, and refused every
+// object and every array inside a container rather than place a tree where the
+// program had declared a class (a place that is read at the declared class's
+// offsets, which is a SIGSEGV and not a report).
+//
+// The compiler now writes the declared element type into the field's descriptor
+// (internal/codegen/reflect.go) and java.lang.reflect answers it as
+// Field.getElementType, so an element is built as the class the field named:
+// List<Person>, Set<Person>, Map<String,Person>, Deque<Person>, Person[], int[].
+// What is still refused is the declaration that names no class -- an element
+// declared Object, a raw List, and a container inside a container, whose element
+// type is erased again -- and this program is both halves.
+
+import teyru.*
+
+class Person {
+  String name
+  int age
+}
+
+record Point(int x, int y) {
+}
+
+class Team {
+  String title
+  List<Person> members
+}
+
+class Bag {
+  List<Person> people
+  Set<Person> crew
+  Map<String, Person> byName
+  Deque<Person> queue
+  ArrayList<Person> plain
+  List<Team> teams
+  List<Point> points
+  Person[] many
+  int[] nums
+  String[] words
+  List<Integer> ids
+  List<Object> loose
+  Map<String, Object> mixed
+  List<List<Person>> nested
+  List raw
+  Person[][] grid
+}
+
+class Main {
+  static String why(Gson gson, String json) {
+    try {
+      gson.<Bag>fromJson(json, Bag.class)
+      return "bound"
+    } catch (JsonParseException e) {
+      return e.getMessage()
+    }
+  }
+
+  static String people(List<Person> l) {
+    StringBuilder sb = new StringBuilder()
+    for (Person p : l) {
+      if (sb.length() > 0) {
+        sb.append(",")
+      }
+      sb.append(p.name).append("/").append(p.age)
+    }
+    return sb.toString()
+  }
+
+  static String personClass(List<Person> l) {
+    Object one = l.get(0)
+    return one.getClass().getName()
+  }
+
+  static String entries(Map<String, Person> m) {
+    StringBuilder sb = new StringBuilder()
+    for (Map.Entry<String, Person> e : m.entrySet()) {
+      if (sb.length() > 0) {
+        sb.append(",")
+      }
+      sb.append(e.getKey()).append("=").append(e.getValue().name)
+    }
+    return sb.toString()
+  }
+
+  public static void main(String[] args) {
+    Gson gson = new Gson()
+
+    String json = "{\"people\":[{\"name\":\"ann\",\"age\":31},{\"name\":\"bo\",\"age\":24}]," +
+        "\"crew\":[{\"name\":\"cy\",\"age\":40}]," +
+        "\"byName\":{\"lead\":{\"name\":\"di\",\"age\":18},\"deputy\":{\"name\":\"ed\",\"age\":50}}," +
+        "\"queue\":[{\"name\":\"fi\",\"age\":60}]," +
+        "\"plain\":[{\"name\":\"gu\",\"age\":70}]," +
+        "\"teams\":[{\"title\":\"t1\",\"members\":[{\"name\":\"ho\",\"age\":80}]}]," +
+        "\"points\":[{\"x\":1,\"y\":2},{\"x\":3,\"y\":4}]," +
+        "\"many\":[{\"name\":\"ik\",\"age\":90},{\"name\":\"jo\",\"age\":100}]," +
+        "\"nums\":[1,2,3],\"words\":[\"a\",\"b\"],\"ids\":[5,6,7]}"
+
+    Bag b = gson.fromJson(json, Bag.class)
+
+    // an element of a List, a Set, a Map's value, a Deque and a declared
+    // ArrayList is the class the field declared, not a tree
+    System.out.println("people=" + people(b.people) + " size=" + b.people.size())
+    System.out.println("element=" + personClass(b.people) + " " + personClass(b.plain))
+    for (Person c : b.crew) {
+      System.out.println("crew=" + c.name + "/" + c.age + " as " + element(b.crew))
+    }
+    System.out.println("byName=" + entries(b.byName))
+    Person lead = b.byName.get("lead")
+    System.out.println("map value=" + lead.name + "/" + lead.age + " as " + elementOfMap(b.byName))
+    System.out.println("queue=" + b.queue.getFirst().name + "/" + b.queue.getFirst().age)
+
+    // one class deeper: a container inside an element binds the same way, so a
+    // List<Team> whose Team holds a List<Person> reads the whole document
+    Team t = b.teams.get(0)
+    System.out.println("team=" + t.title + " " + people(t.members))
+    Point p = b.points.get(1)
+    System.out.println("points=" + b.points.get(0).x() + "," + b.points.get(0).y() + " " +
+        p.x() + "," + p.y() + " as " + elementOfPoint(b.points))
+
+    // an array is built from its component class, so a Person[] holds Persons
+    // and an int[] holds ints -- every array type is one class to reflection
+    // (`teyru.Array`), which is why the component class had to be written down
+    System.out.println("many=" + b.many[0].name + "/" + b.many[1].name + " len=" + b.many.length)
+    System.out.println("nums=" + b.nums[0] + "," + b.nums[1] + "," + b.nums[2] + " len=" + b.nums.length)
+    System.out.println("words=" + b.words[0] + "," + b.words[1] + " len=" + b.words.length)
+    System.out.println("ids=" + b.ids.get(0) + "," + b.ids.get(2))
+
+    // an array whose component is a primitive takes no null, and one whose
+    // component is itself a container has nothing the shape rule could build
+    Object many = b.many
+    System.out.println("many is " + many.getClass().getName() + " of " + elementClass("many"))
+    System.out.println("null in int[]: " + why(gson, "{\"nums\":[1,null]}"))
+    System.out.println("null in Person[]: " + nullName(gson, "{\"many\":[null]}"))
+
+    // the descriptor is what reflection reads, and this is the call the binding
+    // makes for each field it is about to read
+    Field[] fs = Bag.class.getDeclaredFields()
+    for (int i = 0 : i < fs.length : i++) {
+      Class e = fs[i].getElementType()
+      System.out.println("field " + fs[i].getName() + ": " + fs[i].getType().getName() + " -> " +
+          (e == null ? "none" : e.getName()))
+    }
+
+    // both directions: what was read is written back as the objects they are
+    System.out.println(gson.toJson(b.people))
+    System.out.println(gson.toJson(b.byName))
+    System.out.println(gson.toJson(b.many))
+    System.out.println(gson.toJson(b.nums))
+    System.out.println(gson.toJson(b.teams))
+
+    // an element declared Object is answered from the document's shape, and an
+    // object or an array element there is still refused: Object is what a raw
+    // List and an unbound type variable erase to as well, so the declaration
+    // names no class to build.
+    System.out.println("--- refusals ---")
+    System.out.println("mixed: " + why(gson, "{\"mixed\":{\"o\":{\"in\":1}}}"))
+    System.out.println("nested: " + why(gson, "{\"nested\":[[\"a\"]]}"))
+    System.out.println("raw: " + why(gson, "{\"raw\":[{\"name\":\"x\"}]}"))
+    System.out.println("grid: " + why(gson, "{\"grid\":[[{\"name\":\"x\",\"age\":1}]]}"))
+    System.out.println("loose: " + why(gson, "{\"loose\":[{\"in\":1}]}"))
+  }
+
+  // element answers the class of a Set's own element, which is what shows the
+  // difference between a bound element and a tree
+  static String element(Set<Person> s) {
+    for (Object o : s) {
+      return o.getClass().getName()
+    }
+    return "none"
+  }
+
+  static String elementOfMap(Map<String, Person> m) {
+    for (Object o : m.values()) {
+      return o.getClass().getName()
+    }
+    return "none"
+  }
+
+  static String elementOfPoint(List<Point> l) {
+    Object o = l.get(0)
+    return o.getClass().getName()
+  }
+
+  static String elementClass(String name) {
+    Field f = Bag.class.getDeclaredField(name)
+    return f.getElementType().getName()
+  }
+
+  // nullName is a null element's own class, which a null in an array of a
+  // reference component is
+  static String nullName(Gson gson, String json) {
+    Bag b = gson.fromJson(json, Bag.class)
+    Object one = b.many[0]
+    return one == null ? "null" : one.getClass().getName()
+  }
+}

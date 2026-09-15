@@ -1,0 +1,117 @@
+// The annotations the binding reads by name.
+//
+// @SerializedName names a member in the document, @Expose decides which members
+// a Gson configured with excludeFieldsWithoutExposeAnnotation binds and in which
+// direction, and @Since/@Until decide which members a Gson with a version binds.
+// The binding reads all three off the field through java.lang.reflect
+// (lib/26_reflect.teyru), so what this program prints is the same thing the
+// binding asks for -- the annotation itself is the contract in both directions.
+//
+// Gson spells a field's other names as an array element of @SerializedName
+// (`alternate = {...}`). An annotation element with an array type is not carried
+// by this language's reflection, so an alternate is declared by writing the
+// annotation again: the first name is the one the member is written with, the
+// rest are the names a document may use instead. t168_gson_adapters is
+// @JsonAdapter, which has a test of its own.
+
+import teyru.*
+
+class Account {
+  @SerializedName("id")
+  @SerializedName("identifier")
+  String key
+  @SerializedName("name") String owner
+  @SerializedName("balance") double amount
+  String note
+}
+
+class Patch {
+  @Expose String shown
+  @Expose(serialize = false) String onlyRead
+  @Expose(deserialize = false) String onlyWritten
+  String plain
+}
+
+class Feature {
+  @Since(1.0) String first
+  @Until(1.0) String legacy
+  @Since(1.0) @Until(2.0) String middle
+  String always
+}
+
+class Main {
+  public static void main(String[] args) {
+    Gson gson = new Gson()
+
+    // the name the annotation gives is the name in the document, and the first
+    // of them is the one the member is written with
+    Account a = new Account()
+    a.key = "k1"
+    a.owner = "ann"
+    a.amount = 12.5
+    a.note = "n"
+    String json = gson.toJson(a)
+    System.out.println("written=" + json)
+    Account round = gson.fromJson(json, Account.class)
+    System.out.println("round=" + round.key + "/" + round.owner + "/" + round.amount + "/" + round.note)
+
+    // an alternate is read too, and a renamed field does not answer to its own
+    // Java name any more
+    Account byAlternate = gson.fromJson("{\"identifier\":\"k9\",\"name\":\"bo\",\"balance\":3}",
+        Account.class)
+    System.out.println("alternate=" + byAlternate.key + "/" + byAlternate.owner + "/" + byAlternate.amount)
+    Account byFieldName = gson.fromJson("{\"key\":\"zz\",\"name\":\"cy\"}", Account.class)
+    System.out.println("field-name=" + byFieldName.key + "/" + byFieldName.owner)
+
+    // a document carrying both names answers with the one the field is written
+    // with
+    Account both = gson.fromJson("{\"identifier\":\"alt\",\"id\":\"main\"}", Account.class)
+    System.out.println("both=" + both.key)
+
+    // @Expose does nothing without the builder setting, and with it the
+    // annotation decides each direction
+    Patch p = new Patch()
+    p.shown = "s"
+    p.onlyRead = "r"
+    p.onlyWritten = "w"
+    p.plain = "p"
+    System.out.println("expose-off=" + gson.toJson(p))
+    Gson exposed = new GsonBuilder().excludeFieldsWithoutExposeAnnotation().create()
+    System.out.println("expose-on=" + exposed.toJson(p))
+    Patch back = exposed.fromJson("{\"shown\":\"S\",\"onlyRead\":\"R\",\"onlyWritten\":\"W\",\"plain\":\"P\"}",
+        Patch.class)
+    System.out.println("expose-read=" + back.shown + "/" + back.onlyRead + "/" + back.onlyWritten + "/" + back.plain)
+
+    // @Since keeps a member from its version on, @Until up to but not including
+    // its own, and a member with both is bound inside the range
+    Feature f = new Feature()
+    f.first = "1"
+    f.legacy = "L"
+    f.middle = "M"
+    f.always = "A"
+    System.out.println("no-version=" + gson.toJson(f))
+    System.out.println("v0.9=" + version(0.9).toJson(f))
+    System.out.println("v1.0=" + version(1.0).toJson(f))
+    System.out.println("v1.5=" + version(1.5).toJson(f))
+    System.out.println("v2.0=" + version(2.0).toJson(f))
+    Feature at = version(0.9).fromJson("{\"first\":\"x\",\"legacy\":\"y\",\"middle\":\"z\",\"always\":\"w\"}",
+        Feature.class)
+    System.out.println("v0.9-read=" + at.first + "/" + at.legacy + "/" + at.middle + "/" + at.always)
+
+    // the binding reads these through java.lang.reflect, so this is what it sees
+    Annotation[] names = Account.class.getDeclaredField("key").getAnnotations()
+    System.out.println("names=" + names.length)
+    for (int i = 0 : i < names.length : i++) {
+      System.out.println("  name[" + i + "]=" + names[i].stringValue("value"))
+    }
+    Annotation expose = Patch.class.getDeclaredField("onlyRead").getAnnotation(Expose.class)
+    System.out.println("expose=" + expose.booleanValue("serialize") + "/" + expose.booleanValue("deserialize"))
+    Annotation since = Feature.class.getDeclaredField("middle").getAnnotation(Since.class)
+    Annotation until = Feature.class.getDeclaredField("middle").getAnnotation(Until.class)
+    System.out.println("range=" + since.doubleValue("value") + ".." + until.doubleValue("value"))
+  }
+
+  static Gson version(double v) {
+    return new GsonBuilder().setVersion(v).create()
+  }
+}

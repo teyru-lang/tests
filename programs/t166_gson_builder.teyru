@@ -1,0 +1,132 @@
+// GsonBuilder's knobs, each one shown changing what the same class binds to.
+//
+// A Gson is configured before it is built and never after: what the builder
+// records reaches the binding through the Gson it hands out (lib/10_json.teyru),
+// which is why two Gsons bind the same class differently and each keeps its own
+// reader and writer. Every knob is exercised here twice where it applies -- on
+// the way out and on the way back -- because a name or an exclusion that only
+// one direction honours is a document that cannot be read again.
+
+import teyru.*
+
+class Person {
+  String fullName
+  int age
+  String nickname
+  static String shared = "S"
+  transient String scratch = "T"
+}
+
+class Exposed {
+  @Expose String shown
+  @Expose(serialize = false) String readOnly
+  @Expose(deserialize = false) String writeOnly
+  String hidden
+}
+
+class Versioned {
+  @Since(1.5) String added
+  @Until(2.0) String removed
+  String always
+}
+
+class Main {
+  static String why(Gson gson, String json) {
+    try {
+      gson.<Person>fromJson(json, Person.class)
+      return "bound"
+    } catch (JsonParseException e) {
+      return e.getMessage()
+    }
+  }
+
+  static Gson policy(FieldNamingPolicy naming) {
+    return new GsonBuilder().setFieldNamingPolicy(naming).create()
+  }
+
+  static Gson version(double v) {
+    return new GsonBuilder().setVersion(v).create()
+  }
+
+  public static void main(String[] args) {
+    Gson plain = new Gson()
+    Person p = new Person()
+    p.fullName = "ann lee"
+    p.age = 31
+
+    // Gson's defaults: a null member is dropped, and a static field and a
+    // transient one are not bound at all
+    System.out.println("default=" + plain.toJson(p))
+
+    // serializeNulls writes the null; nothing else changes
+    Gson nulls = new GsonBuilder().serializeNulls().create()
+    System.out.println("nulls=" + nulls.toJson(p))
+
+    // setPrettyPrinting is setIndent("  ") on the writer this Gson writes with
+    Gson pretty = new GsonBuilder().setPrettyPrinting().create()
+    System.out.println("pretty=" + pretty.toJson(p))
+
+    // the naming policies, each on the same object
+    System.out.println("identity=" + policy(FieldNamingPolicy.IDENTITY).toJson(p))
+    System.out.println("underscores=" + policy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES).toJson(p))
+    System.out.println("dashes=" + policy(FieldNamingPolicy.LOWER_CASE_WITH_DASHES).toJson(p))
+    System.out.println("camel=" + policy(FieldNamingPolicy.UPPER_CAMEL_CASE).toJson(p))
+    System.out.println("spaces=" + policy(FieldNamingPolicy.UPPER_CAMEL_CASE_WITH_SPACES).toJson(p))
+
+    // a policy names the member in both directions, so the document it wrote is
+    // the document it reads
+    Person under = policy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+        .fromJson("{\"full_name\":\"bo\",\"age\":24}", Person.class)
+    System.out.println("back=" + under.fullName + "/" + under.age)
+
+    // excludeFieldsWithModifiers REPLACES the default set: with nothing named,
+    // a static field and a transient one are bound too, and naming one leaves it
+    // out
+    Gson everything = new GsonBuilder().excludeFieldsWithModifiers().create()
+    System.out.println("everything=" + everything.toJson(p))
+    Gson noStatic = new GsonBuilder().excludeFieldsWithModifiers(Modifier.STATIC).create()
+    System.out.println("no-static=" + noStatic.toJson(p))
+    Gson noTransient = new GsonBuilder().excludeFieldsWithModifiers(Modifier.TRANSIENT).create()
+    System.out.println("no-transient=" + noTransient.toJson(p))
+
+    // setLenient is the reader's own switch: without it the document below is
+    // not the grammar, and with it the reader takes what Gson's lenient reader
+    // takes -- the unquoted name, the single-quoted string, the trailing comma
+    Gson lenient = new GsonBuilder().setLenient(true).create()
+    Person lax = lenient.fromJson("{fullName:'x',}", Person.class)
+    System.out.println("lenient=" + lax.fullName)
+    System.out.println("strict=" + why(plain, "{fullName:'x'}"))
+
+    // @Expose does nothing until the builder asks for it, and then it is the
+    // annotation that decides, direction by direction
+    Exposed e = new Exposed()
+    e.shown = "s"
+    e.readOnly = "r"
+    e.writeOnly = "w"
+    e.hidden = "h"
+    System.out.println("expose-off=" + plain.toJson(e))
+    Gson exposed = new GsonBuilder().excludeFieldsWithoutExposeAnnotation().create()
+    System.out.println("expose-on=" + exposed.toJson(e))
+    Exposed back = exposed.fromJson("{\"shown\":\"A\",\"readOnly\":\"B\",\"writeOnly\":\"C\",\"hidden\":\"D\"}",
+        Exposed.class)
+    System.out.println("expose-read=" + back.shown + "/" + back.readOnly + "/" + back.writeOnly + "/" + back.hidden)
+
+    // @Since and @Until are read against setVersion, and ignored when no
+    // version is set
+    Versioned v = new Versioned()
+    v.added = "a"
+    v.removed = "b"
+    v.always = "c"
+    System.out.println("no-version=" + plain.toJson(v))
+    System.out.println("v1.0=" + version(1.0).toJson(v))
+    System.out.println("v1.5=" + version(1.5).toJson(v))
+    System.out.println("v2.0=" + version(2.0).toJson(v))
+    Versioned at1 = version(1.0).fromJson("{\"added\":\"x\",\"removed\":\"y\",\"always\":\"z\"}",
+        Versioned.class)
+    System.out.println("v1.0-read=" + at1.added + "/" + at1.removed + "/" + at1.always)
+
+    // the configuration is part of what a binding is: the same class bound by
+    // two Gsons is two documents
+    System.out.println("differs=" + (plain.toJson(p).equals(nulls.toJson(p)) == false))
+  }
+}

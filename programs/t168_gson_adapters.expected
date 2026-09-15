@@ -1,0 +1,9 @@
+written={"total":"#125","hexTotal":"0xff","tag":"tag:hot","wrapped":{"kind":"wrapped","value":{"name":"ann"}},"prices":["#7","#9"],"pet":"animal:rex","note":"n"}
+read=125/255/hot/ann/n
+prices=7,9 pet=rex as Dog
+plain-tag="tag:cold"
+field-wins={"total":"#255","hexTotal":"0xff"}
+unregistered={"cents":3}
+delegated=bo
+registration: teyru.String is not a JsonSerializer or a JsonDeserializer
+list=["#100"]

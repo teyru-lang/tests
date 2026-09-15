@@ -1,0 +1,26 @@
+default={"fullName":"ann lee","age":31}
+nulls={"fullName":"ann lee","age":31,"nickname":null}
+pretty={
+  "fullName": "ann lee",
+  "age": 31
+}
+identity={"fullName":"ann lee","age":31}
+underscores={"full_name":"ann lee","age":31}
+dashes={"full-name":"ann lee","age":31}
+camel={"FullName":"ann lee","Age":31}
+spaces={"Full Name":"ann lee","Age":31}
+back=bo/24
+everything={"fullName":"ann lee","age":31,"shared":"S","scratch":"T"}
+no-static={"fullName":"ann lee","age":31,"scratch":"T"}
+no-transient={"fullName":"ann lee","age":31,"shared":"S"}
+lenient=x
+strict=expected a name at line 1 column 2
+expose-off={"shown":"s","readOnly":"r","writeOnly":"w","hidden":"h"}
+expose-on={"shown":"s","writeOnly":"w"}
+expose-read=A/B/null/null
+no-version={"added":"a","removed":"b","always":"c"}
+v1.0={"removed":"b","always":"c"}
+v1.5={"added":"a","removed":"b","always":"c"}
+v2.0={"added":"a","always":"c"}
+v1.0-read=null/y/z
+differs=true

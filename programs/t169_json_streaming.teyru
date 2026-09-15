@@ -1,0 +1,215 @@
+// Gson's streaming reader and writer.
+//
+// A tree answers a document that is wanted whole; a token stream answers one
+// read front to back, holding nothing but the containers that are open. The
+// reader takes the document as a String (that is the reader the whole JSON layer
+// is built on, see lib/10_json.teyru) and hands it back a token at a time --
+// beginObject/endObject, beginArray/endArray, nextName, nextString, nextInt,
+// nextBoolean, nextNull, skipValue, hasNext, peek -- and the writer builds a
+// document with the same calls, name by name, nesting the way the reader reads
+// it. Both are the same scanner the tree parser uses, so the two agree on the
+// grammar, on what lenient accepts, and on where a failure is.
+
+import teyru.*
+
+class Main {
+  public static void main(String[] args) {
+    String doc = "{\"name\":\"root\",\"n\":7,\"big\":90000000000,\"half\":1.5,\"ok\":true," +
+        "\"none\":null,\"list\":[1,2,3],\"deep\":{\"a\":[{\"b\":2},{\"b\":3}]}," +
+        "\"skip\":{\"x\":[1,2,{\"y\":\"z\"},\"s\"]}}"
+
+    JsonReader in = new JsonReader(doc)
+    System.out.println("peek=" + in.peek())
+    in.beginObject()
+    while (in.hasNext()) {
+      String name = in.nextName()
+      if (name.equals("name")) {
+        System.out.println(name + "=" + in.nextString())
+        continue
+      }
+      if (name.equals("n")) {
+        System.out.println(name + "=" + in.nextInt())
+        continue
+      }
+      if (name.equals("big")) {
+        System.out.println(name + "=" + in.nextLong())
+        continue
+      }
+      if (name.equals("half")) {
+        System.out.println(name + "=" + in.nextDouble())
+        continue
+      }
+      if (name.equals("ok")) {
+        System.out.println(name + "=" + in.nextBoolean())
+        continue
+      }
+      if (name.equals("none")) {
+        in.nextNull()
+        System.out.println(name + "=null")
+        continue
+      }
+      if (name.equals("list")) {
+        StringBuilder sb = new StringBuilder()
+        in.beginArray()
+        while (in.hasNext()) {
+          if (sb.length() > 0) {
+            sb.append(",")
+          }
+          sb.append(in.nextInt())
+        }
+        in.endArray()
+        System.out.println(name + "=" + sb.toString() + " next=" + in.peek())
+        continue
+      }
+      if (name.equals("deep")) {
+        // an object inside an array inside an object, read where it stands
+        in.beginObject()
+        in.nextName()
+        in.beginArray()
+        int sum = 0
+        while (in.hasNext()) {
+          in.beginObject()
+          in.nextName()
+          sum = sum + in.nextInt()
+          in.endObject()
+        }
+        in.endArray()
+        in.endObject()
+        System.out.println(name + "=" + sum)
+        continue
+      }
+      // a member the program does not want costs one call, whole subtree and
+      // all, and the reader is left on the member after it
+      in.skipValue()
+      System.out.println(name + "=skipped next=" + in.peek())
+    }
+    in.endObject()
+    System.out.println("end=" + in.peek() + " hasNext=" + in.hasNext())
+
+    // the same document through the tree parser, for the same answer
+    JsonElement tree = JsonParser.parseString(doc)
+    System.out.println("tree=" + tree.getAsJsonObject().get("deep"))
+
+    // lenient streaming: the same concessions the lenient parser makes
+    JsonReader lax = new JsonReader("{a:[1,2,],b:'x',c:bare}")
+    lax.setLenient(true)
+    lax.beginObject()
+    String first = lax.nextName()
+    lax.beginArray()
+    int total = 0
+    while (lax.hasNext()) {
+      total = total + lax.nextInt()
+    }
+    lax.endArray()
+    System.out.println("lenient=" + first + "=" + total + " " + lax.nextName() + "=" + lax.nextString() +
+        " " + lax.nextName() + "=" + lax.nextString())
+    lax.endObject()
+
+    // the scanner is the parser's, escapes and all
+    JsonReader esc = new JsonReader("{\"s\":\"a\\u0041b\\\"q\\\"\"}")
+    esc.beginObject()
+    esc.nextName()
+    String text = esc.nextString()
+    esc.endObject()
+    System.out.println("escaped=" + text + " len=" + text.length() + " peek=" + esc.peek())
+
+    // a failure is where the tree parser's is: the same message, the same place
+    try {
+      JsonReader bad = new JsonReader("{\"a\":1,}")
+      bad.beginObject()
+      bad.nextName()
+      bad.nextInt()
+      bad.hasNext()
+      System.out.println("trailing comma: accepted")
+    } catch (JsonParseException e) {
+      System.out.println("strict: " + e.getMessage())
+    }
+    try {
+      JsonReader bad = new JsonReader("{\"a\":1}")
+      bad.beginObject()
+      bad.nextName()
+      bad.endArray()
+    } catch (IllegalStateException e) {
+      System.out.println("misuse: " + e.getMessage())
+    }
+
+    // a whole-number accessor refuses a fraction rather than rounding it
+    try {
+      JsonReader frac = new JsonReader("1.5")
+      frac.nextInt()
+    } catch (IllegalStateException e) {
+      System.out.println("fraction: " + e.getMessage())
+    }
+
+    // the writer: a document built name by name, with nesting, ending as the
+    // text the sink holds
+    JsonWriter w = new JsonWriter(new StringBuilder())
+    w.beginObject()
+    w.name("a")
+    w.value("s")
+    w.name("b")
+    w.value(3)
+    w.name("c")
+    w.value(1.5)
+    w.name("d")
+    w.value(true)
+    w.name("e")
+    w.nullValue()
+    w.name("f")
+    w.beginArray()
+    w.value(1)
+    w.value(2)
+    w.endArray()
+    w.name("g")
+    w.beginObject()
+    w.name("h")
+    w.value("i")
+    w.endObject()
+    w.endObject()
+    System.out.println("written=" + w.toString())
+
+    // setIndent, and a null member the writer is told to write
+    JsonWriter pretty = new JsonWriter(new StringBuilder())
+    pretty.setIndent("  ")
+    pretty.beginArray()
+    pretty.value(1)
+    pretty.beginObject()
+    pretty.name("k")
+    pretty.value("v")
+    pretty.endObject()
+    pretty.endArray()
+    System.out.println("pretty=" + pretty.toString())
+
+    JsonWriter keep = new JsonWriter(new StringBuilder())
+    keep.setSerializeNulls(true)
+    keep.beginObject()
+    keep.name("a")
+    keep.value("s")
+    keep.name("gone")
+    keep.nullValue()
+    keep.endObject()
+    System.out.println("nulls=" + keep.toString())
+
+    JsonWriter drop = new JsonWriter(new StringBuilder())
+    drop.setSerializeNulls(false)
+    drop.beginObject()
+    drop.name("gone")
+    drop.nullValue()
+    drop.endObject()
+    System.out.println("dropped=" + drop.toString())
+
+    // what the writer wrote is what the reader reads
+    JsonReader again = new JsonReader(w.toString())
+    again.beginObject()
+    StringBuilder names = new StringBuilder()
+    while (again.hasNext()) {
+      if (names.length() > 0) {
+        names.append(",")
+      }
+      names.append(again.nextName())
+      again.skipValue()
+    }
+    again.endObject()
+    System.out.println("names=" + names.toString() + " " + again.peek())
+  }
+}
