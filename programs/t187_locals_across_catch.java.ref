@@ -1,0 +1,81 @@
+/* The same program in Java, which is where t187_locals_across_catch.expected
+   comes from:
+     javac -d /tmp LocalsAcrossCatch.java && java -cp /tmp LocalsAcrossCatch */
+import java.util.ArrayList;
+import java.util.List;
+
+public class LocalsAcrossCatch {
+  static String fromParam(String p, int n) {
+    String out = "";
+    try {
+      p = p + "!";
+      n = n + 10;
+      out = "assigned";
+      throw new IllegalStateException("boom");
+    } catch (RuntimeException e) {
+      return "p=" + p + " n=" + n + " out=" + out;
+    }
+  }
+
+  static String throughFinally() {
+    int a = 1;
+    String b = "one";
+    try {
+      a = 2;
+      b = "two";
+      throw new IllegalStateException("x");
+    } catch (RuntimeException e) {
+      a = a + 100;
+    } finally {
+      a = a + 1000;
+      b = b + "+finally";
+    }
+    return "a=" + a + " b=" + b;
+  }
+
+  static String nested() {
+    int outer = 0;
+    int inner = 0;
+    try {
+      outer = 5;
+      try {
+        inner = 7;
+        throw new IllegalStateException("inner");
+      } catch (RuntimeException e) {
+        inner = inner + 1;
+        throw new IllegalStateException("rethrow");
+      }
+    } catch (RuntimeException e) {
+      return "outer=" + outer + " inner=" + inner;
+    }
+  }
+
+  public static void main(String[] args) {
+    int before = 7;
+    int after = 0;
+    String s = "start";
+    List<String> list = new ArrayList<String>();
+    try {
+      after = 5;
+      s = "changed";
+      list.add("added");
+      throw new RuntimeException("x");
+    } catch (Throwable e) {
+      System.out.println("before=" + before + " after=" + after + " s=" + s + " list=" + list.size());
+    }
+
+    int i = 0;
+    try {
+      while (i < 3) { i = i + 1; }
+      throw new RuntimeException("y");
+    } catch (Throwable e) {
+      System.out.println("i=" + i);
+    }
+
+    System.out.println(fromParam("hi", 1));
+    System.out.println(throughFinally());
+    System.out.println(nested());
+
+    System.out.println("after=" + after + " s=" + s + " i=" + i);
+  }
+}
