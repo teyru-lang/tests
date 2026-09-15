@@ -1,0 +1,210 @@
+// The same program written with Java's punctuation, kept so the comparison
+// against javac can be redone:
+//
+//   cp tests/programs/t171_iostream_text.java.ref /tmp/S.java
+//   /opt/jdk21/jdk-21.0.11+10/bin/javac -d /tmp/out /tmp/S.java
+//   /opt/jdk21/jdk-21.0.11+10/bin/java -cp /tmp/out S
+//
+// The output is tests/programs/t171_iostream_text.expected, byte for byte.
+// (The class is named S; javac wants the file named after it.)
+//
+// Three spellings differ, all of them because Teyru has no UTF-16 and no
+// separate character stream:
+//
+//   - new BufferedReader("text") is new BufferedReader(new StringReader("text"))
+//     here, which is the same class with the reader left out.
+//   - new BufferedReader(new ByteArrayInputStream(bytes)) is a BufferedReader
+//     over an InputStreamReader over that stream with UTF-8, which is what a
+//     ByteArrayInputStream already is on the Teyru side (a Teyru string is UTF-8
+//     bytes, so a byte IS a character).
+//   - readln(), the prelude InputStream's line reader that both streams
+//     override, has no Java spelling: the reference reads those same bytes with
+//     a BufferedReader and prints the same lines.
+//   - a Writer that is a ByteArrayOutputStream is a Teyru shape (one byte is one
+//     character); here the same two writes go to a StringWriter.
+//
+// Everything else is the same program: the two Writer subclasses below are the
+// Teyru ones with Java's signatures, and PrintWriter's buffering of the
+// OutputStream constructor is Java's own.
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+
+class Recorder extends Writer {
+  private StringBuilder log = new StringBuilder();
+
+  public void write(char[] cbuf, int off, int len) {
+    log.append("write:" + new String(cbuf, off, len) + ";");
+  }
+
+  public void write(int c) {
+    log.append("write:" + String.valueOf((char) c) + ";");
+  }
+
+  public void flush() {
+    log.append("flush;");
+  }
+
+  public void close() {
+    log.append("close;");
+  }
+
+  public String logText() {
+    return log.toString();
+  }
+}
+
+class Broken extends Writer {
+  public void write(char[] cbuf, int off, int len) throws IOException {
+    throw new IOException("no room");
+  }
+
+  public void write(int c) throws IOException {
+    throw new IOException("no room");
+  }
+
+  public void flush() {
+  }
+
+  public void close() {
+  }
+}
+
+class S {
+  public static void main(String[] args) throws Exception {
+    BufferedReader br = new BufferedReader(new StringReader("first\nsecond\r\n\rthird\n\nlast without newline"));
+    printLine(br);
+    printLine(br);
+    printLine(br);
+    printLine(br);
+    printLine(br);
+    printLine(br);
+    printLine(br);
+    System.out.println("at end " + br.read());
+    br.close();
+
+    BufferedReader bytes = new BufferedReader(new StringReader("ab\nc"));
+    System.out.println(bytes.read() + " " + bytes.read() + " " + bytes.read() + " " + bytes.read());
+    BufferedReader closed = new BufferedReader(new StringReader("x\ny"));
+    System.out.println("[" + closed.readLine() + "]");
+    closed.close();
+    try {
+      closed.readLine();
+      System.out.println("no throw");
+    } catch (IOException e) {
+      System.out.println("closed: " + e.getMessage());
+    }
+
+    ByteArrayInputStream raw = new ByteArrayInputStream("alpha\nbeta\ngamma".getBytes(StandardCharsets.UTF_8));
+    BufferedReader overReader = new BufferedReader(new InputStreamReader(raw, StandardCharsets.UTF_8));
+    System.out.println("[" + overReader.readLine() + "][" + overReader.readLine() + "][" +
+      overReader.readLine() + "]" + " " + overReader.readLine());
+
+    BufferedReader lines = new BufferedReader(new StringReader("one\r\ntwo\n\nthree"));
+    System.out.println("[" + lines.readLine() + "][" + lines.readLine() + "][" + lines.readLine() + "][" +
+      lines.readLine() + "][" + lines.readLine() + "]");
+    BufferedReader data = new BufferedReader(new StringReader("x\r\ny\nz"));
+    System.out.println("[" + data.readLine() + "][" + data.readLine() + "][" + data.readLine() + "]");
+    BufferedReader trailing = new BufferedReader(new StringReader("x\ry\nz\r"));
+    System.out.println("[" + trailing.readLine() + "][" + trailing.readLine() + "][" +
+      trailing.readLine() + "][" + trailing.readLine() + "]");
+
+    StringWriter buffer = new StringWriter();
+    Writer text = buffer;
+    text.write("hé");
+    text.write(65);
+    text.flush();
+    text.close();
+    System.out.println("writer [" + buffer.toString() + "]");
+
+    ByteArrayOutputStream sink = new ByteArrayOutputStream();
+    PrintWriter pw = new PrintWriter((OutputStream) sink);
+    pw.print("no newline");
+    pw.print(1);
+    pw.print(true);
+    pw.print('c');
+    pw.print(2.5);
+    pw.print((Object) null);
+    pw.println();
+    pw.println("line");
+    pw.println(3);
+    pw.printf("%s=%d;", "k", 7);
+    pw.format("%.2f|%x", 1.5, 255);
+    System.out.println("unflushed size " + sink.size());
+    System.out.println("autoflush off: no flush yet " + pw.checkError());
+    System.out.println("[" + sink.toString() + "]");
+    pw.flush();
+    pw.close();
+    System.out.println("after close " + sink.size());
+
+    Recorder rec = new Recorder();
+    PrintWriter manual = new PrintWriter(rec);
+    manual.print("a");
+    manual.println("b");
+    manual.printf("%d", 4);
+    System.out.println("manual " + rec.logText());
+    manual.close();
+    System.out.println("manual closed " + rec.logText());
+
+    Recorder auto = new Recorder();
+    PrintWriter flushing = new PrintWriter(auto, true);
+    flushing.print("a");
+    flushing.println("b");
+    flushing.print("c");
+    flushing.printf("%d", 5);
+    System.out.println("auto " + auto.logText());
+    flushing.close();
+    System.out.println("auto closed " + auto.logText());
+
+    Recorder ints = new Recorder();
+    PrintWriter chars = new PrintWriter(ints);
+    chars.write(65);
+    chars.write("bc");
+    System.out.println("chars " + ints.logText());
+
+    PrintWriter broken = new PrintWriter(new Broken());
+    System.out.println("before " + broken.checkError());
+    broken.print("this goes nowhere");
+    broken.println("nor this");
+    System.out.println("after " + broken.checkError());
+    broken.close();
+    System.out.println("closed " + broken.checkError());
+
+    PrintWriter nulls = new PrintWriter((OutputStream) new ByteArrayOutputStream());
+    nulls.print((String) null);
+    nulls.println((String) null);
+    try {
+      nulls.write((String) null);
+      System.out.println("no throw");
+    } catch (NullPointerException e) {
+      System.out.println("NullPointerException");
+    }
+
+    ByteArrayOutputStream late = new ByteArrayOutputStream();
+    PrintWriter closedOut = new PrintWriter((OutputStream) late);
+    closedOut.print("first");
+    closedOut.close();
+    closedOut.print("second");
+    System.out.println("late [" + late.toString() + "] " + closedOut.checkError());
+  }
+
+  static void printLine(BufferedReader br) throws IOException {
+    String line = br.readLine();
+    if (line == null) {
+      System.out.println("null");
+    } else {
+      System.out.println("[" + line + "]");
+    }
+  }
+}

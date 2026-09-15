@@ -1,0 +1,57 @@
+nextInt 42
+nextLine [ hello world]
+nextLine [second line]
+hasNextLine false
+hasNext false
+NoSuchElementException
+hasNextInt false
+next abc
+nextInt 12
+hasNext false
+blank hasNext false
+blank hasNextLine true
+blank next NoSuchElementException
+blank nextInt NoSuchElementException
+empty hasNext false
+empty hasNextInt false
+empty hasNextLine false
+empty nextLine NoSuchElementException
+overflow hasNextInt false
+overflow hasNextLong true
+overflow nextLong 123456789012345
+1e hasNextDouble false
+1e hasNextInt false
+1e next 1e
+nope hasNextInt false
+nope nextInt InputMismatchException
+still there nope
+then 3
+double 2.5
+double -1000.0
+double 7.0
+double 0.015
+exhausted false false
+lines [a][][b]
+lines hasNextLine false
+signs 5 -6
+hex hasNextInt false
+hex token 0x10
+hex then int 5
+before close true
+closed next IllegalStateException: Scanner closed
+closed hasNext IllegalStateException
+fresh [[]] length 2
+empty value [none] length 4
+filled [a,b] length 5
+merged [a,b,c-d] other c-d
+merge into empty c-d vs c-d
+solo [] length 0
+one {only}
+123e4567-e89b-12d3-a456-426614174000
+version 1 variant 2
+123e4567e89b12d3 a456426614174000
+compare -1 1 0
+equals false true
+hash 1256478162 1256478163
+random version 4 variant 2 text length 36
+random round trip true

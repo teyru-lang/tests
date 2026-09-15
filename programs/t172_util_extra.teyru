@@ -1,0 +1,165 @@
+import teyru.*
+
+/* java.util's odds, checked against javac's own classes: Scanner's tokeniser
+ * and its nextLine, StringJoiner's empty value, and the UUID that lib/25
+ * already had.
+ *
+ * Scanner is the reason this file exists. Java's semantics around a token read
+ * followed by a line read are the ones people get wrong -- nextLine() returns
+ * the rest of the line from wherever the position is, so it begins with the
+ * delimiter that ended the previous token -- and a token that is not a number
+ * leaves the position where it was, so the token can be read again with next().
+ * Every case below was run through javac's Scanner before it was written here,
+ * and the .expected file is the output of this program on javac 21.
+ *
+ * The exceptions are caught by type and printed as names of types, because
+ * Teyru's classes live in teyru and Java's in java.util: what the test can hold
+ * the two to is that the same call throws the same kind of thing, and for
+ * NoSuchElementException, InputMismatchException and IllegalStateException that
+ * is the whole of the observable difference anyway.
+ */
+
+class Main {
+  public static void main(String[] args) {
+    // ---- a token read and then a line read ----
+    Scanner s = new Scanner("42 hello world\nsecond line\n")
+    System.out.println("nextInt " + s.nextInt())
+    System.out.println("nextLine [" + s.nextLine() + "]")
+    System.out.println("nextLine [" + s.nextLine() + "]")
+    System.out.println("hasNextLine " + s.hasNextLine())
+    System.out.println("hasNext " + s.hasNext())
+    try {
+      s.nextLine()
+      System.out.println("no throw")
+    } catch (NoSuchElementException e) {
+      System.out.println("NoSuchElementException")
+    }
+
+    // ---- a token that is not a number is still a token ----
+    Scanner t = new Scanner("abc 12")
+    System.out.println("hasNextInt " + t.hasNextInt())
+    System.out.println("next " + t.next())
+    System.out.println("nextInt " + t.nextInt())
+    System.out.println("hasNext " + t.hasNext())
+
+    // ---- nothing at all, in the three ways ----
+    Scanner blank = new Scanner("   ")
+    System.out.println("blank hasNext " + blank.hasNext())
+    System.out.println("blank hasNextLine " + blank.hasNextLine())
+    try {
+      blank.next()
+      System.out.println("no throw")
+    } catch (NoSuchElementException e) {
+      System.out.println("blank next NoSuchElementException")
+    }
+    try {
+      blank.nextInt()
+      System.out.println("no throw")
+    } catch (NoSuchElementException e) {
+      System.out.println("blank nextInt NoSuchElementException")
+    }
+
+    Scanner empty = new Scanner("")
+    System.out.println("empty hasNext " + empty.hasNext())
+    System.out.println("empty hasNextInt " + empty.hasNextInt())
+    System.out.println("empty hasNextLine " + empty.hasNextLine())
+    try {
+      empty.nextLine()
+      System.out.println("no throw")
+    } catch (NoSuchElementException e) {
+      System.out.println("empty nextLine NoSuchElementException")
+    }
+
+    // ---- what does not fit is not a number, and the position is left alone ----
+    Scanner wide = new Scanner("123456789012345")
+    System.out.println("overflow hasNextInt " + wide.hasNextInt())
+    System.out.println("overflow hasNextLong " + wide.hasNextLong())
+    System.out.println("overflow nextLong " + wide.nextLong())
+
+    Scanner bad = new Scanner("1e nope 3")
+    System.out.println("1e hasNextDouble " + bad.hasNextDouble())
+    System.out.println("1e hasNextInt " + bad.hasNextInt())
+    System.out.println("1e next " + bad.next())
+    System.out.println("nope hasNextInt " + bad.hasNextInt())
+    try {
+      bad.nextInt()
+      System.out.println("no throw")
+    } catch (InputMismatchException e) {
+      System.out.println("nope nextInt InputMismatchException")
+    }
+    System.out.println("still there " + bad.next())
+    System.out.println("then " + bad.nextInt())
+
+    // ---- the doubles Java accepts from a text field ----
+    Scanner nums = new Scanner("2.5 -1e3 7 1.5e-2")
+    while (nums.hasNextDouble()) {
+      System.out.println("double " + nums.nextDouble())
+    }
+    System.out.println("exhausted " + nums.hasNextDouble() + " " + nums.hasNext())
+
+    // ---- lines, including the empty one ----
+    Scanner lines = new Scanner("a\n\nb\n")
+    System.out.println("lines [" + lines.nextLine() + "][" + lines.nextLine() + "][" +
+      lines.nextLine() + "]")
+    System.out.println("lines hasNextLine " + lines.hasNextLine())
+
+    // ---- sign, and a spelling that is not a decimal number ----
+    Scanner signs = new Scanner(" +5 -6 ")
+    System.out.println("signs " + signs.nextInt() + " " + signs.nextInt())
+    Scanner hex = new Scanner("0x10 5")
+    System.out.println("hex hasNextInt " + hex.hasNextInt())
+    System.out.println("hex token " + hex.next())
+    System.out.println("hex then int " + hex.nextInt())
+
+    // ---- closed ----
+    Scanner gone = new Scanner("1 2")
+    gone.next()
+    System.out.println("before close " + gone.hasNext())
+    gone.close()
+    try {
+      gone.next()
+      System.out.println("no throw")
+    } catch (IllegalStateException e) {
+      System.out.println("closed next IllegalStateException: " + e.getMessage())
+    }
+    try {
+      gone.hasNext()
+      System.out.println("no throw")
+    } catch (IllegalStateException e) {
+      System.out.println("closed hasNext IllegalStateException")
+    }
+
+    // ---- StringJoiner, and what it is when nothing was added ----
+    StringJoiner j = new StringJoiner(",", "[", "]")
+    System.out.println("fresh [" + j + "] length " + j.length())
+    System.out.println("empty value [" + j.setEmptyValue("none") + "] length " + j.length())
+    j.add("a")
+    j.add("b")
+    System.out.println("filled " + j + " length " + j.length())
+    StringJoiner k = new StringJoiner("-")
+    k.add("c")
+    k.add("d")
+    System.out.println("merged " + j.merge(k) + " other " + k)
+    System.out.println("merge into empty " + new StringJoiner(",").merge(k) + " vs " + k)
+    StringJoiner solo = new StringJoiner(":")
+    System.out.println("solo [" + solo.setEmptyValue("") + "] length " + solo.length())
+    StringJoiner one = new StringJoiner(",", "{", "}")
+    System.out.println("one " + one.setEmptyValue("{}").add("only"))
+
+    // ---- the UUID that was already in the library ----
+    UUID u = UUID.fromString("123e4567-e89b-12d3-a456-426614174000")
+    System.out.println(u)
+    System.out.println("version " + u.version() + " variant " + u.variant())
+    System.out.println(Long.toHexString(u.getMostSignificantBits()) + " " +
+      Long.toHexString(u.getLeastSignificantBits()))
+    UUID v = UUID.fromString("123e4567-e89b-12d3-a456-426614174001")
+    System.out.println("compare " + u.compareTo(v) + " " + v.compareTo(u) + " " + u.compareTo(u))
+    System.out.println("equals " + u.equals(v) + " " +
+      u.equals(UUID.fromString("123e4567-e89b-12d3-a456-426614174000")))
+    System.out.println("hash " + u.hashCode() + " " + v.hashCode())
+    UUID random = UUID.randomUUID()
+    System.out.println("random version " + random.version() + " variant " + random.variant() +
+      " text length " + random.toString().length())
+    System.out.println("random round trip " + random.equals(UUID.fromString(random.toString())))
+  }
+}

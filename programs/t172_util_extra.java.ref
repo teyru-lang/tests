@@ -1,0 +1,155 @@
+// The same program written with Java's punctuation, kept so the comparison
+// against javac can be redone:
+//
+//   cp tests/programs/t172_util_extra.java.ref /tmp/S.java
+//   /opt/jdk21/jdk-21.0.11+10/bin/javac -d /tmp/out /tmp/S.java
+//   /opt/jdk21/jdk-21.0.11+10/bin/java -cp /tmp/out S
+//
+// The output is tests/programs/t172_util_extra.expected, byte for byte.
+// (The class is named S; javac wants the file named after it.)
+//
+// Nothing is substituted this time: Scanner, StringJoiner and UUID are
+// java.util's and the Teyru ones are held to these. The exceptions are printed
+// by kind and not by class name, because a Teyru class lives in teyru and a
+// Java one in java.util -- what both sides can agree on is which call throws.
+
+import java.util.InputMismatchException;
+import java.util.NoSuchElementException;
+import java.util.Scanner;
+import java.util.StringJoiner;
+import java.util.UUID;
+
+class S {
+  public static void main(String[] args) {
+    Scanner s = new Scanner("42 hello world\nsecond line\n");
+    System.out.println("nextInt " + s.nextInt());
+    System.out.println("nextLine [" + s.nextLine() + "]");
+    System.out.println("nextLine [" + s.nextLine() + "]");
+    System.out.println("hasNextLine " + s.hasNextLine());
+    System.out.println("hasNext " + s.hasNext());
+    try {
+      s.nextLine();
+      System.out.println("no throw");
+    } catch (NoSuchElementException e) {
+      System.out.println("NoSuchElementException");
+    }
+
+    Scanner t = new Scanner("abc 12");
+    System.out.println("hasNextInt " + t.hasNextInt());
+    System.out.println("next " + t.next());
+    System.out.println("nextInt " + t.nextInt());
+    System.out.println("hasNext " + t.hasNext());
+
+    Scanner blank = new Scanner("   ");
+    System.out.println("blank hasNext " + blank.hasNext());
+    System.out.println("blank hasNextLine " + blank.hasNextLine());
+    try {
+      blank.next();
+      System.out.println("no throw");
+    } catch (NoSuchElementException e) {
+      System.out.println("blank next NoSuchElementException");
+    }
+    try {
+      blank.nextInt();
+      System.out.println("no throw");
+    } catch (NoSuchElementException e) {
+      System.out.println("blank nextInt NoSuchElementException");
+    }
+
+    Scanner empty = new Scanner("");
+    System.out.println("empty hasNext " + empty.hasNext());
+    System.out.println("empty hasNextInt " + empty.hasNextInt());
+    System.out.println("empty hasNextLine " + empty.hasNextLine());
+    try {
+      empty.nextLine();
+      System.out.println("no throw");
+    } catch (NoSuchElementException e) {
+      System.out.println("empty nextLine NoSuchElementException");
+    }
+
+    Scanner wide = new Scanner("123456789012345");
+    System.out.println("overflow hasNextInt " + wide.hasNextInt());
+    System.out.println("overflow hasNextLong " + wide.hasNextLong());
+    System.out.println("overflow nextLong " + wide.nextLong());
+
+    Scanner bad = new Scanner("1e nope 3");
+    System.out.println("1e hasNextDouble " + bad.hasNextDouble());
+    System.out.println("1e hasNextInt " + bad.hasNextInt());
+    System.out.println("1e next " + bad.next());
+    System.out.println("nope hasNextInt " + bad.hasNextInt());
+    try {
+      bad.nextInt();
+      System.out.println("no throw");
+    } catch (InputMismatchException e) {
+      System.out.println("nope nextInt InputMismatchException");
+    }
+    System.out.println("still there " + bad.next());
+    System.out.println("then " + bad.nextInt());
+
+    Scanner nums = new Scanner("2.5 -1e3 7 1.5e-2");
+    while (nums.hasNextDouble()) {
+      System.out.println("double " + nums.nextDouble());
+    }
+    System.out.println("exhausted " + nums.hasNextDouble() + " " + nums.hasNext());
+
+    Scanner lines = new Scanner("a\n\nb\n");
+    System.out.println("lines [" + lines.nextLine() + "][" + lines.nextLine() + "][" +
+      lines.nextLine() + "]");
+    System.out.println("lines hasNextLine " + lines.hasNextLine());
+
+    Scanner signs = new Scanner(" +5 -6 ");
+    System.out.println("signs " + signs.nextInt() + " " + signs.nextInt());
+    Scanner hex = new Scanner("0x10 5");
+    System.out.println("hex hasNextInt " + hex.hasNextInt());
+    System.out.println("hex token " + hex.next());
+    System.out.println("hex then int " + hex.nextInt());
+
+    Scanner gone = new Scanner("1 2");
+    gone.next();
+    System.out.println("before close " + gone.hasNext());
+    gone.close();
+    try {
+      gone.next();
+      System.out.println("no throw");
+    } catch (IllegalStateException e) {
+      System.out.println("closed next IllegalStateException: " + e.getMessage());
+    }
+    try {
+      gone.hasNext();
+      System.out.println("no throw");
+    } catch (IllegalStateException e) {
+      System.out.println("closed hasNext IllegalStateException");
+    }
+
+    StringJoiner j = new StringJoiner(",", "[", "]");
+    System.out.println("fresh [" + j + "] length " + j.length());
+    System.out.println("empty value [" + j.setEmptyValue("none") + "] length " + j.length());
+    j.add("a");
+    j.add("b");
+    System.out.println("filled " + j + " length " + j.length());
+    StringJoiner k = new StringJoiner("-");
+    k.add("c");
+    k.add("d");
+    System.out.println("merged " + j.merge(k) + " other " + k);
+    System.out.println("merge into empty " + new StringJoiner(",").merge(k) + " vs " + k);
+    StringJoiner solo = new StringJoiner(":");
+    System.out.println("solo [" + solo.setEmptyValue("") + "] length " + solo.length());
+    StringJoiner one = new StringJoiner(",", "{", "}");
+    System.out.println("one " + one.setEmptyValue("{}").add("only"));
+
+    UUID u = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+    System.out.println(u);
+    System.out.println("version " + u.version() + " variant " + u.variant());
+    System.out.println(Long.toHexString(u.getMostSignificantBits()) + " " +
+      Long.toHexString(u.getLeastSignificantBits()));
+    UUID v = UUID.fromString("123e4567-e89b-12d3-a456-426614174001");
+    System.out.println("compare " + u.compareTo(v) + " " + v.compareTo(u) + " " + u.compareTo(u));
+    System.out.println("equals " + u.equals(v) + " " +
+      u.equals(UUID.fromString("123e4567-e89b-12d3-a456-426614174000")));
+    System.out.println("hash " + u.hashCode() + " " + v.hashCode());
+    UUID random = UUID.randomUUID();
+    System.out.println("random version " + random.version() + " variant " + random.variant() +
+      " text length " + random.toString().length());
+    System.out.println("random round trip " + random.equals(UUID.fromString(random.toString())));
+  }
+}

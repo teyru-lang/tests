@@ -1,0 +1,239 @@
+/* java.security.MessageDigest, exercised against the JDK's own answers. This is
+   the same program as the javac 21 program in t173_digest.java.ref, line for
+   line, except for the semicolons the language does not have and the
+   `throws Exception` its main does not need; its output is
+   t173_digest.expected, so every hex string below is what the JDK produced for
+   that input.
+
+   The inputs are chosen for the places a digest implementation goes wrong:
+
+     * the empty message, which is all padding;
+     * one byte and three bytes, where the message is shorter than both the
+       block and the length field;
+     * every length from 50 to 70 and from 105 to 135, which crosses both
+       padding boundaries -- the point where the 1 bit and the length field stop
+       fitting in the last block and a whole extra block is added -- for the
+       64-byte block and the 128-byte block, and again at 190/192 where the
+       crossing happens on the far side of two blocks;
+     * a 1000-byte message, which is many blocks and exercises the path that
+       feeds whole blocks straight out of the caller's array;
+     * the same message fed one byte at a time, in three-byte slices, and
+       through digest(byte[]), which must all agree with the one-shot digest;
+     * a digest carried into the next one without a reset, and a reset;
+     * the failures, whose messages are the JDK's, printed through getMessage()
+       because a Teyru exception's toString carries this runtime's package where
+       Java's carries java.security's.
+
+   Everything printed is ASCII and every digest is printed as hex, so the
+   byte-oriented Teyru string is the same string Java's is. */
+
+package teyru
+
+class T173 {
+  static void p(String s) { System.out.println(s) }
+
+  static String hex(byte[] bs) {
+    StringBuilder sb = new StringBuilder()
+    for (int i = 0 : i < bs.length : i++) {
+      int v = bs[i] & 0xFF
+      sb.append("0123456789abcdef".charAt(v >> 4))
+      sb.append("0123456789abcdef".charAt(v & 0xF))
+    }
+    return sb.toString()
+  }
+
+  /* A message of exactly n bytes, the same bytes in both programs. */
+  static byte[] msg(int n) {
+    String alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    byte[] out = new byte[n]
+    for (int i = 0 : i < n : i++) {
+      out[i] = (byte) alpha.charAt(i % 62)
+    }
+    return out
+  }
+
+  static final String[] ALGS = { "MD5", "SHA-1", "SHA-224", "SHA-256", "SHA-384", "SHA-512" }
+
+  static MessageDigest md(String alg) {
+    return MessageDigest.getInstance(alg)
+  }
+
+  static void all(String label, byte[] data) {
+    for (int i = 0 : i < ALGS.length : i++) {
+      p(label + " " + ALGS[i] + " " + hex(md(ALGS[i]).digest(data)))
+    }
+  }
+
+  public static void main(String[] args) {
+    // ---------- getInstance: names, aliases, case, lengths ----------
+    String[] names = {
+      "MD5", "md5", "Md5", "SHA", "sha", "SHA-1", "sha-1", "SHA1", "sha1",
+      "SHA-224", "SHA224", "sha-224", "SHA-256", "SHA256", "sha256",
+      "SHA-384", "SHA384", "SHA-512", "SHA512", "Sha-512",
+    }
+    for (int i = 0 : i < names.length : i++) {
+      MessageDigest d = md(names[i])
+      p("name " + names[i] + " -> " + d.getAlgorithm() + " " + d.getDigestLength())
+    }
+
+    // ---------- the empty message and the short ones ----------
+    all("empty", new byte[0])
+    all("one", msg(1))
+    all("abc", "abc".getBytes())
+    all("two", msg(2))
+
+    // ---------- every length across both padding boundaries ----------
+    for (int n = 50 : n <= 70 : n++) {
+      all("len" + n, msg(n))
+    }
+    for (int n = 105 : n <= 135 : n++) {
+      all("len" + n, msg(n))
+    }
+    for (int n = 190 : n <= 192 : n++) {
+      all("len" + n, msg(n))
+    }
+
+    // ---------- many blocks ----------
+    byte[] big = msg(1000)
+    all("1000", big)
+    all("1000 again", big)
+
+    // ---------- the same message, fed in pieces ----------
+    byte[] data = msg(300)
+    for (int i = 0 : i < ALGS.length : i++) {
+      String alg = ALGS[i]
+      MessageDigest d = md(alg)
+      for (int k = 0 : k < data.length : k++) {
+        d.update(data[k])
+      }
+      p("bytes " + alg + " " + hex(d.digest()))
+      d = md(alg)
+      int at = 0
+      while (at < data.length) {
+        int take = 3
+        if (at + take > data.length) {
+          take = data.length - at
+        }
+        d.update(data, at, take)
+        at = at + take
+      }
+      p("slices " + alg + " " + hex(d.digest()))
+      d = md(alg)
+      d.update(data, 0, 7)
+      d.update(data, 7, 200)
+      d.update(data, 207, 93)
+      p("mixed " + alg + " " + hex(d.digest()))
+      p("chained " + alg + " " + hex(md(alg).digest(data)) + " " + hex(md(alg).digest(data)))
+      byte[] part = Arrays.copyOfRange(data, 11, 261)
+      p("oneshot " + alg + " " + hex(md(alg).digest(part)))
+    }
+
+    // ---------- a digest carried on without reset, and a reset ----------
+    MessageDigest d = md("SHA-256")
+    d.update("abc".getBytes())
+    p("pending " + hex(d.digest()))
+    p("after digest " + hex(d.digest()))
+    d.update("abc".getBytes())
+    p("reused " + hex(d.digest()))
+    d.update("abc".getBytes())
+    d.reset()
+    d.update("abc".getBytes())
+    p("reset " + hex(d.digest()))
+
+    // ---------- the buffer-shaped digest ----------
+    MessageDigest e = md("SHA-512")
+    byte[] out = new byte[64]
+    int n = e.digest(out, 0, 64)
+    p("into buf " + n + " " + hex(out))
+    e = md("SHA-1")
+    byte[] out2 = new byte[40]
+    n = e.digest(out2, 9, 31)
+    p("into buf at 9 " + n + " " + hex(out2))
+
+    // ---------- isEqual ----------
+    byte[] x = md("MD5").digest("abc".getBytes())
+    byte[] y = md("MD5").digest("abc".getBytes())
+    byte[] z = md("MD5").digest("abd".getBytes())
+    p("isEqual " + MessageDigest.isEqual(x, y) + " " + MessageDigest.isEqual(x, z) + " " +
+      MessageDigest.isEqual(x, x) + " " + MessageDigest.isEqual(x, "abc".getBytes()))
+
+    // ---------- the failures ----------
+    byte[] none = null
+    String[] bad = { "MD-5", "MD5 ", "", "sha-256 " }
+    for (int i = 0 : i < bad.length : i++) {
+      try {
+        md(bad[i])
+        p("bad [" + bad[i] + "] accepted")
+      } catch (NoSuchAlgorithmException ex) {
+        p("bad [" + bad[i] + "] " + ex.getMessage())
+      }
+    }
+    try {
+      md(null)
+      p("null accepted")
+    } catch (NullPointerException ex) {
+      p("null " + ex.getMessage())
+    }
+    try {
+      md("SHA-256").digest(new byte[4], 0, 4)
+      p("short accepted")
+    } catch (DigestException ex) {
+      p("short " + ex.getMessage())
+    }
+    try {
+      md("sha1").digest(new byte[19], 0, 19)
+      p("short accepted")
+    } catch (DigestException ex) {
+      p("short by name " + ex.getMessage())
+    }
+    try {
+      md("SHA-512").digest(new byte[32], 0, 32)
+      p("short accepted")
+    } catch (DigestException ex) {
+      p("short 512 " + ex.getMessage())
+    }
+    try {
+      md("SHA-256").update(none)
+      p("null array accepted")
+    } catch (NullPointerException ex) {
+      p("null array throws NullPointerException")
+    }
+    try {
+      md("SHA-256").update("abc".getBytes(), -1, 2)
+      p("signed range accepted")
+    } catch (ArrayIndexOutOfBoundsException ex) {
+      p("signed range " + ex.getMessage())
+    }
+    try {
+      md("SHA-256").update("abc".getBytes(), 0, -1)
+      p("signed range accepted")
+    } catch (ArrayIndexOutOfBoundsException ex) {
+      p("signed range2 " + ex.getMessage())
+    }
+    try {
+      md("SHA-256").update("abc".getBytes(), 1, 4)
+      p("short input accepted")
+    } catch (IllegalArgumentException ex) {
+      p("short input " + ex.getMessage())
+    }
+    try {
+      md("SHA-256").update(none, 0, 0)
+      p("null input accepted")
+    } catch (IllegalArgumentException ex) {
+      p("null input " + ex.getMessage())
+    }
+    try {
+      md("SHA-256").digest(none, 0, 0)
+      p("null output accepted")
+    } catch (IllegalArgumentException ex) {
+      p("null output " + ex.getMessage())
+    }
+    byte[] small = new byte[20]
+    try {
+      md("SHA-256").digest(small, 30, 4)
+      p("small output accepted")
+    } catch (IllegalArgumentException ex) {
+      p("small output " + ex.getMessage())
+    }
+  }
+}

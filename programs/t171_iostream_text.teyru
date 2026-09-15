@@ -1,0 +1,206 @@
+import teyru.*
+
+/* BufferedReader and PrintWriter, on the shapes Java defines for them.
+ *
+ * readLine is checked against every terminator Java's reader knows -- LF, CRLF,
+ * a lone CR, a last line with no terminator at all, and the empty line between
+ * two of them -- because those are the cases a line reader gets wrong quietly,
+ * and the .expected file is the output of the same program on javac 21.
+ *
+ * PrintWriter is checked for the thing it is built for: what reaches the sink
+ * without a newline, what a println adds, when autoFlush flushes and when it
+ * does not, and that a writer that throws sets the error flag instead of
+ * unwinding out of a println. The recording writer below is the only way to see
+ * that from the outside, and it exists in both programs.
+ *
+ * The .expected file comes from tests/programs/t171_iostream_text.java.ref.
+ */
+
+/* A Writer that writes nothing and remembers everything it was asked to do, so
+   the test can see the calls and not only their result. */
+class Recorder implements Writer {
+  private StringBuilder log = new StringBuilder()
+
+  public void write(String s) {
+    log.append("write:" + s + ";")
+  }
+
+  public void write(int c) {
+    log.append("write:" + String.valueOf((char) c) + ";")
+  }
+
+  public void flush() {
+    log.append("flush;")
+  }
+
+  public void close() {
+    log.append("close;")
+  }
+
+  public String logText() {
+    return log.toString()
+  }
+}
+
+/* A Writer whose writes fail, which is the case PrintWriter's contract is
+   about: the failure becomes a flag and not an exception. */
+class Broken implements Writer {
+  public void write(String s) {
+    throw new IOException("no room")
+  }
+
+  public void write(int c) {
+    throw new IOException("no room")
+  }
+
+  public void flush() {
+  }
+
+  public void close() {
+  }
+}
+
+class Main {
+  public static void main(String[] args) {
+    // ---- the line grammar ----
+    BufferedReader br = new BufferedReader("first\nsecond\r\n\rthird\n\nlast without newline")
+    printLine(br)
+    printLine(br)
+    printLine(br)
+    printLine(br)
+    printLine(br)
+    printLine(br)
+    printLine(br)
+    System.out.println("at end " + br.read())
+    br.close()
+
+    // ---- read() one byte at a time, and close() ----
+    BufferedReader bytes = new BufferedReader("ab\nc")
+    System.out.println(bytes.read() + " " + bytes.read() + " " + bytes.read() + " " + bytes.read())
+    BufferedReader closed = new BufferedReader("x\ny")
+    System.out.println("[" + closed.readLine() + "]")
+    closed.close()
+    try {
+      closed.readLine()
+      System.out.println("no throw")
+    } catch (IOException e) {
+      System.out.println("closed: " + e.getMessage())
+    }
+
+    // ---- a reader is a source too, and so is a data stream ----
+    ByteArrayInputStream raw = new ByteArrayInputStream("alpha\nbeta\ngamma".getBytes())
+    BufferedReader overReader = new BufferedReader(raw)
+    System.out.println("[" + overReader.readLine() + "][" + overReader.readLine() + "][" +
+      overReader.readLine() + "]" + " " + overReader.readLine())
+
+    /* readln() is the prelude's InputStream method; on a stream of bytes it has
+       to read that stream's lines and not the console's. The Java half of this
+       test reads the same bytes with a BufferedReader. */
+    ByteArrayInputStream lines = new ByteArrayInputStream("one\r\ntwo\n\nthree".getBytes())
+    System.out.println("[" + lines.readln() + "][" + lines.readln() + "][" + lines.readln() + "][" +
+      lines.readln() + "][" + lines.readln() + "]")
+    DataInputStream data = new DataInputStream(new ByteArrayInputStream("x\r\ny\nz".getBytes()))
+    System.out.println("[" + data.readln() + "][" + data.readln() + "][" + data.readln() + "]")
+    BufferedReader trailing = new BufferedReader("x\ry\nz\r")
+    System.out.println("[" + trailing.readLine() + "][" + trailing.readLine() + "][" +
+      trailing.readLine() + "][" + trailing.readLine() + "]")
+
+    /* A byte array output stream is a Writer here as well as an OutputStream,
+       because one byte is one character; the Java half of this test uses its
+       StringWriter, which is the same writer over a buffer of characters. */
+    ByteArrayOutputStream buffer = new ByteArrayOutputStream()
+    Writer text = buffer
+    text.write("hé")
+    text.write(65)
+    text.flush()
+    text.close()
+    System.out.println("writer [" + buffer.toString() + "]")
+
+    // ---- PrintWriter over a byte stream ----
+    ByteArrayOutputStream sink = new ByteArrayOutputStream()
+    /* The cast picks Java's OutputStream constructor: a byte array stream is
+       both an OutputStream and a Writer here, so without it the Writer overload
+       would win and the buffering under test would not be in the way. */
+    PrintWriter pw = new PrintWriter((OutputStream) sink)
+    pw.print("no newline")
+    pw.print(1)
+    pw.print(true)
+    pw.print('c')
+    pw.print(2.5)
+    pw.print((Object) null)
+    pw.println()
+    pw.println("line")
+    pw.println(3)
+    pw.printf("%s=%d;", "k", 7)
+    pw.format("%.2f|%x", 1.5, 255)
+    System.out.println("unflushed size " + sink.size())
+    System.out.println("autoflush off: no flush yet " + pw.checkError())
+    System.out.println("[" + sink.toString() + "]")
+    pw.flush()
+    pw.close()
+    System.out.println("after close " + sink.size())
+
+    // ---- what autoFlush flushes ----
+    Recorder rec = new Recorder()
+    PrintWriter manual = new PrintWriter(rec)
+    manual.print("a")
+    manual.println("b")
+    manual.printf("%d", 4)
+    System.out.println("manual " + rec.logText())
+    manual.close()
+    System.out.println("manual closed " + rec.logText())
+
+    Recorder auto = new Recorder()
+    PrintWriter flushing = new PrintWriter(auto, true)
+    flushing.print("a")
+    flushing.println("b")
+    flushing.print("c")
+    flushing.printf("%d", 5)
+    System.out.println("auto " + auto.logText())
+    flushing.close()
+    System.out.println("auto closed " + auto.logText())
+
+    Recorder ints = new Recorder()
+    PrintWriter chars = new PrintWriter(ints)
+    chars.write(65)
+    chars.write("bc")
+    System.out.println("chars " + ints.logText())
+
+    // ---- a write that fails is a flag, not an exception ----
+    PrintWriter broken = new PrintWriter(new Broken())
+    System.out.println("before " + broken.checkError())
+    broken.print("this goes nowhere")
+    broken.println("nor this")
+    System.out.println("after " + broken.checkError())
+    broken.close()
+    System.out.println("closed " + broken.checkError())
+
+    // ---- Java's PrintWriter.write(String) refuses null; print(String) does not ----
+    PrintWriter nulls = new PrintWriter((OutputStream) new ByteArrayOutputStream())
+    nulls.print((String) null)
+    nulls.println((String) null)
+    try {
+      nulls.write((String) null)
+      System.out.println("no throw")
+    } catch (NullPointerException e) {
+      System.out.println("NullPointerException")
+    }
+
+    // ---- writes after close are dropped, as Java drops them ----
+    ByteArrayOutputStream late = new ByteArrayOutputStream()
+    PrintWriter closedOut = new PrintWriter((OutputStream) late)
+    closedOut.print("first")
+    closedOut.close()
+    closedOut.print("second")
+    System.out.println("late [" + late.toString() + "] " + closedOut.checkError())
+  }
+
+  static void printLine(BufferedReader br) {
+    String line = br.readLine()
+    if (line == null) {
+      System.out.println("null")
+    } else {
+      System.out.println("[" + line + "]")
+    }
+  }
+}

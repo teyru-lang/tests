@@ -1,0 +1,58 @@
+of [] [] [] upper=false
+up [:] [0x] [h] upper=true
+lower again false false true
+rebuilt <01>-<02>
+fmt empty []
+fmt one 01
+fmt x 000fa5ff80
+fmt up 0x00h:0x0Fh:0xA5h:0xFFh:0x80h
+fmt up empty []
+fmt close de, ad, be, ef
+fmt ranges [][000fa5ff80][0f][a5ff][80]
+fmt ranges up 0x0Fh:0xA5h
+parse bare 00ff80
+parse bare case 0a0b0c
+parse empty length 0
+parse shaped 0x00h:0x0Fh:0xA5h
+parse shaped lower digits 0x00h:0x0Fh
+parse shaped single 0xFFh
+parse delimiter de:ad:be:ef
+parse chars abcdef
+parse chars slice bcde
+parse chars empty 0
+parse chars shaped 0x00h
+odd [abc] string length not even: 3
+odd [00ff0] string length not even: 5
+odd [0] string length not even: 1
+odd chars string length not even: 5
+digit [0g] not a hexadecimal digit: "g" = 103
+digit [g0] not a hexadecimal digit: "g" = 103
+digit [00zg] not a hexadecimal digit: "z" = 122
+digit [0x0a] not a hexadecimal digit: "x" = 120
+shape [0x0aGE] extra or missing delimiters or values consisting of prefix, two hexadecimal digits, and suffix
+shape [0x0a:0x0b] extra or missing delimiters or values consisting of prefix, two hexadecimal digits, and suffix
+shape [0y00h:0x0fh] found: "0y", expected: "0x", index: 0 ch: 121
+shape [0x00h:0x0fh:] extra or missing delimiters or values consisting of prefix, two hexadecimal digits, and suffix
+range Range [3, 1) out of bounds for length 5
+range neg Range [-1, 2) out of bounds for length 5
+range over Range [0, 6) out of bounds for length 5
+char range Range [0, 7) out of bounds for length 6
+digits byte 0a 0A ff 80 7f
+digits short 0102 fffe 0000 FFFE
+digits char 0041 1234 0000
+digits int 00001234 ffffffff 00000000 000000FF
+digits long ffffffffffffffff 112210f47de98115 0000000000000000
+digits width |4|1234|01234|fff|0000000000000001
+hi low ab AB ff f0
+from hex 0 9 10 15
+is hex true true true false false false
+from hex bad not a hexadecimal digit: "g" = 103
+from hex wide not a hexadecimal digit: "È" = 200
+width 17 number of digits: 17
+width -1 number of digits: -1
+null delimiter delimiter
+null prefix prefix
+null suffix suffix
+null with-delimiter delimiter
+null bytes throws NullPointerException
+null string throws NullPointerException

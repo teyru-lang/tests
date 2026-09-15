@@ -1,0 +1,126 @@
+import java.util.zip.CRC32;
+import java.util.zip.Checksum;
+
+/* The javac 21 program t174_crc32.teyru is the same program as. Its output is
+   t174_crc32.expected: the expectation is the JDK's, not this repository's. */
+
+public class T174 {
+  static void p(String s) { System.out.println(s); }
+
+  static byte[] msg(int n) {
+    String alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    byte[] out = new byte[n];
+    for (int i = 0; i < n; i++) {
+      out[i] = (byte) alpha.charAt(i % 62);
+    }
+    return out;
+  }
+
+  public static void main(String[] args) {
+    // ---------- the empty message, and one byte at a time ----------
+    CRC32 c = new CRC32();
+    p("empty " + c.getValue());
+    int[] one = { 0x00, 0x01, 0x61, 0x7f, 0x80, 0xff };
+    for (int i = 0; i < one.length; i++) {
+      CRC32 d = new CRC32();
+      d.update(one[i]);
+      p("byte " + one[i] + " " + d.getValue());
+    }
+
+    // ---------- update(int) takes the low eight bits ----------
+    CRC32 e = new CRC32();
+    e.update(0x161);
+    p("int 0x161 " + e.getValue());
+    CRC32 f = new CRC32();
+    f.update(-1);
+    p("int -1 " + f.getValue());
+    CRC32 g = new CRC32();
+    g.update(0x100);
+    p("int 0x100 " + g.getValue());
+
+    // ---------- the standard check value ----------
+    CRC32 h = new CRC32();
+    h.update("123456789".getBytes());
+    p("check 123456789 " + h.getValue());
+
+    // ---------- a sentence, whole, byte at a time, in slices, by interface ----------
+    byte[] fox = "The quick brown fox jumps over the lazy dog".getBytes();
+    CRC32 i = new CRC32();
+    i.update(fox);
+    p("fox " + i.getValue());
+    CRC32 j = new CRC32();
+    for (int k = 0; k < fox.length; k++) {
+      j.update(fox[k]);
+    }
+    p("fox bytes " + j.getValue());
+    CRC32 k2 = new CRC32();
+    k2.update(fox, 4, 5);
+    p("fox slice " + k2.getValue());
+    Checksum cs = new CRC32();
+    cs.update(fox);
+    p("fox interface " + cs.getValue());
+    Checksum cs2 = new CRC32();
+    cs2.update(fox, 4, 5);
+    p("fox interface slice " + cs2.getValue());
+
+    // ---------- longer messages, and the whole length range up to two blocks ----------
+    byte[] big = msg(1000);
+    CRC32 m = new CRC32();
+    m.update(big);
+    p("1000 " + m.getValue());
+    for (int n = 0; n <= 70; n++) {
+      CRC32 q = new CRC32();
+      q.update(msg(n));
+      p("len " + n + " " + q.getValue());
+    }
+    for (int n = 125; n <= 130; n++) {
+      CRC32 q = new CRC32();
+      q.update(msg(n));
+      p("len " + n + " " + q.getValue());
+    }
+
+    // ---------- reset, and updating after a value was read ----------
+    CRC32 r = new CRC32();
+    r.update("abc".getBytes());
+    long first = r.getValue();
+    long again = r.getValue();
+    p("read twice " + first + " " + again);
+    r.reset();
+    p("after reset " + r.getValue());
+    r.update("abc".getBytes());
+    p("reused " + r.getValue());
+    r.update("abc".getBytes());
+    p("appended " + r.getValue());
+
+    // ---------- the failures ----------
+    byte[] none = null;
+    try {
+      new CRC32().update(none, 0, 0);
+      p("null accepted");
+    } catch (NullPointerException ex) {
+      p("null output throws NullPointerException");
+    }
+    try {
+      new CRC32().update("abc".getBytes(), -1, 2);
+      p("signed range accepted");
+    } catch (ArrayIndexOutOfBoundsException ex) {
+      p("signed range " + ex.getMessage());
+    }
+    try {
+      new CRC32().update("abc".getBytes(), 2, 3);
+      p("over range accepted");
+    } catch (ArrayIndexOutOfBoundsException ex) {
+      p("over range " + ex.getMessage());
+    }
+    try {
+      new CRC32().update("abc".getBytes(), 0, -1);
+      p("negative accepted");
+    } catch (ArrayIndexOutOfBoundsException ex) {
+      p("negative " + ex.getMessage());
+    }
+    CRC32 edge = new CRC32();
+    edge.update("abc".getBytes(), 3, 0);
+    edge.update("abc".getBytes(), 0, 0);
+    p("empty ranges " + edge.getValue());
+  }
+}

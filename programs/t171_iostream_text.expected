@@ -1,0 +1,37 @@
+[first]
+[second]
+[]
+[third]
+[]
+[last without newline]
+null
+at end -1
+97 98 10 99
+[x]
+closed: Stream closed
+[alpha][beta][gamma] null
+[one][two][][three][null]
+[x][y][z]
+[x][y][z][null]
+writer [héA]
+unflushed size 0
+autoflush off: no flush yet false
+[no newline1truec2.5null
+line
+3
+k=7;1.50|ff]
+after close 42
+manual write:a;write:b;write:
+;write:4;
+manual closed write:a;write:b;write:
+;write:4;close;
+auto write:a;write:b;write:
+;flush;write:c;write:5;flush;
+auto closed write:a;write:b;write:
+;flush;write:c;write:5;flush;close;
+chars write:A;write:bc;
+before false
+after true
+closed true
+NullPointerException
+late [first] true

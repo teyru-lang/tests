@@ -1,0 +1,434 @@
+/* java.math.BigInteger and BigDecimal, stressed where a hand-written big
+   integer goes wrong, against the JDK's own answers. This is the same program
+   as the javac 21 program in t176_bigint.java.ref, whose output is
+   t176_bigint.expected, so every value below is the JDK's.
+
+   lib/23_math.teyru has its own test, t115_math, which walks the whole surface.
+   This one is deliberately not that. It goes after the arithmetic that a
+   limb-based representation can get wrong while still looking right on small
+   inputs, and it does it with numbers of several hundred bits, well past the
+   point where a value stops fitting in one limb of the sign-and-magnitude
+   layout (base 2^30, so 2^30, 2^60, 2^90 ... are the seams):
+
+     * a carry that has to cross several limbs at once: (2^30-1)+1,
+       (2^60-1)+1, (2^90-1)+1, (2^300-1)+1, and A+A where the top limb carries
+       into a new one;
+     * a subtraction that changes sign, and one that borrows across limbs;
+     * products of two multi-limb numbers, printed in full as decimals, since
+       an exact product is the only way to see a mis-carried middle limb;
+     * divide and remainder with every combination of signs -- because Java
+       truncates toward zero, so the remainder takes the dividend's sign, while
+       mod() is defined to be non-negative and must disagree with remainder()
+       exactly on the negative ones;
+     * divideAndRemainder, which has to agree with divide and remainder;
+     * pow with an exponent that makes a thousand-bit number, and with a
+       negative base and an odd exponent;
+     * toString in radices 2, 10, 16 and 36, including negatives, where the
+       sign is the first character and the digits after it are the magnitude's;
+     * shiftLeft and shiftRight by amounts inside a limb, on a limb boundary,
+       across several limbs, past the bit length, and negative (which reverses
+       the direction); shiftRight of a negative is floor division, not
+       truncation, which is the single most common disagreement;
+     * gcd of two coprime several-hundred-bit values, of a value and its
+       multiple, and of zero;
+     * bitLength and bitCount on both sides of 2^300 and of 2^30, including
+       negatives, where bitLength counts the bits of the two's complement
+       magnitude (so -1 has none);
+     * modPow and modInverse over a 300-bit modulus, which are built on the same
+       divide and so inherit its sign mistakes;
+     * the bitwise operators, whose results are defined through two's complement
+       and so have to agree with Java on negatives;
+     * toByteArray and the byte[] constructor, which are where the sign bit and
+       the limb layout meet;
+     * BigDecimal: scale, the difference between equals (scale-sensitive) and
+       compareTo (not), setScale in both directions, and a division that needs a
+       rounding mode, run over all eight of them so that the tie cases are
+       pinned rather than assumed.
+
+   The values are named the same way in both programs and are defined here
+   rather than in a comment: A is 2^300-1, B is 2^300+1, C is 10^90, D is 2^299+
+   12345, E is -(2^300-1), P is 2^149-1 and Q is 2^151-1 (two coprime Mersenne
+   numbers, so that P*Q is a 300-bit modulus whose factors are known). */
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.RoundingMode;
+
+/* The javac 21 program t176_bigint.teyru is the same program as. Its output
+   is t176_bigint.expected: the expectation is the JDK's, not this
+   repository's. */
+
+
+public class T176 {
+  static void p(String s) { System.out.println(s); }
+
+  static void d(String label, BigInteger v) {
+    p(label + " = " + v);
+  }
+
+  static void qr(String label, BigInteger[] q) {
+    p(label + " = " + q[0] + " rem " + q[1]);
+  }
+
+  static void bits(String label, BigInteger v) {
+    p(label + " bits=" + v.bitLength() + "/" + v.bitCount() + " sign=" + v.signum());
+  }
+
+  static void bd(String label, BigDecimal v) {
+    p(label + " = " + v + " |plain=" + v.toPlainString() + "|s=" + v.scale() + "|p=" + v.precision() +
+      "|u=" + v.unscaledValue());
+  }
+
+  public static void main(String[] args) {
+    BigInteger A = new BigInteger("2037035976334486086268445688409378161051468393665936250636140449354381299763336706183397375");
+    BigInteger B = new BigInteger("2037035976334486086268445688409378161051468393665936250636140449354381299763336706183397377");
+    BigInteger C = new BigInteger("1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+    BigInteger D = new BigInteger("1018517988167243043134222844204689080525734196832968125318070224677190649881668353091711033");
+    BigInteger E = new BigInteger("-2037035976334486086268445688409378161051468393665936250636140449354381299763336706183397375");
+    BigInteger P = new BigInteger("713623846352979940529142984724747568191373311");
+    BigInteger Q = new BigInteger("2854495385411919762116571938898990272765493247");
+    BigInteger M = P.multiply(Q);
+    BigInteger L1M = new BigInteger("1073741823");
+    BigInteger L1 = new BigInteger("1073741824");
+    BigInteger L2M = new BigInteger("1152921504606846975");
+    BigInteger L2 = new BigInteger("1152921504606846976");
+    BigInteger L3M = new BigInteger("1237940039285380274899124223");
+    BigInteger L3 = new BigInteger("1237940039285380274899124224");
+
+    // ---------- the values themselves ----------
+    bits("A", A);
+    bits("B", B);
+    bits("D", D);
+    bits("E", E);
+    bits("P", P);
+    bits("Q", Q);
+    bits("M", M);
+    d("A", A);
+    d("D", D);
+
+    // ---------- radix conversion, both signs ----------
+    p("A radix2 " + A.toString(2));
+    p("A radix10 " + A.toString(10));
+    p("A radix16 " + A.toString(16));
+    p("A radix36 " + A.toString(36));
+    p("E radix2 " + E.toString(2));
+    p("E radix16 " + E.toString(16));
+    p("E radix36 " + E.toString(36));
+    p("M radix36 " + M.toString(36));
+    p("P radix2 " + P.toString(2));
+    p("P radix16 " + P.toString(16));
+    p("parse radix16 " + new BigInteger("1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16));
+    p("parse radix36 " + new BigInteger("zzzzzzzzzzzzzzzz", 36));
+    p("parse radix2 " + new BigInteger("-1010101010101010101010101010101010101010101010101010101010101", 2));
+    p("radix roundtrip " + new BigInteger(A.toString(36), 36).equals(A) + " " +
+      new BigInteger(E.toString(7), 7).equals(E));
+
+    // ---------- add: carries across limbs ----------
+    d("L1M+1", L1M.add(BigInteger.ONE));
+    d("L2M+1", L2M.add(BigInteger.ONE));
+    d("L3M+1", L3M.add(BigInteger.ONE));
+    d("A+1", A.add(BigInteger.ONE));
+    d("A+2", A.add(BigInteger.TWO));
+    d("A+B", A.add(B));
+    d("A+C", A.add(C));
+    d("C+A", C.add(A));
+    d("A+D", A.add(D));
+    d("A+A", A.add(A));
+    d("M+M", M.add(M));
+    d("A+E", A.add(E));
+    d("E+A", E.add(A));
+    d("E+E", E.add(E));
+    d("E+1", E.add(BigInteger.ONE));
+    d("E+B", E.add(B));
+    d("P+Q", P.add(Q));
+
+    // ---------- subtract: borrows and a sign that flips ----------
+    d("A-B", A.subtract(B));
+    d("B-A", B.subtract(A));
+    d("A-A", A.subtract(A));
+    d("1-A", BigInteger.ONE.subtract(A));
+    d("L1-1", L1.subtract(BigInteger.ONE));
+    d("L2-1", L2.subtract(BigInteger.ONE));
+    d("L3-1", L3.subtract(BigInteger.ONE));
+    d("A-C", A.subtract(C));
+    d("C-A", C.subtract(A));
+    d("A-D", A.subtract(D));
+    d("E-A", E.subtract(A));
+    d("A-E", A.subtract(E));
+    d("E+1-E", E.add(BigInteger.ONE).subtract(E));
+    d("M-P", M.subtract(P));
+    d("M-Q", M.subtract(Q));
+
+    // ---------- multiply: the middle limbs are the ones that go wrong ----------
+    d("A*B", A.multiply(B));
+    d("A*A", A.multiply(A));
+    d("A*E", A.multiply(E));
+    d("E*E", E.multiply(E));
+    d("C*C", C.multiply(C));
+    d("P*Q", P.multiply(Q));
+    d("M*M", M.multiply(M));
+    d("A*0", A.multiply(BigInteger.ZERO));
+    d("A*1", A.multiply(BigInteger.ONE));
+    d("A*(-1)", A.multiply(BigInteger.valueOf(-1)));
+    d("C*A", C.multiply(A));
+    d("(2^150)*(2^150)", BigInteger.TWO.pow(150).multiply(BigInteger.TWO.pow(150)));
+    d("L1M*L1M", L1M.multiply(L1M));
+    d("L1M*L1", L1M.multiply(L1));
+    d("L1*L1", L1.multiply(L1));
+
+    // ---------- divide and remainder: the sign rules ----------
+    d("M/P", M.divide(P));
+    d("M%P", M.remainder(P));
+    d("M/Q", M.divide(Q));
+    d("M%Q", M.remainder(Q));
+    d("(-M)/P", M.negate().divide(P));
+    d("(-M)%P", M.negate().remainder(P));
+    d("M/(-P)", M.divide(P.negate()));
+    d("M%(-P)", M.remainder(P.negate()));
+    d("(-M)/(-P)", M.negate().divide(P.negate()));
+    d("(-M)%(-P)", M.negate().remainder(P.negate()));
+    d("M mod P", M.mod(P));
+    d("(-M) mod P", M.negate().mod(P));
+    d("A/B", A.divide(B));
+    d("A%B", A.remainder(B));
+    d("(-A)/B", A.negate().divide(B));
+    d("(-A)%B", A.negate().remainder(B));
+    d("A/(-B)", A.divide(B.negate()));
+    d("A%(-B)", A.remainder(B.negate()));
+    d("(-A) mod B", A.negate().mod(B));
+    d("A/7", A.divide(BigInteger.valueOf(7)));
+    d("A%7", A.remainder(BigInteger.valueOf(7)));
+    d("(-A)/7", A.negate().divide(BigInteger.valueOf(7)));
+    d("(-A)%7", A.negate().remainder(BigInteger.valueOf(7)));
+    d("(-A) mod 7", A.negate().mod(BigInteger.valueOf(7)));
+    d("A/M", A.divide(M));
+    d("A%M", A.remainder(M));
+    d("A/(A-1)", A.divide(A.subtract(BigInteger.ONE)));
+    d("A%(A-1)", A.remainder(A.subtract(BigInteger.ONE)));
+    d("M/(M-1)", M.divide(M.subtract(BigInteger.ONE)));
+    d("M%(M-1)", M.remainder(M.subtract(BigInteger.ONE)));
+    d("L3/L1", L3.divide(L1));
+    d("L3%L1", L3.remainder(L1));
+    qr("qr M/P", M.divideAndRemainder(P));
+    qr("qr -M/P", M.negate().divideAndRemainder(P));
+    qr("qr M/-P", M.divideAndRemainder(P.negate()));
+    qr("qr -M/-P", M.negate().divideAndRemainder(P.negate()));
+    qr("qr A/7", A.divideAndRemainder(BigInteger.valueOf(7)));
+    qr("qr -A/7", A.negate().divideAndRemainder(BigInteger.valueOf(7)));
+
+    // ---------- pow ----------
+    d("3^100", BigInteger.valueOf(3).pow(100));
+    d("(-3)^101", BigInteger.valueOf(-3).pow(101));
+    d("(-3)^100", BigInteger.valueOf(-3).pow(100));
+    d("2^1000", BigInteger.TWO.pow(1000));
+    d("A^2", A.pow(2));
+    d("A^3", A.pow(3));
+    d("E^3", E.pow(3));
+    d("A^0", A.pow(0));
+    d("P^5", P.pow(5));
+
+    // ---------- shifts ----------
+    d("A<<1", A.shiftLeft(1));
+    d("A<<29", A.shiftLeft(29));
+    d("A<<30", A.shiftLeft(30));
+    d("A<<31", A.shiftLeft(31));
+    d("A<<61", A.shiftLeft(61));
+    d("A<<300", A.shiftLeft(300));
+    d("A<<1000", A.shiftLeft(1000));
+    d("E<<1", E.shiftLeft(1));
+    d("E<<30", E.shiftLeft(30));
+    d("A>>1", A.shiftRight(1));
+    d("A>>29", A.shiftRight(29));
+    d("A>>30", A.shiftRight(30));
+    d("A>>31", A.shiftRight(31));
+    d("A>>299", A.shiftRight(299));
+    d("A>>300", A.shiftRight(300));
+    d("A>>1000", A.shiftRight(1000));
+    d("E>>1", E.shiftRight(1));
+    d("E>>30", E.shiftRight(30));
+    d("E>>300", E.shiftRight(300));
+    d("-1>>1", BigInteger.valueOf(-1).shiftRight(1));
+    d("-3>>1", BigInteger.valueOf(-3).shiftRight(1));
+    d("-3>>2", BigInteger.valueOf(-3).shiftRight(2));
+    d("(-A)>>1", A.negate().shiftRight(1));
+    d("M>>150", M.shiftRight(150));
+    d("A<<-1", A.shiftLeft(-1));
+    d("A>>-1", A.shiftRight(-1));
+    d("E>>-1", E.shiftRight(-1));
+
+    // ---------- gcd ----------
+    d("gcd(P,Q)", P.gcd(Q));
+    d("gcd(A,A+1)", A.gcd(A.add(BigInteger.ONE)));
+    d("gcd(M,P)", M.gcd(P));
+    d("gcd(M,Q)", M.gcd(Q));
+    d("gcd(M,P*3)", M.gcd(P.multiply(BigInteger.valueOf(3))));
+    d("gcd(0,A)", BigInteger.ZERO.gcd(A));
+    d("gcd(A,0)", A.gcd(BigInteger.ZERO));
+    d("gcd(-A,A)", A.negate().gcd(A));
+    d("gcd(E,C)", E.gcd(C));
+    d("gcd(C,C)", C.gcd(C));
+    d("gcd(P*3,P*9)", P.multiply(BigInteger.valueOf(3)).gcd(P.multiply(BigInteger.valueOf(9))));
+
+    // ---------- bitLength and bitCount on both sides of a power of two ----------
+    bits("2^30-1", L1M);
+    bits("2^30", L1);
+    bits("2^30+1", L1.add(BigInteger.ONE));
+    bits("2^300-1", A);
+    bits("2^300", A.add(BigInteger.ONE));
+    bits("2^300+1", A.add(BigInteger.TWO));
+    bits("-(2^300)", E.add(BigInteger.ONE));
+    bits("-(2^300-1)", E);
+    bits("-(2^300+1)", E.subtract(BigInteger.ONE));
+    bits("0", BigInteger.ZERO);
+    bits("1", BigInteger.ONE);
+    bits("-1", BigInteger.valueOf(-1));
+    bits("-2", BigInteger.valueOf(-2));
+    bits("-3", BigInteger.valueOf(-3));
+    bits("M", M);
+
+    // ---------- the bitwise operators, which are two's complement ----------
+    d("A and B", A.and(B));
+    d("A or B", A.or(B));
+    d("A xor B", A.xor(B));
+    d("A andNot B", A.andNot(B));
+    d("E not", E.not());
+    d("A xor A", A.xor(A));
+    d("E and A", E.and(A));
+    d("E or A", E.or(A));
+    p("M testBit " + M.testBit(0) + " " + M.testBit(1) + " " + M.testBit(299) + " " + M.testBit(300));
+    d("A setBit 300", A.setBit(300));
+    d("A clearBit 299", A.clearBit(299));
+    d("A clearBit 0", A.clearBit(0));
+    p("getLowestSetBit " + A.getLowestSetBit() + " " + C.getLowestSetBit() + " " + BigInteger.ZERO.getLowestSetBit());
+
+    // ---------- the byte[] boundary ----------
+    byte[] ab = A.toByteArray();
+    byte[] pb = P.toByteArray();
+    byte[] eb = E.toByteArray();
+    p("A bytes " + ab.length + " " + (ab[0] & 0xFF) + " " + (ab[1] & 0xFF) + " " + (ab[ab.length - 1] & 0xFF));
+    p("P bytes " + pb.length + " " + (pb[0] & 0xFF));
+    p("E bytes " + eb.length + " " + (eb[0] & 0xFF));
+    p("A from bytes " + new BigInteger(ab).equals(A));
+    p("E from bytes " + new BigInteger(eb).equals(E));
+    p("P from bytes " + new BigInteger(pb).equals(P));
+    p("from bytes offset " + new BigInteger(ab, 1, ab.length - 1).equals(A.shiftRight(8)) + " " +
+      new BigInteger(ab, 2, ab.length - 2).equals(A.shiftRight(16)));
+
+    // ---------- modPow and modInverse ----------
+    d("modPow 65537", P.modPow(BigInteger.valueOf(65537), M));
+    d("modPow Q", P.modPow(Q, M));
+    d("modPow neg base", A.negate().modPow(BigInteger.valueOf(65537), M));
+    d("modInverse P", P.modInverse(Q));
+    d("modInverse Q", Q.modInverse(P));
+    d("P*inv(P,Q) mod Q", P.multiply(P.modInverse(Q)).mod(Q));
+    d("modPow 0", P.modPow(BigInteger.ZERO, M));
+
+    // ---------- compareTo, equals, signum, abs, negate, min, max ----------
+    p("compare " + A.compareTo(B) + " " + B.compareTo(A) + " " + A.compareTo(A) + " " +
+      A.compareTo(A.negate()) + " " + A.negate().compareTo(A));
+    p("equals " + A.equals(new BigInteger(A.toString(10))) + " " + A.equals(B) + " " + A.equals(A.negate()));
+    p("signum " + A.signum() + " " + E.signum() + " " + BigInteger.ZERO.signum() + " " + P.signum());
+    d("abs E", E.abs());
+    d("negate E", E.negate());
+    d("abs A", A.abs());
+    p("minmax " + A.min(B) + " " + A.max(B) + " " + E.min(A) + " " + E.max(A));
+    p("valueOf " + BigInteger.valueOf(9223372036854775807L) + " " + BigInteger.valueOf(-9223372036854775808L));
+    p("intValue " + A.intValue() + " " + A.negate().intValue() + " longValue " + M.longValue());
+    p("longValueExact " + BigInteger.valueOf(1234567890123456789L).longValueExact() + " " +
+      BigInteger.valueOf(-9223372036854775808L).longValueExact());
+
+    // ---------- the failures ----------
+    try {
+      d("divide by zero", A.divide(BigInteger.ZERO));
+    } catch (ArithmeticException ex) {
+      p("divide by zero -> " + ex.getMessage());
+    }
+    try {
+      d("remainder by zero", A.remainder(BigInteger.ZERO));
+    } catch (ArithmeticException ex) {
+      p("remainder by zero -> " + ex.getMessage());
+    }
+    try {
+      d("mod by zero", A.mod(BigInteger.ZERO));
+    } catch (ArithmeticException ex) {
+      p("mod by zero -> " + ex.getMessage());
+    }
+    try {
+      d("mod by negative", A.mod(BigInteger.valueOf(-7)));
+    } catch (ArithmeticException ex) {
+      p("mod by negative -> " + ex.getMessage());
+    }
+    try {
+      d("pow negative", A.pow(-1));
+    } catch (ArithmeticException ex) {
+      p("pow negative -> " + ex.getMessage());
+    }
+    try {
+      d("not invertible", new BigInteger("4").modInverse(new BigInteger("8")));
+    } catch (ArithmeticException ex) {
+      p("not invertible -> " + ex.getMessage());
+    }
+    try {
+      d("parse bad", new BigInteger("12x3"));
+    } catch (NumberFormatException ex) {
+      p("parse bad -> " + ex.getMessage());
+    }
+    p("radix out of range " + A.toString(1) + " " + A.toString(37));
+
+    // ---------- BigDecimal ----------
+    BigDecimal one = new BigDecimal("1.0");
+    BigDecimal oneToo = new BigDecimal("1.00");
+    p("1.0 vs 1.00 equals=" + one.equals(oneToo) + " compareTo=" + one.compareTo(oneToo) +
+      " scales=" + one.scale() + "/" + oneToo.scale());
+    p("add zero " + one.add(BigDecimal.ZERO).toString() + " " + oneToo.add(BigDecimal.ZERO).toString());
+    bd("big add", new BigDecimal("123456789012345678901234567890.12345").add(new BigDecimal("0.00001")));
+    bd("big sub", new BigDecimal("123456789012345678901234567890.12345").subtract(new BigDecimal("0.00005")));
+    bd("big mul", new BigDecimal("123456789012345678901234567890.12345").multiply(new BigDecimal("-0.00002")));
+    bd("scale up", new BigDecimal("2.345").setScale(6));
+    bd("scale down half even", new BigDecimal("2.345").setScale(2, RoundingMode.HALF_EVEN));
+    bd("scale down half up", new BigDecimal("2.345").setScale(2, RoundingMode.HALF_UP));
+    bd("scale down up", new BigDecimal("2.341").setScale(2, RoundingMode.UP));
+    bd("scale down ceiling negative", new BigDecimal("-2.341").setScale(2, RoundingMode.CEILING));
+    bd("scale down floor negative", new BigDecimal("-2.341").setScale(2, RoundingMode.FLOOR));
+    bd("strip", new BigDecimal("1.00").stripTrailingZeros());
+    bd("plain", new BigDecimal("1E+10"));
+    bd("plain big", new BigDecimal("1.2345E+90"));
+    bd("neg zero", new BigDecimal("-0.000").setScale(1));
+    bd("huge div", new BigDecimal(C).divide(new BigDecimal("7"), 40, RoundingMode.HALF_UP));
+    bd("huge div floor", new BigDecimal(C).divide(new BigDecimal("7"), 40, RoundingMode.FLOOR));
+    bd("huge div neg", new BigDecimal(C).negate().divide(new BigDecimal("7"), 40, RoundingMode.HALF_UP));
+    bd("div scale 0", new BigDecimal("1").divide(new BigDecimal("3"), 0, RoundingMode.HALF_EVEN));
+    bd("div exact", new BigDecimal("1E+90").divide(new BigDecimal("1000"), 3, RoundingMode.UNNECESSARY));
+    bd("div by zero-ish", new BigDecimal("1.5").divide(new BigDecimal("3"), 5, RoundingMode.HALF_UP));
+    p("scale sign " + new BigDecimal("0.00").scale() + " " + new BigDecimal("-0.000").scale() + " " +
+      new BigDecimal("12345.6789").precision());
+    p("compare " + new BigDecimal("1.0").compareTo(new BigDecimal("1.0001")) + " " +
+      new BigDecimal("-0.5").compareTo(BigDecimal.ZERO) + " " + one.compareTo(one));
+    RoundingMode[] modes = RoundingMode.values();
+    for (int i = 0; i < modes.length; i++) {
+      try {
+        bd("mode " + modes[i], new BigDecimal("1").divide(new BigDecimal("8"), 2, modes[i]));
+      } catch (ArithmeticException ex) {
+        p("mode " + modes[i] + " -> " + ex.getMessage());
+      }
+    }
+    for (int i = 0; i < modes.length; i++) {
+      try {
+        bd("neg mode " + modes[i], new BigDecimal("-1").divide(new BigDecimal("8"), 2, modes[i]));
+      } catch (ArithmeticException ex) {
+        p("neg mode " + modes[i] + " -> " + ex.getMessage());
+      }
+    }
+    try {
+      bd("divide non-terminating", new BigDecimal("1").divide(new BigDecimal("3")));
+    } catch (ArithmeticException ex) {
+      p("divide non-terminating -> " + ex.getMessage());
+    }
+    try {
+      bd("setScale unnecessary", new BigDecimal("2.345").setScale(2, RoundingMode.UNNECESSARY));
+    } catch (ArithmeticException ex) {
+      p("setScale unnecessary -> " + ex.getMessage());
+    }
+    p("bd compareTo scale " + new BigDecimal(P.toString()).compareTo(new BigDecimal(P.toString() + ".0")));
+  }
+}

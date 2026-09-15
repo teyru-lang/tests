@@ -1,0 +1,36 @@
+88 bytes
+0100ffc81234fffe4e2d0a0b0c0dffffffff0123456789abcdefffffffffffffffff3fc000007fc000003ff80000000000008000000000000000000000026869000668c3a96c6c6f0006e4b8ade696870006eda0bdedb880
+counted 88 streamed 88
+true false
+-1 200
+4660 65534
+20013
+a0b0c0d -1
+123456789abcdef -1
+1.5 NaN
+1.5 -0.0
+[][hi][héllo][中文][😀]
+end -1
+available 8 65 66
+next 67 68
+reset 67 available 5
+skip 5 available 0
+end -1
+got 5 [world] available 0
+second -1
+size 40 text [ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMN]
+copy 40 same true
+reset size 0 text []
+after 3 [hé]
+tail 68c3a9
+too long: encoded string (aaaaaaaa...aaaaaaaa) too long: 65536 bytes
+after the failure 0102
+bad: malformed input around byte 2
+bad: malformed input around byte 0
+bad: malformed input: partial character at end
+bad: malformed input around byte 2
+nul 0002c080
+nul back 1 true
+pair 😀
+EOFException
+big 65535 65537

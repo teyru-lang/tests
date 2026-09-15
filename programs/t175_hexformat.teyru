@@ -1,0 +1,213 @@
+/* java.util.HexFormat, exercised against the JDK's own answers. This is the
+   same program as the javac 21 program in t175_hexformat.java.ref, whose output
+   is t175_hexformat.expected, so every string below is what the JDK produced.
+
+   The class is small but its edges are all load-bearing, so each one is pinned:
+   that a formatter with no delimiter joins the bytes with nothing and one with
+   a delimiter puts it between bytes and not after the last; that the prefix and
+   the suffix wrap every byte, the last one included; that a range formats only
+   its own range and an empty range formats to nothing; that parseHex reads the
+   shape it wrote, including a char[] slice and a formatted run with a prefix,
+   a delimiter and a suffix; that a bare run of digits is read two at a time
+   regardless of case while a shaped run is checked against the shape it
+   declares; and the two failures of a parse plus the range failure of a format,
+   with the JDK's messages.
+
+   The digit conversions are pinned at every width, because that is where the
+   width actually shows: the value is a bit pattern, not a number, so
+   toHexDigits((byte) -1) is two digits and toHexDigits((long) -1) is sixteen,
+   and the two-argument form takes the low digits of the same pattern. */
+
+package teyru
+
+class T175 {
+  static void p(String s) { System.out.println(s) }
+
+  public static void main(String[] args) {
+    byte[] x = { (byte) 0x00, (byte) 0x0f, (byte) 0xa5, (byte) 0xff, (byte) 0x80 }
+
+    // ---------- the factories and the accessors ----------
+    HexFormat h = HexFormat.of()
+    p("of [" + h.delimiter() + "] [" + h.prefix() + "] [" + h.suffix() + "] upper=" + h.isUpperCase())
+    HexFormat up = HexFormat.ofDelimiter(":").withPrefix("0x").withSuffix("h").withUpperCase()
+    p("up [" + up.delimiter() + "] [" + up.prefix() + "] [" + up.suffix() + "] upper=" + up.isUpperCase())
+    p("lower again " + up.withLowerCase().isUpperCase() + " " + h.withLowerCase().isUpperCase() + " " +
+      h.withUpperCase().isUpperCase())
+    p("rebuilt " + HexFormat.ofDelimiter("-").withPrefix("<").withSuffix(">").formatHex(new byte[] { (byte) 1, (byte) 2 }))
+
+    // ---------- formatting, whole and in ranges ----------
+    p("fmt empty [" + h.formatHex(new byte[0]) + "]")
+    p("fmt one " + h.formatHex(new byte[] { (byte) 1 }))
+    p("fmt x " + h.formatHex(x))
+    p("fmt up " + up.formatHex(x))
+    p("fmt up empty [" + up.formatHex(new byte[0]) + "]")
+    p("fmt close " + HexFormat.ofDelimiter(", ").formatHex(new byte[] { (byte) 0xde, (byte) 0xad, (byte) 0xbe, (byte) 0xef }))
+    p("fmt ranges [" + h.formatHex(x, 1, 1) + "][" + h.formatHex(x, 0, 5) + "][" + h.formatHex(x, 1, 2) + "][" +
+      h.formatHex(x, 2, 4) + "][" + h.formatHex(x, 4, 5) + "]")
+    p("fmt ranges up " + up.formatHex(x, 1, 3))
+
+    // ---------- parsing what was formatted ----------
+    p("parse bare " + h.formatHex(h.parseHex("00ff80")))
+    p("parse bare case " + h.formatHex(h.parseHex("0a0B0c")))
+    p("parse empty length " + h.parseHex("").length)
+    p("parse shaped " + up.formatHex(up.parseHex("0x00h:0x0fh:0xa5h")))
+    p("parse shaped lower digits " + up.formatHex(up.parseHex("0x00h:0x0fh")))
+    p("parse shaped single " + up.formatHex(up.parseHex("0xffh")))
+    p("parse delimiter " + HexFormat.ofDelimiter(":").formatHex(HexFormat.ofDelimiter(":").parseHex("de:ad:be:ef")))
+    char[] cs = "abcdef".toCharArray()
+    p("parse chars " + h.formatHex(h.parseHex(cs, 0, 6)))
+    p("parse chars slice " + h.formatHex(h.parseHex(cs, 1, 5)))
+    p("parse chars empty " + h.parseHex(cs, 2, 2).length)
+    p("parse chars shaped " + up.formatHex(up.parseHex("0x00h".toCharArray(), 0, 5)))
+
+    // ---------- a parse failure: a length that is not even ----------
+    String[] odd = { "abc", "00ff0", "0" }
+    for (int i = 0 : i < odd.length : i++) {
+      try {
+        h.parseHex(odd[i])
+        p("odd [" + odd[i] + "] accepted")
+      } catch (IllegalArgumentException ex) {
+        p("odd [" + odd[i] + "] " + ex.getMessage())
+      }
+    }
+    try {
+      h.parseHex(cs, 0, 5)
+      p("odd chars accepted")
+    } catch (IllegalArgumentException ex) {
+      p("odd chars " + ex.getMessage())
+    }
+
+    // ---------- a parse failure: a character that is not a digit ----------
+    String[] notDigit = { "0g", "g0", "00zg", "0x0a" }
+    for (int i = 0 : i < notDigit.length : i++) {
+      try {
+        h.parseHex(notDigit[i])
+        p("digit [" + notDigit[i] + "] accepted")
+      } catch (NumberFormatException ex) {
+        p("digit [" + notDigit[i] + "] " + ex.getMessage())
+      }
+    }
+
+    // ---------- a parse failure: the shape does not hold ----------
+    String[] shaped = { "0x0aGE", "0x0a:0x0b", "0y00h:0x0fh", "0x00h:0x0fh:" }
+    for (int i = 0 : i < shaped.length : i++) {
+      try {
+        up.parseHex(shaped[i])
+        p("shape [" + shaped[i] + "] accepted")
+      } catch (IllegalArgumentException ex) {
+        p("shape [" + shaped[i] + "] " + ex.getMessage())
+      }
+    }
+
+    // ---------- a format failure: the range is not a range ----------
+    try {
+      h.formatHex(x, 3, 1)
+      p("range accepted")
+    } catch (IndexOutOfBoundsException ex) {
+      p("range " + ex.getMessage())
+    }
+    try {
+      h.formatHex(x, -1, 2)
+      p("range accepted")
+    } catch (IndexOutOfBoundsException ex) {
+      p("range neg " + ex.getMessage())
+    }
+    try {
+      h.formatHex(x, 0, 6)
+      p("range accepted")
+    } catch (IndexOutOfBoundsException ex) {
+      p("range over " + ex.getMessage())
+    }
+    try {
+      h.parseHex(cs, 0, 7)
+      p("char range accepted")
+    } catch (IndexOutOfBoundsException ex) {
+      p("char range " + ex.getMessage())
+    }
+
+    // ---------- the digit conversions ----------
+    p("digits byte " + h.toHexDigits((byte) 10) + " " + up.toHexDigits((byte) 10) + " " +
+      h.toHexDigits((byte) -1) + " " + h.toHexDigits((byte) -128) + " " + h.toHexDigits((byte) 127))
+    p("digits short " + h.toHexDigits((short) 258) + " " + h.toHexDigits((short) -2) + " " +
+      h.toHexDigits((short) 0) + " " + up.toHexDigits((short) -2))
+    p("digits char " + h.toHexDigits('A') + " " + h.toHexDigits((char) 0x1234) + " " + h.toHexDigits((char) 0))
+    p("digits int " + h.toHexDigits(0x1234) + " " + h.toHexDigits(-1) + " " + h.toHexDigits(0) + " " +
+      up.toHexDigits(255))
+    p("digits long " + h.toHexDigits(-1L) + " " + h.toHexDigits(1234567890123456789L) + " " + h.toHexDigits(0L))
+    p("digits width " + h.toHexDigits(0x1234L, 0) + "|" + h.toHexDigits(0x1234L, 1) + "|" +
+      h.toHexDigits(0x1234L, 4) + "|" + h.toHexDigits(0x1234L, 5) + "|" + h.toHexDigits(-1L, 3) + "|" +
+      h.toHexDigits(1L, 16))
+    p("hi low " + h.toHighHexDigit(0xab) + h.toLowHexDigit(0xab) + " " +
+      up.toHighHexDigit(0xab) + up.toLowHexDigit(0xab) + " " + h.toHighHexDigit(-1) + h.toLowHexDigit(-1) + " " +
+      h.toHighHexDigit(0xf0) + h.toLowHexDigit(0xf0))
+    p("from hex " + HexFormat.fromHexDigit('0') + " " + HexFormat.fromHexDigit('9') + " " +
+      HexFormat.fromHexDigit('a') + " " + HexFormat.fromHexDigit('F'))
+    p("is hex " + HexFormat.isHexDigit('0') + " " + HexFormat.isHexDigit('f') + " " +
+      HexFormat.isHexDigit('F') + " " + HexFormat.isHexDigit('g') + " " + HexFormat.isHexDigit(200) + " " +
+      HexFormat.isHexDigit('/'))
+    try {
+      HexFormat.fromHexDigit('g')
+      p("from hex accepted")
+    } catch (NumberFormatException ex) {
+      p("from hex bad " + ex.getMessage())
+    }
+    try {
+      HexFormat.fromHexDigit(200)
+      p("from hex accepted")
+    } catch (NumberFormatException ex) {
+      p("from hex wide " + ex.getMessage())
+    }
+    try {
+      h.toHexDigits(1L, 17)
+      p("width accepted")
+    } catch (IllegalArgumentException ex) {
+      p("width 17 " + ex.getMessage())
+    }
+    try {
+      h.toHexDigits(1L, -1)
+      p("width accepted")
+    } catch (IllegalArgumentException ex) {
+      p("width -1 " + ex.getMessage())
+    }
+
+    // ---------- the null arguments ----------
+    try {
+      HexFormat.ofDelimiter(null)
+      p("null delimiter accepted")
+    } catch (NullPointerException ex) {
+      p("null delimiter " + ex.getMessage())
+    }
+    try {
+      h.withPrefix(null)
+      p("null prefix accepted")
+    } catch (NullPointerException ex) {
+      p("null prefix " + ex.getMessage())
+    }
+    try {
+      h.withSuffix(null)
+      p("null suffix accepted")
+    } catch (NullPointerException ex) {
+      p("null suffix " + ex.getMessage())
+    }
+    try {
+      h.withDelimiter(null)
+      p("null with-delimiter accepted")
+    } catch (NullPointerException ex) {
+      p("null with-delimiter " + ex.getMessage())
+    }
+    byte[] noBytes = null
+    try {
+      h.formatHex(noBytes)
+      p("null bytes accepted")
+    } catch (NullPointerException ex) {
+      p("null bytes throws NullPointerException")
+    }
+    String noString = null
+    try {
+      h.parseHex(noString)
+      p("null string accepted")
+    } catch (NullPointerException ex) {
+      p("null string throws NullPointerException")
+    }
+  }
+}
