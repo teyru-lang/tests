@@ -52,14 +52,18 @@
    The one thing in this program that is not the standard library's business:
    the tasks that have to block -- the four meeting at the gate, and the two the
    single-thread executor is held on -- spin on a shared counter with
-   Thread.sleep between looks, rather than waiting on a latch, and this program
-   uses CountDownLatch only where it is the thing being tested. That is not
-   squeamishness about the latch: it is that this runtime's Object.wait corrupts
-   the monitor it waits on (a worker parked that way throws
-   IllegalMonitorStateException from the next synchronized block it leaves), so
-   the library's own tasks never wait, and a test that proves the library's
-   pool works should not fail on the runtime's monitor instead. The latch's own
-   section below is where the waiting is the point. */
+   Thread.sleep between looks, and this program uses CountDownLatch only where
+   it is the thing being tested. That is deliberate, and it is not about the
+   latch: a detector that waited on something the library itself completes would
+   hang when the pool is broken, and a hang is the one outcome a test must not
+   have -- it says nothing, and the harness has to time out to notice. Polling a
+   counter the tasks write is independent of everything under test, so a broken
+   pool fails this program instead of freezing it. (This detector was also
+   working around a broken Object.wait at the time it was written -- a thread
+   that returned from one threw IllegalMonitorStateException on leaving its
+   synchronized block -- and that bug is fixed, so the detector no longer has to
+   explain itself in terms of it.) The latch's own section below is where the
+   waiting is the point. */
 
 /* One of the twelve: it reports to the gate, spins until four tasks are inside
    it, counts itself into the shared AtomicInteger, and answers its square. */
