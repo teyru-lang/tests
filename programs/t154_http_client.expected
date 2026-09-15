@@ -20,4 +20,4 @@ Connection: keep-alive
 204 body=0 true
 404 9 false not found
 302 /pets 0
-https: https is not supported: the runtime has no TLS
+https: attempted, and the connection failed

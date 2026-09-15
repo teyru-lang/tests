@@ -54,12 +54,20 @@ class Main {
     HttpClientResponse r5 = ClientResponseParser.of("HTTP/1.1 302 Found\r\nLocation: /pets\r\nContent-Length: 0\r\n\r\n")
     System.out.println(r5.statusCode() + " " + r5.header("location") + " " + r5.body().length())
 
-    // https is refused rather than attempted: the runtime has no TLS
+    // https is attempted rather than refused at the scheme now: the URL opens
+    // the connection a http:// URL opens and the TLS handshake runs on it. The
+    // port below is one a listener had and gave back, so nothing is behind it
+    // and what comes back is the connection's own failure -- named as that, and
+    // not as "no TLS". The live TLS path, with a server, a self-signed
+    // certificate and a body compared byte for byte, is t163.
+    ServerSocket spare = new ServerSocket(0)
+    int closedPort = spare.getLocalPort()
+    spare.close()
     try {
-      HttpClient.newHttpClient().send(HttpClientRequest.of("GET", "https://example.com/"))
-      System.out.println("https attempted")
-    } catch (IllegalStateException e) {
-      System.out.println("https: " + e.getMessage())
+      HttpClient.newHttpClient().connectTimeout(2000).send(HttpClientRequest.of("GET", "https://127.0.0.1:" + closedPort + "/"))
+      System.out.println("https: answered")
+    } catch (IOException e) {
+      System.out.println("https: attempted, and the connection failed")
     }
   }
 }

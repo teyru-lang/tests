@@ -1,0 +1,247 @@
+import teyru.*
+
+// HTTPS, both directions: a Teyru TLS server on a thread and a Teyru client
+// against it, over a real socket, with the certificate the client is to trust
+// written from the constants below at run time -- because that is what both
+// sides take, a path.
+//
+// The pair was made with the openssl CLI, which is how a real deployment makes
+// one too:
+//
+//   openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+//       -keyout key-a.pem -out cert-a.pem -days 36500 -subj "/CN=teyru test" \
+//       -addext "subjectAltName=IP:127.0.0.1"
+//
+// cert-b and key-b are that command again with 127.0.0.2 in place of 127.0.0.1
+// and nothing else changed. The difference is what the last two tests need: a
+// client that has been given cert-b as an anchor does verify the chain, and
+// still refuses it for 127.0.0.1, because a certificate says which names it is
+// for and 127.0.0.2 is not 127.0.0.1.
+//
+// A self-signed certificate is its own trust anchor, which is what makes the
+// first request below a test of verification rather than a test of a handshake
+// with the checking turned off: the client is given cert-a as an anchor, the
+// system's anchors are loaded as well, and the request succeeds because this
+// certificate is now one of them. The second request is the same request from a
+// client that was given nothing, and it fails. Nothing in the library turns
+// verification off -- there is no call that does -- so a TLS connection here is
+// one the client actually vouched for.
+
+@RestController
+@RequestMapping("/tls")
+class TlsController {
+  // The body carries a multi-byte character, and the client below compares it
+  // byte for byte with the same text written a second time: a body that came
+  // back truncated, re-encoded or read past its end fails this program's own
+  // comparison rather than somebody's eye.
+  @GetMapping("/hello")
+  String hello() {
+    return "hello over TLS, na\u00efve"
+  }
+}
+
+class Main {
+  // The certificate and the key of the first server, and then of the second.
+  // Both are PEM, both are what `openssl req -x509` writes, and both are
+  // constants here rather than files beside this program because the suite
+  // hands a program its sources and nothing else: a certificate that had to be
+  // checked in next to the test would be a file the harness has to know about,
+  // and this way the whole certificate story is in the one file that uses it.
+  static final String CERT_A = """
+-----BEGIN CERTIFICATE-----
+MIIBkjCCATigAwIBAgIUY7HGBQ3Vv5DJjs7pao+ZNTzCKoEwCgYIKoZIzj0EAwIw
+FTETMBEGA1UEAwwKdGV5cnUgdGVzdDAgFw0yNjA5MTUwOTIwNDVaGA8yMTI2MDgy
+MjA5MjA0NVowFTETMBEGA1UEAwwKdGV5cnUgdGVzdDBZMBMGByqGSM49AgEGCCqG
+SM49AwEHA0IABJezzdg2dsElVPGyfjROwkR9N9cCIomuCOHx6RHdcU4KLd1VXLhM
+2Kx0j3bk+SmJI74AYl7ArzS6pU8PYRza7IKjZDBiMB0GA1UdDgQWBBRg5tBK8emj
+sUSGgvHw5c/7/JRD2zAfBgNVHSMEGDAWgBRg5tBK8emjsUSGgvHw5c/7/JRD2zAP
+BgNVHRMBAf8EBTADAQH/MA8GA1UdEQQIMAaHBH8AAAEwCgYIKoZIzj0EAwIDSAAw
+RQIgbzpcPuILKcnRNrcBl+UcVwni/cMcawupurQo2TerQy8CIQDyAiTfgr+nPHG4
+lZFpZl+H059fk9Fa1VppxipgALyQcQ==
+-----END CERTIFICATE-----
+"""
+  static final String KEY_A = """
+-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgX6cwTKzUxknb+0uT
+gzkvtOggWp3vg2CodL3Fn/WJ+RmhRANCAASXs83YNnbBJVTxsn40TsJEfTfXAiKJ
+rgjh8ekR3XFOCi3dVVy4TNisdI925PkpiSO+AGJewK80uqVPD2Ec2uyC
+-----END PRIVATE KEY-----
+"""
+  static final String CERT_B = """
+-----BEGIN CERTIFICATE-----
+MIIBnjCCAUSgAwIBAgIUZtnchpP+vYUZzyHdJe2BvVB1U/AwCgYIKoZIzj0EAwIw
+GzEZMBcGA1UEAwwQdGV5cnUgdGVzdCBvdGhlcjAgFw0yNjA5MTUwOTIwNDVaGA8y
+MTI2MDgyMjA5MjA0NVowGzEZMBcGA1UEAwwQdGV5cnUgdGVzdCBvdGhlcjBZMBMG
+ByqGSM49AgEGCCqGSM49AwEHA0IABLyMqUPNO0H6SDQt2A98FAssWctPA9NibuHi
+vbBPjZi0uPTmmPMZ+zJu+73H8gwaaNbm9s2g8e0Y9gSdBf7vr+yjZDBiMB0GA1Ud
+DgQWBBR6lT0RpDD4yWEmjo3/uyLGE0zTqTAfBgNVHSMEGDAWgBR6lT0RpDD4yWEm
+jo3/uyLGE0zTqTAPBgNVHRMBAf8EBTADAQH/MA8GA1UdEQQIMAaHBH8AAAIwCgYI
+KoZIzj0EAwIDSAAwRQIgJLwl1z2dyieL76QgA50veiQGdqvsSnZVrA4ii6o7PtwC
+IQDsbx5ua1ph1OL6kKUkGqF12prYZNgI1afaXMxl9ST/IQ==
+-----END CERTIFICATE-----
+"""
+  static final String KEY_B = """
+-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgvIykaFT4MWTYi71t
+2vVuTBUG3ErMSLaf924Hr3u3JMihRANCAAS8jKlDzTtB+kg0LdgPfBQLLFnLTwPT
+Ym7h4r2wT42YtLj05pjzGfsybvu9x/IMGmjW5vbNoPHtGPYEnQX+76/s
+-----END PRIVATE KEY-----
+"""
+
+  public static void main(String[] args) throws Exception {
+    // Both sides take a path, so the constants are written out first. The
+    // directory is this program's own -- mkdtemp, so two runs at once cannot be
+    // handed the same name -- and it is removed at the end of this method.
+    Path dir = Files.createTempDirectory("teyru-tls-")
+    String certA = File.join(dir.toString(), "cert-a.pem")
+    String keyA = File.join(dir.toString(), "key-a.pem")
+    String certB = File.join(dir.toString(), "cert-b.pem")
+    String keyB = File.join(dir.toString(), "key-b.pem")
+    Files.writeString(certA, CERT_A + "\n")
+    Files.writeString(keyA, KEY_A + "\n")
+    Files.writeString(certB, CERT_B + "\n")
+    Files.writeString(keyB, KEY_B + "\n")
+
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    Router router = Application.routerFrom(ctx)
+
+    // Two servers, both on the port the kernel picks -- 0 -- so that two runs of
+    // this program print the same bytes. The first presents the certificate the
+    // client is given, the second the one it is not supposed to accept here.
+    HttpServer serverA = new HttpServer(0, router, ctx).ssl(certA, keyA)
+    serverA.bind()
+    int portA = serverA.getPort()
+    ServerTask taskA = new ServerTask(serverA)
+    Thread threadA = new Thread(taskA, "server-a")
+    threadA.start()
+
+    HttpServer serverB = new HttpServer(0, router, ctx).ssl(certB, keyB)
+    serverB.bind()
+    int portB = serverB.getPort()
+    ServerTask taskB = new ServerTask(serverB)
+    Thread threadB = new Thread(taskB, "server-b")
+    threadB.start()
+
+    // The anchors are the system's plus this file: the client verifies that the
+    // certificate chains to one of them and that it is for the host it
+    // connected to.
+    HttpClient client = HttpClient.newHttpClient().connectTimeout(5000).trustStore(certA)
+
+    // A connection is retried until the serving thread answers one, rather than
+    // waited for: a sleep long enough to be reliable is a sleep that is too long
+    // on every run but the slow one, and the first attempt may arrive before the
+    // loop is in accept.
+    boolean ready = false
+    for (int attempt = 0 : attempt < 100 && ready == false : attempt++) {
+      try {
+        ready = client.send(HttpClientRequest.of("GET", "https://127.0.0.1:" + portA + "/tls/hello")).statusCode() == 200
+      } catch (IOException e) {
+        Thread.sleep(10)
+      }
+    }
+    System.out.println("server ready=" + ready)
+    System.out.println("serving TLS=" + serverA.isSecure())
+    if (ready == false) {
+      System.out.println("the TLS server never answered on the port it bound")
+      client.close()
+      taskA.stop()
+      threadA.join()
+      serverA.close()
+      taskB.stop()
+      threadB.join()
+      serverB.close()
+      remove(dir, certA, keyA, certB, keyB)
+      return
+    }
+
+    // The whole point: a GET over https, the status, and the body compared with
+    // the text the handler returned.
+    HttpClientResponse hello = client.send(HttpClientRequest.of("GET", "https://127.0.0.1:" + portA + "/tls/hello"))
+    String body = hello.body()
+    // The port is in the URL and not in the output: it is a port the kernel
+    // picked, so printing it would make two runs of this program differ.
+    System.out.println("GET /tls/hello over TLS -> " + hello.statusCode())
+    System.out.println("body identical=" + body.equals("hello over TLS, na\u00efve") + " bytes=" + body.length())
+    // Closed here rather than at the end, and not because of anything TLS does:
+    // a server answers one connection at a time, and this connection is being
+    // kept alive for the next request. The server's loop would sit on it -- the
+    // read timeout is ten seconds -- while the clients below waited to be
+    // accepted, and the refusals below would then time out instead of being
+    // refused.
+    client.close()
+
+    // The same request from a client that was given no anchor for this
+    // certificate. The system's anchors do not include a certificate made a
+    // moment ago in a temporary directory, so the chain does not verify and the
+    // request never reaches the handler.
+    HttpClient untrusting = HttpClient.newHttpClient().connectTimeout(5000)
+    try {
+      untrusting.send(HttpClientRequest.of("GET", "https://127.0.0.1:" + portA + "/tls/hello"))
+      System.out.println("a certificate nothing vouches for: ACCEPTED")
+    } catch (TlsCertificateException e) {
+      System.out.println("a certificate nothing vouches for: refused as a certificate: " + e.getMessage())
+    } catch (TlsException e) {
+      System.out.println("a certificate nothing vouches for: refused otherwise: " + e.getMessage())
+    } finally {
+      untrusting.close()
+    }
+
+    // And the failure a trust store cannot catch: the certificate is trusted --
+    // this client was given it -- and it is not for the address in the URL.
+    HttpClient otherCa = HttpClient.newHttpClient().connectTimeout(5000).trustStore(certB)
+    try {
+      otherCa.send(HttpClientRequest.of("GET", "https://127.0.0.1:" + portB + "/tls/hello"))
+      System.out.println("a certificate for another address: ACCEPTED")
+    } catch (TlsHostnameException e) {
+      System.out.println("a certificate for another address: refused as a host name: " + e.getMessage())
+    } catch (TlsException e) {
+      System.out.println("a certificate for another address: refused otherwise: " + e.getMessage())
+    } finally {
+      otherCa.close()
+    }
+
+    // The port speaks TLS and nothing else. A plaintext request reaches the
+    // handshake, which cannot parse it, and the connection ends without an
+    // answer -- which is the one answer a client must never get: the bytes
+    // never reach the handler and the handler's bytes never leave unencrypted.
+    try {
+      Http.get("http://127.0.0.1:" + portA + "/tls/hello")
+      System.out.println("a plaintext request: answered")
+    } catch (IOException e) {
+      System.out.println("a plaintext request: not answered")
+    } catch (IllegalStateException e) {
+      System.out.println("a plaintext request: not answered")
+    }
+
+    // The loops are the last thing stopped, after every client has closed: a
+    // serving thread is reading the next request off whatever connection is
+    // open, and it notices a client that has gone the moment that read returns.
+    // Stopping the task first would leave the thread waiting out the ten-second
+    // request timeout before it noticed.
+    taskA.stop()
+    threadA.join()
+    serverA.close()
+    taskB.stop()
+    threadB.join()
+    serverB.close()
+    System.out.println("serving thread alive after join=" + threadA.isAlive())
+
+    // The directory this program made, removed by the program that made it --
+    // on the path above that gives up early too, which is what remove is for.
+    remove(dir, certA, keyA, certB, keyB)
+    System.out.println("done")
+  }
+
+  // remove takes back the four files and then the directory they were made in,
+  // which has to be empty for the last call to work. Both paths out of main go
+  // through here: a failing run is the one that most needs to leave nothing
+  // behind, and it is the one that would not.
+  private static void remove(Path dir, String certA, String keyA, String certB, String keyB) {
+    Files.delete(certA)
+    Files.delete(keyA)
+    Files.delete(certB)
+    Files.delete(keyB)
+    Files.delete(dir.toString())
+  }
+}

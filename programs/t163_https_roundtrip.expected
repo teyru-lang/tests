@@ -1,0 +1,9 @@
+server ready=true
+serving TLS=true
+GET /tls/hello over TLS -> 200
+body identical=true bytes=22
+a certificate nothing vouches for: refused as a certificate: TLS handshake with 127.0.0.1: self-signed certificate
+a certificate for another address: refused as a host name: TLS handshake with 127.0.0.1: IP address mismatch
+a plaintext request: not answered
+serving thread alive after join=false
+done
