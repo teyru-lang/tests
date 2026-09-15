@@ -1,3 +1,10 @@
+/* The two sources below are compiled as one translation unit, and the POSIX
+   platform implementation asks for the GNU extensions it uses
+   (pthread_getattr_np, accept4). A feature macro only counts before the first
+   header is read, so it is set here, at the top, where this file is the one
+   being compiled. */
+#define _GNU_SOURCE 1
+
 /* tests/native/net_c_test.c - the socket layer tested as C, because the
  * interesting failures need a peer that is genuinely slow, genuinely silent or
  * genuinely gone, and a language with no threads cannot be that peer while it
@@ -28,6 +35,13 @@
  */
 
 #include "../../internal/runtime/src/tyrt_net.c"
+/* The platform half of the socket layer. tyrt_net.c calls it and does not
+   contain it -- a build compiles one platform implementation beside the socket
+   code -- and this test compiles the layer rather than linking against it, so
+   the POSIX implementation is compiled here as well. This test is POSIX
+   anyway: its whole point is a forked child that is a slow, silent or gone
+   peer. */
+#include "../../internal/runtime/src/tyrt_plat_posix.c"
 /* Included after the source so that the compiler compares this file's
    prototypes against the definitions above: a header that had drifted from
    the code would be a build error here rather than a surprise in a program
