@@ -1,0 +1,19 @@
+int /= 2.5 = 2
+int %= 2.5 = 2
+long /= 2.5 = 2
+int /= 2 = 3
+long /= 2L = 3
+int /= 2L = 3
+float /= 2.5 = 2.8
+double /= 2 = 3.5
+int /= 0.5 past the range = 2147483647
+int /= 0.0 = 2147483647
+int /= 2.5 negative = -2
+long %= 2.5 = 2
+byte /= 2.5 = 40
+char /= 2.0 = 48
+short /= 3.0 = -2
+int /= 2 = 2
+int %= 2 = 1
+long /= 2 = 3
+int %= 2.5 negative = -2

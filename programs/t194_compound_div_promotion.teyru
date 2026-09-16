@@ -1,0 +1,80 @@
+/* A compound division or remainder whose operands promote: `E1 op= E2` is
+ * `E1 = (T) ((E1) op (E2))`, and the operation is performed in the type binary
+ * numeric promotion gives the two operands, not in the target's type (JLS
+ * 15.26.2, with 15.17.2 and 15.17.3 for the two operations).
+ *
+ * The difference is invisible until an operand is floating-point, because for
+ * two integral operands the target's type and the promoted type are the same.
+ * `int a = 7; a /= 2.5` done in the target's type narrows 2.5 to 2 and answers
+ * 7/2 = 3; Java promotes to double, divides to 2.8, and converts back to 2. The
+ * same mistake turns `a %= 2.5` into 1 instead of 2, and makes
+ * `int m = 2147483647; m /= 0.5` an integer division by zero -- an
+ * ArithmeticException -- where Java divides in double and saturates on the way
+ * back to int. Both operations, every integral target, the integral cases that
+ * must not move, and the two that leave the target's range in opposite
+ * directions.
+ *
+ * The expectation is the same program compiled by javac:
+ *   javac -d /tmp t194_compound_div_promotion.java && java -cp /tmp Main
+ *   (see the .java.ref) */
+class Main {
+  public static void main(String[] args) {
+    int a = 7
+    a /= 2.5
+    System.out.println("int /= 2.5 = " + a)
+    int b = 7
+    b %= 2.5
+    System.out.println("int %= 2.5 = " + b)
+    long c = 7L
+    c /= 2.5
+    System.out.println("long /= 2.5 = " + c)
+    int d = 7
+    d /= 2
+    System.out.println("int /= 2 = " + d)
+    long e = 7L
+    e /= 2L
+    System.out.println("long /= 2L = " + e)
+    int f = 7
+    f /= 2L
+    System.out.println("int /= 2L = " + f)
+    float g = 7.0f
+    g /= 2.5
+    System.out.println("float /= 2.5 = " + g)
+    double h = 7
+    h /= 2
+    System.out.println("double /= 2 = " + h)
+    int i = 2147483647
+    i /= 0.5
+    System.out.println("int /= 0.5 past the range = " + i)
+    int j = 7
+    j /= 0.0
+    System.out.println("int /= 0.0 = " + j)
+    int k = -7
+    k /= 2.5
+    System.out.println("int /= 2.5 negative = " + k)
+    long m = 7L
+    m %= 2.5
+    System.out.println("long %= 2.5 = " + m)
+    byte n = 100
+    n /= 2.5
+    System.out.println("byte /= 2.5 = " + n)
+    char o = 'a'
+    o /= 2.0
+    System.out.println("char /= 2.0 = " + ((int) o))
+    short p = -7
+    p /= 3.0
+    System.out.println("short /= 3.0 = " + p)
+    int q = 5
+    q /= 2
+    System.out.println("int /= 2 = " + q)
+    int r = 7
+    r %= 2
+    System.out.println("int %= 2 = " + r)
+    long s = 7L
+    s /= 2
+    System.out.println("long /= 2 = " + s)
+    int t = -7
+    t %= 2.5
+    System.out.println("int %= 2.5 negative = " + t)
+  }
+}
