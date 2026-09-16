@@ -1,0 +1,11 @@
+charAt StringIndexOutOfBounds
+substring StringIndexOutOfBounds
+substring2 StringIndexOutOfBounds
+substringPast StringIndexOutOfBounds
+sbCharAt StringIndexOutOfBounds
+sbSubstring StringIndexOutOfBounds
+sbSetLength StringIndexOutOfBounds
+arrayRead ArrayIndexOutOfBounds
+arrayWrite ArrayIndexOutOfBounds
+valueOfChars StringIndexOutOfBounds
+inRange no-throw
