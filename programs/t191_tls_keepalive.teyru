@@ -1,0 +1,113 @@
+import teyru.*
+
+// A TLS connection kept alive across two requests.
+//
+// The client keeps a connection for the next request to the same authority
+// (lib/32_http_client.teyru), and the server answers as many requests on one
+// connection as the client sends (HttpServer.serveOne). Neither of those is
+// TLS-specific, and the point of this test is that upgrading the socket did not
+// change it: the connection is one TLS session from the handshake to the last
+// response, and the second request goes down it.
+//
+// What makes the two answers one connection rather than two is the deadline
+// this test sets, not a number it asserts. The server answers one connection at
+// a time and stays in its keep-alive read loop on the connection it is reading,
+// so a second connection would not even be accepted until the first one's
+// ten-second request timeout expired -- and the client, whose timeout is five
+// seconds, would raise SocketTimeoutException instead of printing a second 200.
+// A client that stopped reusing the connection therefore fails this test.
+//
+// The elapsed time is deliberately not printed: one harness compares stdout byte
+// for byte and the other counts any stderr as a failure, so a number that
+// changes between runs has nowhere to go. The two requests of a passing run take
+// one or two milliseconds together, against the ten seconds a second connection
+// would have needed -- which is the evidence, and this file is where it is
+// written down for whoever changes the TLS layer next.
+//
+// The certificate is the one t163 uses, and the command that made it is there.
+// It is written to a temporary directory at run time because a server takes a
+// path, and the directory is removed at the end.
+
+@RestController
+@RequestMapping("/tls")
+class TlsController {
+  @GetMapping("/hello")
+  String hello() {
+    return "hello over TLS"
+  }
+}
+
+class Main {
+  static final String CERT_A = """
+-----BEGIN CERTIFICATE-----
+MIIBkjCCATigAwIBAgIUY7HGBQ3Vv5DJjs7pao+ZNTzCKoEwCgYIKoZIzj0EAwIw
+FTETMBEGA1UEAwwKdGV5cnUgdGVzdDAgFw0yNjA5MTUwOTIwNDVaGA8yMTI2MDgy
+MjA5MjA0NVowFTETMBEGA1UEAwwKdGV5cnUgdGVzdDBZMBMGByqGSM49AgEGCCqG
+SM49AwEHA0IABJezzdg2dsElVPGyfjROwkR9N9cCIomuCOHx6RHdcU4KLd1VXLhM
+2Kx0j3bk+SmJI74AYl7ArzS6pU8PYRza7IKjZDBiMB0GA1UdDgQWBBRg5tBK8emj
+sUSGgvHw5c/7/JRD2zAfBgNVHSMEGDAWgBRg5tBK8emjsUSGgvHw5c/7/JRD2zAP
+BgNVHRMBAf8EBTADAQH/MA8GA1UdEQQIMAaHBH8AAAEwCgYIKoZIzj0EAwIDSAAw
+RQIgbzpcPuILKcnRNrcBl+UcVwni/cMcawupurQo2TerQy8CIQDyAiTfgr+nPHG4
+lZFpZl+H059fk9Fa1VppxipgALyQcQ==
+-----END CERTIFICATE-----
+"""
+  static final String KEY_A = """
+-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgX6cwTKzUxknb+0uT
+gzkvtOggWp3vg2CodL3Fn/WJ+RmhRANCAASXs83YNnbBJVTxsn40TsJEfTfXAiKJ
+rgjh8ekR3XFOCi3dVVy4TNisdI925PkpiSO+AGJewK80uqVPD2Ec2uyC
+-----END PRIVATE KEY-----
+"""
+
+  public static void main(String[] args) throws Exception {
+    Path dir = Files.createTempDirectory("teyru-tls-keepalive-")
+    String cert = File.join(dir.toString(), "cert.pem")
+    String key = File.join(dir.toString(), "key.pem")
+    Files.writeString(cert, CERT_A + "\\n")
+    Files.writeString(key, KEY_A + "\\n")
+
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.ssl(cert, key)
+    server.bind()
+    int port = server.getPort()
+
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "server")
+    serving.start()
+
+    // Five seconds, against the server's ten-second request timeout: the margin
+    // is what turns "the connection was not reused" into a failure here.
+    HttpClient client = HttpClient.newHttpClient().connectTimeout(5000).trustStore(cert)
+    boolean ready = false
+    for (int attempt = 0 : attempt < 100 && ready == false : attempt++) {
+      try {
+        ready = client.send(HttpClientRequest.of("GET", "https://127.0.0.1:" + port + "/tls/hello")).statusCode() == 200
+      } catch (IOException e) {
+        Thread.sleep(10)
+      }
+    }
+    System.out.println("ready=" + ready)
+
+    HttpClientResponse first = client.send(HttpClientRequest.of("GET", "https://127.0.0.1:" + port + "/tls/hello"))
+    HttpClientResponse second = client.send(HttpClientRequest.of("GET", "https://127.0.0.1:" + port + "/tls/hello"))
+
+    System.out.println("first=" + first.statusCode() + " " + first.header("connection") + " [" + first.body() + "]")
+    System.out.println("second=" + second.statusCode() + " " + second.header("connection") + " [" + second.body() + "]")
+    System.out.println("same connection=" + (first.statusCode() == 200 && second.statusCode() == 200 &&
+        first.header("connection").equals("keep-alive") && second.header("connection").equals("keep-alive")))
+
+    // The client first, then the loop: the serving thread is reading the next
+    // request off the connection this client kept, and it sees the client go the
+    // moment that read returns.
+    client.close()
+    task.stop()
+    serving.join()
+    server.close()
+    Files.delete(cert)
+    Files.delete(key)
+    Files.delete(dir.toString())
+    System.out.println("done")
+  }
+}

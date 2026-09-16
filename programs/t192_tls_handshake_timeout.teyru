@@ -1,0 +1,77 @@
+import teyru.*
+
+// A peer that completes the TCP connection and then says nothing: the TLS
+// handshake has nowhere to go, and the client has to give up on its own
+// deadline.
+//
+// This is the timeout path of tyrt_tls.c, which is the one thing about TLS that
+// is easy to get subtly wrong: SO_RCVTIMEO expires, the socket layer reports
+// -EAGAIN, and that has to leave the TLS read as TY_NET_TIMEOUT rather than as
+// the 0 that means "the peer closed the stream". A 0 there is read as the end of
+// the connection by every loop that checks for one, so a handshake that timed
+// out would arrive as a handshake that ended -- and a request answered from half
+// a response is worse than a request that failed.
+//
+// Nothing here asserts a duration, only that the failure is a
+// SocketTimeoutException whose message names the handshake: the type is what the
+// layer promises, and a test that compared milliseconds would fail on a busy
+// machine rather than on a broken one. The peer outlives the client's two-second
+// deadline by reading the connection rather than sleeping on it: the read
+// returns the moment the client gives up and closes, so the test lasts exactly
+// as long as the client's deadline and there is no fixed hold time for a slow
+// machine to race against. (An earlier version slept four seconds in the peer.
+// That was not wrong -- Thread.sleep really does block, and costs the process
+// nothing -- but a test whose length is a constant has to be long enough for the
+// worst machine, and this one does not.)
+
+// Silent accepts one connection, never writes a byte to it, and reads whatever
+// arrives -- the client's ClientHello -- and then keeps reading until the client
+// gives up and closes, which is what ends the loop.
+class Silent implements Runnable {
+  private ServerSocket listener
+
+  public Silent(ServerSocket listener) {
+    this.listener = listener
+  }
+
+  public void run() {
+    try {
+      Socket s = listener.accept()
+      byte[] buf = new byte[4096]
+      while (true) {
+        int n = s.read(buf, 0, buf.length)
+        if (n <= 0) {
+          break
+        }
+      }
+      s.close()
+    } catch (Exception e) {
+    }
+  }
+}
+
+class Main {
+  public static void main(String[] args) throws Exception {
+    ServerSocket silent = new ServerSocket(0)
+    int port = silent.getLocalPort()
+    Thread peer = new Thread(new Silent(silent), "silent")
+    peer.start()
+
+    HttpClient client = HttpClient.newHttpClient().connectTimeout(2000)
+    try {
+      client.send(HttpClientRequest.of("GET", "https://127.0.0.1:" + port + "/"))
+      System.out.println("a peer that says nothing: answered")
+    } catch (SocketTimeoutException e) {
+      System.out.println("a peer that says nothing: SocketTimeoutException")
+      System.out.println("message names the handshake: " + e.getMessage())
+    } catch (IOException e) {
+      System.out.println("a peer that says nothing: " + e.getMessage())
+    } finally {
+      client.close()
+    }
+
+    silent.close()
+    peer.join()
+    System.out.println("done")
+  }
+}

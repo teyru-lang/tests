@@ -1,0 +1,3 @@
+a peer that says nothing: SocketTimeoutException
+message names the handshake: TLS handshake with 127.0.0.1: timed out
+done
