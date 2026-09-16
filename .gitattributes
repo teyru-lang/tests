@@ -1,0 +1,13 @@
+# GitHub's language statistics. This project is written in Teyru: the compiler
+# is Go and the runtime C, but the language, its standard library and every test
+# are .teyru, and Linguist does not know the extension unless it is told.
+*.teyru linguist-language=Teyru
+
+# The Java files under tests/ are references: javac's output is the
+# specification the .expected files were derived from, and several of them are
+# whole JDK-shaped programs. Counting them made "Java" the largest language in a
+# repository that contains almost none.
+*.java.ref linguist-detectable=false
+
+# Expected output is test data, not a language.
+*.expected linguist-detectable=false
