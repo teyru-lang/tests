@@ -1,0 +1,153 @@
+/* The byte side of a Java String, which is where t196_string_bytes.expected
+   comes from:
+     javac -d /tmp StrBytes.java && java -Dstdout.encoding=UTF-8 -cp /tmp StrBytes
+   (the file is named after its public class; rename it to match when
+   re-running). Three lines differ in shape from the Teyru source, since the
+   point of the comparison is the output: Java writes the loops with semicolons,
+   where Teyru calls Net.stringFrom the Java line is the constructor that helper
+   is defined to behave like, and read() is declared to throw. */
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+public class StrBytes {
+  static void hex(String label, byte[] b) {
+    StringBuilder sb = new StringBuilder();
+    sb.append(label).append(" = ").append(b.length).append(" [");
+    for (int i = 0; i < b.length; i++) {
+      if (i > 0) {
+        sb.append(",");
+      }
+      sb.append((int) b[i]);
+    }
+    sb.append("]");
+    System.out.println(sb.toString());
+  }
+
+  // What a byte[] decodes to, and what that encodes back to: the round trip is
+  // the byte-level statement, and every ill-formed sequence shows up in it as
+  // the three bytes of one U+FFFD.
+  static void dec(String label, byte[] b) {
+    String s = new String(b);
+    byte[] r = s.getBytes();
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < r.length; i++) {
+      if (i > 0) {
+        sb.append(",");
+      }
+      sb.append((int) r[i]);
+    }
+    System.out.println(label + " -> " + r.length + " [" + sb + "]");
+  }
+
+  public static void main(String[] args) throws Exception {
+    dec("empty", new byte[0]);
+    dec("nul", new byte[] {(byte) 0x00});
+    dec("ascii", new byte[] {(byte) 0x41});
+    dec("del", new byte[] {(byte) 0x7F});
+    dec("cont80", new byte[] {(byte) 0x80});
+    dec("contbf", new byte[] {(byte) 0xBF});
+    dec("c0", new byte[] {(byte) 0xC0});
+    dec("c1", new byte[] {(byte) 0xC1});
+    dec("c2", new byte[] {(byte) 0xC2});
+    dec("df", new byte[] {(byte) 0xDF});
+    dec("e0", new byte[] {(byte) 0xE0});
+    dec("ed", new byte[] {(byte) 0xED});
+    dec("ef", new byte[] {(byte) 0xEF});
+    dec("f0", new byte[] {(byte) 0xF0});
+    dec("f4", new byte[] {(byte) 0xF4});
+    dec("f5", new byte[] {(byte) 0xF5});
+    dec("ff", new byte[] {(byte) 0xFF});
+    dec("two_ok", new byte[] {(byte) 0xC2, (byte) 0x80});
+    dec("two_bad2", new byte[] {(byte) 0xC2, (byte) 0x41});
+    dec("two_trunc", new byte[] {(byte) 0xC2});
+    dec("two_max", new byte[] {(byte) 0xDF, (byte) 0xBF});
+    dec("overlong2", new byte[] {(byte) 0xC0, (byte) 0x80});
+    dec("overlong2b", new byte[] {(byte) 0xC1, (byte) 0xBF});
+    dec("three_ok", new byte[] {(byte) 0xE4, (byte) 0xB8, (byte) 0xAD});
+    dec("three_trunc1", new byte[] {(byte) 0xE4});
+    dec("three_trunc2", new byte[] {(byte) 0xE4, (byte) 0xB8});
+    dec("three_bad2", new byte[] {(byte) 0xE4, (byte) 0x41});
+    dec("three_bad3", new byte[] {(byte) 0xE4, (byte) 0xB8, (byte) 0x41});
+    dec("overlong3", new byte[] {(byte) 0xE0, (byte) 0x80, (byte) 0x80});
+    dec("e0_ok", new byte[] {(byte) 0xE0, (byte) 0xA0, (byte) 0x80});
+    dec("e0_bad_tail", new byte[] {(byte) 0xE0, (byte) 0x80});
+    dec("d7ff", new byte[] {(byte) 0xED, (byte) 0x9F, (byte) 0xBF});
+    dec("surrogate_hi", new byte[] {(byte) 0xED, (byte) 0xA0, (byte) 0x80});
+    dec("surrogate_lo", new byte[] {(byte) 0xED, (byte) 0xBF, (byte) 0xBF});
+    dec("surrogate_trunc", new byte[] {(byte) 0xED, (byte) 0xA0});
+    dec("surrogate_bad3", new byte[] {(byte) 0xED, (byte) 0xA0, (byte) 0x41});
+    dec("ff_max", new byte[] {(byte) 0xEF, (byte) 0xBF, (byte) 0xBF});
+    dec("four_ok", new byte[] {(byte) 0xF0, (byte) 0x90, (byte) 0x80, (byte) 0x80});
+    dec("four_trunc1", new byte[] {(byte) 0xF0});
+    dec("four_trunc2", new byte[] {(byte) 0xF0, (byte) 0x90});
+    dec("four_trunc3", new byte[] {(byte) 0xF0, (byte) 0x90, (byte) 0x80});
+    dec("max_cp", new byte[] {(byte) 0xF4, (byte) 0x8F, (byte) 0xBF, (byte) 0xBF});
+    dec("past_max", new byte[] {(byte) 0xF4, (byte) 0x90, (byte) 0x80, (byte) 0x80});
+    dec("past_max_trunc", new byte[] {(byte) 0xF4, (byte) 0x90, (byte) 0x80});
+    dec("f5_4", new byte[] {(byte) 0xF5, (byte) 0x80, (byte) 0x80, (byte) 0x80});
+    dec("f7_4", new byte[] {(byte) 0xF7, (byte) 0xBF, (byte) 0xBF, (byte) 0xBF});
+    dec("f8", new byte[] {(byte) 0xF8, (byte) 0x80, (byte) 0x80, (byte) 0x80});
+    dec("overlong4a", new byte[] {(byte) 0xF0, (byte) 0x80, (byte) 0x80, (byte) 0x80});
+    dec("overlong4b", new byte[] {(byte) 0xF0, (byte) 0x8F, (byte) 0xBF, (byte) 0xBF});
+    dec("bad4_3", new byte[] {(byte) 0xF0, (byte) 0x90, (byte) 0x41, (byte) 0x80});
+    dec("bad4_4", new byte[] {(byte) 0xF0, (byte) 0x90, (byte) 0x80, (byte) 0x41});
+    dec("mix1", new byte[] {(byte) 0x41, (byte) 0xC2, (byte) 0x41});
+    dec("mix2", new byte[] {(byte) 0xE4, (byte) 0xB8, (byte) 0xAD, (byte) 0x41});
+    dec("mix3", new byte[] {(byte) 0xFF, (byte) 0xFF});
+    dec("mix4", new byte[] {(byte) 0x80, (byte) 0x80, (byte) 0x80});
+    dec("mix5", new byte[] {(byte) 0x41, (byte) 0xED, (byte) 0xA0, (byte) 0x80, (byte) 0x42});
+    dec("trunc_then_ok", new byte[] {(byte) 0xE4, (byte) 0xB8, (byte) 0x41, (byte) 0xC2, (byte) 0x80});
+    // A range of an array, and the range checks Java makes.
+    byte[] mixed = "a中😀b".getBytes();
+    System.out.println("part = " + new String(mixed, 1, 3));
+    System.out.println("part_all = " + new String(mixed, 0, mixed.length));
+    System.out.println("part_empty = [" + new String(mixed, mixed.length, 0) + "]");
+    try {
+      new String(mixed, 1, mixed.length);
+      System.out.println("range: no exception");
+    } catch (StringIndexOutOfBoundsException e) {
+      System.out.println("range: StringIndexOutOfBoundsException");
+    }
+    try {
+      new String(mixed, -1, 2);
+      System.out.println("negative: no exception");
+    } catch (StringIndexOutOfBoundsException e) {
+      System.out.println("negative: StringIndexOutOfBoundsException");
+    }
+
+    // A NUL is a character like any other and survives the round trip.
+    hex("nul_text", "a\u0000b".getBytes());
+    dec("nul_round", "a\u0000b".getBytes());
+
+    // The network: a read can stop in the middle of a sequence, and what comes
+    // back has to be a string rather than the halves of one.
+    ServerSocket server = new ServerSocket(0);
+    server.setSoTimeout(2000);
+    int port = server.getLocalPort();
+    Socket client = new Socket("127.0.0.1", port);
+    client.setSoTimeout(2000);
+    Socket conn = server.accept();
+    conn.setSoTimeout(2000);
+    // "中" is three bytes; send two of them and then, in the same stream, the
+    // rest of the character -- the reader sees the truncation and the
+    // continuation in one buffer.
+    byte[] text = "中abc".getBytes();
+    OutputStream out = conn.getOutputStream();
+    out.write(text, 0, 2);
+    out.flush();
+    InputStream in = client.getInputStream();
+    byte[] buf = new byte[16];
+    int got = in.read(buf, 0, buf.length);
+    System.out.println("truncated read = " + got + " " + (new String(buf, 0, got)).getBytes().length
+        + " " + (new String(buf, 0, got)).getBytes().length);
+    out.write(text, 2, 4);
+    out.flush();
+    got = in.read(buf, 0, buf.length);
+    System.out.println("continuation = " + new String(buf, 0, got));
+    conn.close();
+    client.close();
+    server.close();
+  }
+}
