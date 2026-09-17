@@ -1,0 +1,122 @@
+/* A compound assignment whose target is boxed. `Integer a = 5; a += 1` is legal
+ * Java and means `a = Integer.valueOf(((int) a.intValue()) + 1)` (JLS 15.26.2
+ * with 5.1.8 and 5.1.7): the target is unboxed, the operation runs on the
+ * primitive at the primitive's own width, and the result is converted back and
+ * boxed again -- with the unboxing's null check where Java puts it, before the
+ * operation.
+ *
+ * The C back end does not lower that conversion at all: it hands the operator
+ * the boxed reference itself. Where the operator does not typecheck on a
+ * pointer the generated C does not compile (`(*p) /= 2` on a `C_teyru_Long *`);
+ * where it does -- `+=` and `-=` are pointer arithmetic -- the program compiles
+ * and then walks the reference by one element, which corrupts it:
+ * `Long a = 1L; a += 1` segfaults, and `Integer a = null; a += 1` segfaults
+ * where Java throws. The LLVM back end performs the same operators through a
+ * getelementptr that lands on the payload, which is right by layout, so every
+ * case here answers correctly there: the divergence this case reports is the C
+ * back end against the LLVM back end and against the JDK.
+ *
+ * The shifted and the bitwise spellings are t247 and t248, where the LLVM back
+ * end is the one that is wrong.
+ *
+ * The expectation is the same program compiled by javac 21:
+ *   javac -d /tmp t246_probe_boxed_compound.java && java -cp /tmp Main
+ *   (see the .java.ref) */
+import teyru.*
+
+class Main {
+  static Long S = 1L
+
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v)
+  }
+
+  public static void main(String[] args) {
+    // arithmetic on a boxed Integer
+    Integer i = 5
+    i += 1
+    p("Integer += 1", i)
+    Integer j = 7
+    j -= 1
+    p("Integer -= 1", j)
+    Integer k = 5
+    k *= 2
+    p("Integer *= 2", k)
+    Integer l = 7
+    l /= 2
+    p("Integer /= 2", l)
+    Integer m = 7
+    m %= 2
+    p("Integer %= 2", m)
+
+    // arithmetic on a boxed Long, where the width of the operation is
+    // observable: `b += 1` past 32 bits is not (int) b + 1
+    Long a = 1L
+    a += 1
+    p("Long += 1", a)
+    Long b = 4294967296L
+    b += 1
+    p("Long += 1 past 32 bits", b)
+    Long c = 7L
+    c -= 2
+    p("Long -= 2", c)
+    Long d = 3L
+    d *= 4
+    p("Long *= 4", d)
+    Long e = 7L
+    e /= 2
+    p("Long /= 2", e)
+    Long f = 7L
+    f %= 2
+    p("Long %= 2", f)
+    Long g = 4294967296L
+    g -= 1
+    p("Long -= 1 past 32 bits", g)
+
+    // a boxed Double and Float
+    Double df = 1.5
+    df += 1
+    p("Double += 1", df)
+    Double dg = 1.5
+    dg *= 2
+    p("Double *= 2", dg)
+    Float fh = 1.5f
+    fh /= 2
+    p("Float /= 2", fh)
+    Float fi = 1.5f
+    fi %= 1.0f
+    p("Float %= 1.0f", fi)
+
+    // the unboxing's null check, where Java puts it: before the operation
+    Integer nu = null
+    try {
+      nu += 1
+      p("Integer null += 1", nu)
+    } catch (NullPointerException ne) {
+      p("Integer null += 1", "NullPointerException")
+    }
+    Long nl = null
+    try {
+      nl *= 2
+      p("Long null *= 2", nl)
+    } catch (NullPointerException ne) {
+      p("Long null *= 2", "NullPointerException")
+    }
+
+    // the same values without a compound assignment, as the control
+    Long ctl1 = 1L
+    p("control 1L << 33", ctl1 << 33)
+    Long ctl3 = 4294967296L
+    p("control 4294967296L + 1", ctl3 + 1)
+    Integer ctl4 = 5
+    p("control 5 + 1", ctl4 + 1)
+
+    // the other lvalue shapes: a static field and an array element
+    S += 1
+    p("static Long += 1", S)
+    Long[] arr = new Long[1]
+    arr[0] = 1L
+    arr[0] += 1
+    p("Long[] element += 1", arr[0])
+  }
+}

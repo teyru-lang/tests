@@ -1,0 +1,44 @@
+/* The Java twin of t247_probe_boxed_bitwise.teyru, printed by
+   `teyru emit-java` from the same source and compiled with javac 21 to produce
+   the .expected file:
+
+     javac -d /tmp t247_probe_boxed_bitwise.java && java -cp /tmp Main
+
+   `Integer a = 5; a &= 3` unboxes the target, ands the primitives, and boxes the
+   result (JLS 15.26.2 with 5.1.8). Neither back end unboxes it: the LLVM back
+   end emits `and ptr` and the module does not verify, and the C back end emits
+   `(*p) &= 3` on a `C_teyru_Integer *`, which no C compiler accepts. */
+class Main {
+  static Integer S = 5;
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v);
+  }
+  public static void main(String[] args) {
+    Integer a = 5;
+    a &= 3;
+    p("Integer &= 3", a);
+    Integer b = 5;
+    b |= 2;
+    p("Integer |= 2", b);
+    Integer c = 5;
+    c ^= 3;
+    p("Integer ^= 3", c);
+    Integer d = -1;
+    d &= 15;
+    p("Integer -1 &= 15", d);
+    Long e = 3L;
+    e &= 1L;
+    p("Long &= 1L", e);
+    Long f = 1L;
+    f |= 2L;
+    p("Long |= 2L", f);
+    Long g = 3L;
+    g ^= 1L;
+    p("Long ^= 1L", g);
+    Long h = 4294967296L;
+    h &= 4294967296L;
+    p("Long &= past 32 bits", h);
+    S &= 3;
+    p("static Integer &= 3", S);
+  }
+}
