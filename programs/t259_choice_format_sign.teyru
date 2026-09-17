@@ -1,0 +1,47 @@
+import teyru.*
+
+/* The "<=" spelling of a choice limit.
+ *
+ * A ChoiceFormat pattern writes an interval as "limit#format" or
+ * "limit<format", and Java accepts a third spelling of the separator: U+2264,
+ * the "<=" sign, which is another way of writing "#" -- it is NOT "<": the
+ * limit that follows it is the limit written, where "<" means the next double
+ * after it. The two are one character apart in the source and one nextDouble
+ * apart in the limits, which is what these four patterns print.
+ *
+ * U+2264 is one UTF-16 code unit, and the separator here is one character, so
+ * the format text after it starts at the next index. Reading it as the three
+ * bytes it takes in UTF-8 is what this file pins: the format text began two
+ * characters late, so "1≤one" answered "ne".
+ *
+ * Every expectation is the output of t259_choice_format_sign.java.ref on
+ * OpenJDK 21.0.11+10, which prints the limits, the formats, three format()
+ * answers and toPattern() for the same patterns.
+ */
+
+class Main {
+  static void show(String pattern) {
+    try {
+      ChoiceFormat f = new ChoiceFormat(pattern)
+      double[] limits = f.getLimits()
+      Object[] formats = f.getFormats()
+      StringBuilder b = new StringBuilder()
+      for (int i = 0 : i < limits.length : i++) {
+        b.append(" ").append(limits[i]).append("=").append(formats[i])
+      }
+      System.out.println("[" + pattern + "] ->" + b + " 1.0[" + f.format(1.0) + "] 2.0[" +
+          f.format(2.0) + "] 0.5[" + f.format(0.5) + "] toPattern[" + f.toPattern() + "]")
+    } catch (IllegalArgumentException e) {
+      System.out.println("[" + pattern + "] -> java.lang.IllegalArgumentException: " + e.getMessage())
+    } catch (NumberFormatException e) {
+      System.out.println("[" + pattern + "] -> java.lang.NumberFormatException: " + e.getMessage())
+    }
+  }
+
+  public static void main(String[] args) {
+    show("0#none|1#one|2<two")
+    show("0#none|1\u2264one|2\u2264two")
+    show("0#none|1<one|2<two")
+    show("1\u2264one|2\u2264two")
+  }
+}

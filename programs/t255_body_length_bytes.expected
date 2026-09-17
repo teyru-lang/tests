@@ -1,0 +1,9 @@
+body chars 27 bytes 27 declared 27
+body chars 25 bytes 33 declared 33
+body chars 4 bytes 12 declared 12
+body chars 6 bytes 6 declared 6
+mock declared 12
+mock ascii declared 6
+server ready=true
+echo -> 200 [order 3 x 中文咖啡]
+done

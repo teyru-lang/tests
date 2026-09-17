@@ -1,0 +1,57 @@
+import teyru.*
+
+/* BufferedReader over a String, one character at a time.
+ *
+ * A String is a source of characters, so this reader's read() answers what
+ * String.charAt answers: a UTF-16 code unit as an int, 0..65535, and -1 at the
+ * end. A byte-oriented answer would be a different one for every character
+ * above U+007F -- é is 233 either way, but 中 is 20013 and not the 45 its low
+ * byte spells -- and a line reader that answered bytes would hand back a
+ * different string than the one it was built over, which is the bug this file
+ * pins.
+ *
+ * Java's BufferedReader over a StringReader is the same program; this class
+ * takes the String directly and says so at its head. The .expected file is the
+ * output of t254_reader_codeunits.java.ref on OpenJDK 21.0.11+10.
+ */
+
+class Main {
+  public static void main(String[] args) {
+    /* read() and readLine() share one position: the character read first is not
+       in the line that follows. */
+    BufferedReader over = new BufferedReader("中文\nx")
+    System.out.println("read " + over.read())
+    String line = over.readLine()
+    System.out.println("line length " + line.length() + " chars " + (int) line.charAt(0))
+    System.out.println("then " + over.read())
+    System.out.println("end " + over.read())
+
+    /* Every character of a mixed string, one at a time, including the two units
+       an astral character is: those are the mid-pair cases the read API
+       answers as two. */
+    BufferedReader walk = new BufferedReader("aé中\ud83d\ude00 z")
+    StringBuilder codes = new StringBuilder()
+    while (true) {
+      int c = walk.read()
+      if (c < 0) {
+        break
+      }
+      codes.append(c).append(" ")
+    }
+    System.out.println("codes " + codes)
+
+    /* A line that is not ASCII, and the control beside it. */
+    BufferedReader lines = new BufferedReader("café\n中, text\nplain\n")
+    System.out.println("[" + lines.readLine() + "]")
+    System.out.println("[" + lines.readLine() + "]")
+    System.out.println("[" + lines.readLine() + "]")
+    System.out.println("last " + lines.readLine())
+
+    /* A reader over a byte stream still answers bytes: the two sources are
+       different kinds of thing, and the stream half is unchanged. */
+    ByteArrayInputStream bytes = new ByteArrayInputStream("ab\nc".getBytes())
+    BufferedReader overBytes = new BufferedReader(bytes)
+    System.out.println("bytes " + overBytes.read() + " " + overBytes.read() + " " +
+        overBytes.read() + " " + overBytes.read())
+  }
+}

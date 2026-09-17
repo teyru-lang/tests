@@ -1,0 +1,4 @@
+[0#none|1#one|2<two] -> 0.0=none 1.0=one 2.0000000000000004=two 1.0[one] 2.0[one] 0.5[none] toPattern[0.0#none|1.0#one|2.0<two]
+[0#none|1≤one|2≤two] -> 0.0=none 1.0=one 2.0=two 1.0[one] 2.0[two] 0.5[none] toPattern[0.0#none|1.0#one|2.0#two]
+[0#none|1<one|2<two] -> 0.0=none 1.0000000000000002=one 2.0000000000000004=two 1.0[none] 2.0[one] 0.5[none] toPattern[0.0#none|1.0<one|2.0<two]
+[1≤one|2≤two] -> 1.0=one 2.0=two 1.0[one] 2.0[two] 0.5[one] toPattern[1.0#one|2.0#two]

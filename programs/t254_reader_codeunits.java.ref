@@ -1,0 +1,42 @@
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.StringReader;
+
+/* The Java half of t254_reader_codeunits.teyru: the same program, with Java's
+ * StringReader standing in for this library's BufferedReader(String)
+ * constructor (see the class comment in lib/42_iostream.teyru). Its output on
+ * OpenJDK 21.0.11+10 is the .expected file beside it. */
+
+public class Main {
+  public static void main(String[] args) throws Exception {
+    BufferedReader over = new BufferedReader(new StringReader("中文\nx"));
+    System.out.println("read " + over.read());
+    String line = over.readLine();
+    System.out.println("line length " + line.length() + " chars " + (int) line.charAt(0));
+    System.out.println("then " + over.read());
+    System.out.println("end " + over.read());
+
+    BufferedReader walk = new BufferedReader(new StringReader("aé中\ud83d\ude00 z"));
+    StringBuilder codes = new StringBuilder();
+    while (true) {
+      int c = walk.read();
+      if (c < 0) {
+        break;
+      }
+      codes.append(c).append(" ");
+    }
+    System.out.println("codes " + codes);
+
+    BufferedReader lines = new BufferedReader(new StringReader("café\n中, text\nplain\n"));
+    System.out.println("[" + lines.readLine() + "]");
+    System.out.println("[" + lines.readLine() + "]");
+    System.out.println("[" + lines.readLine() + "]");
+    System.out.println("last " + lines.readLine());
+
+    BufferedReader overBytes = new BufferedReader(
+        new java.io.InputStreamReader(new ByteArrayInputStream("ab\nc".getBytes("UTF-8")),
+            java.nio.charset.StandardCharsets.UTF_8));
+    System.out.println("bytes " + overBytes.read() + " " + overBytes.read() + " " +
+        overBytes.read() + " " + overBytes.read());
+  }
+}
