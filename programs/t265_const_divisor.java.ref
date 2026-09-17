@@ -1,0 +1,35 @@
+public class Main {
+  static final int K = 7;
+  static final int NEG = -3;
+  static final long LK = 1000000007L;
+  static int ci(int x) { return x; }
+  static long cl(long x) { return x; }
+  public static void main(String[] a) {
+    int mn = -2147483648;
+    long lmn = -9223372036854775808L;
+    System.out.println("i/1 " + (ci(5) / 1));
+    System.out.println("i/-1 min " + (mn / -1) + " rem " + (mn % -1));
+    System.out.println("i%1 " + (ci(5) % 1) + " i%-1 " + (ci(5) % -1));
+    System.out.println("neg div " + (-7 / -3) + " " + (7 / -3) + " " + (-7 / 3));
+    System.out.println("neg rem " + (-7 % -3) + " " + (7 % -3) + " " + (-7 % 3));
+    System.out.println("K " + (ci(100) / K) + " " + (ci(100) % K));
+    System.out.println("NEG " + (ci(100) / NEG) + " " + (ci(100) % NEG));
+    System.out.println("l/1 " + (cl(5) / 1));
+    System.out.println("l/-1 min " + (lmn / -1) + " rem " + (lmn % -1));
+    System.out.println("lK " + (cl(1000000008L) / LK) + " " + (cl(1000000008L) % LK));
+    System.out.println("lneg " + (cl(-100) / -3) + " " + (cl(-100) % -3));
+    System.out.println("lmin/2 " + (lmn / 2) + " " + (lmn % 2));
+    System.out.println("imin/2 " + (mn / 2) + " " + (mn % 2) + " imin/7 " + (mn / 7) + " " + (mn % 7));
+    try { int z = 0; System.out.println(ci(5) / z); } catch (ArithmeticException e) { System.out.println("div0 " + e.getMessage()); }
+    try { int z = 0; System.out.println(ci(5) % z); } catch (ArithmeticException e) { System.out.println("rem0 " + e.getMessage()); }
+    int c = 1;
+    c /= 1; c %= 1; c /= -1; c %= -1; c /= K; c %= NEG;
+    System.out.println("compound " + c);
+    byte b = -128;
+    b /= 2; b %= 3; b /= -1;
+    System.out.println("byte " + b);
+    long l = lmn;
+    l /= -1; l %= -1; l /= 7;
+    System.out.println("longcmp " + l);
+  }
+}
