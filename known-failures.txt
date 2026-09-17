@@ -36,7 +36,6 @@ t231_probe_strings W5 hashCode, format width, isLetter/isWhitespace, strip and f
 #     regression in %d/%s/%.2f/%e/%g or printf is a failure rather than a silence.
 
 # --- boxing: valueOf does not cache, so == differs for every wrapper type
-t233_probe_boxing W6 Integer/Long/Short/Byte/Character/Boolean.valueOf return a fresh object (plan 1.2)
 
 # --- collection toString: the iteration order of HashMap and HashSet is not the
 #     JDK's, which is W6's HashMap change on top of W5's hashCode
@@ -61,7 +60,6 @@ t238_probe_switch_return W7 a switch whose cases all return is reported as a mis
 #     rejects it at compile time
 t239_probe_negative_array W7 a negative array size is a compile error here and a run-time exception in Java (plan 1.2)
 
-t01_basics W5 a deliberate test of the mechanism
 
 # --- the first difference internal/tools/progen found and minimised: seed 3,
 #     twenty-six statements, one try/catch left
