@@ -1,0 +1,8 @@
+nul bytes 4 0002C080 back length 1 char0 0 equals true
+nul-mid bytes 6 000461C08062 back length 3 char0 97 equals true
+high bytes 5 0003EDA0BD back length 1 char0 55357 equals true
+low bytes 5 0003EDB880 back length 1 char0 56832 equals true
+astral bytes 8 0006EDA0BDEDB880 back length 2 char0 55357 equals true
+ascii bytes 4 00026869 back length 2 char0 104 equals true
+two-byte bytes 4 0002C3A9 back length 1 char0 233 equals true
+cjk bytes 5 0003E4B8AD back length 1 char0 20013 equals true

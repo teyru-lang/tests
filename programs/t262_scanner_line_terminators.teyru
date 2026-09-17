@@ -1,0 +1,62 @@
+import teyru.*
+
+/* Scanner's line terminators, which are Java's and not java.io's.
+ *
+ * Java's line pattern is "\r\n|[\n\r\u2028\u2029\u0085]": CRLF is one
+ * terminator, and a lone CR, a lone LF, U+2028 LINE SEPARATOR, U+2029 PARAGRAPH
+ * SEPARATOR and U+0085 NEXT LINE are each one on their own. This reader split on
+ * the three java.io uses, so it answered one line where Java answers two for
+ * every separator above U+007F -- and because U+2028 and U+2029 are whitespace
+ * to Scanner too, a line that held one was not even a token boundary here.
+ *
+ * nextLine() is checked rather than the token reader: it is the method the
+ * terminators belong to, and it answers "" for a line that is empty rather than
+ * skipping it, which is where a reader that treats a terminator as two gets it
+ * wrong.
+ *
+ * The expectations are the output of t262_scanner_line_terminators.java.ref on
+ * OpenJDK 21.0.11+10.
+ */
+
+class Main {
+  static String codes(String s) {
+    StringBuilder b = new StringBuilder("[")
+    for (int i = 0 : i < s.length() : i++) {
+      if (i > 0) {
+        b.append(" ")
+      }
+      b.append((int) s.charAt(i))
+    }
+    return b.append("]").toString()
+  }
+
+  static void lines(String label, String source) {
+    Scanner in = new Scanner(source)
+    StringBuilder b = new StringBuilder()
+    while (in.hasNextLine()) {
+      b.append(codes(in.nextLine()))
+    }
+    System.out.println(label + " " + b + " hasNextLine " + in.hasNextLine())
+  }
+
+  public static void main(String[] args) {
+    // the three terminators java.io's readers also use
+    lines("lf", "a\nb")
+    lines("crlf", "a\r\nb")
+    lines("cr", "a\rb")
+    // and the three it does not
+    lines("line-separator", "a\u2028b")
+    lines("paragraph-separator", "a\u2029b")
+    lines("next-line", "a\u0085b")
+    // a terminator at the end, at the start, and two in a row
+    lines("trailing", "a\u2028")
+    lines("leading", "\u2028a")
+    lines("empty-between", "a\u2029\u2029b")
+    lines("crlf-then-cr", "a\r\n\rb")
+    // all six in one string
+    lines("mixed", "a\u2028b\u2029c\u0085d\r\ne\rf\ng")
+    // a line with no terminator at all, and the empty input
+    lines("no-terminator", "abc")
+    lines("empty", "")
+  }
+}

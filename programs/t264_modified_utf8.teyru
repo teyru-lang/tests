@@ -1,0 +1,59 @@
+import teyru.*
+
+/* Modified UTF-8, both directions, over the code units Java defines it on.
+ *
+ * writeUTF is not UTF-8 and is not meant to be: U+0000 is two bytes (0xC0 0x80)
+ * rather than one, a character above the BMP is the two three-byte halves of its
+ * surrogate pair rather than one four-byte sequence, and a surrogate with no
+ * partner -- a string Java has and a string here can hold, because the storage
+ * is WTF-8 -- is written as the three bytes of the surrogate itself. The last
+ * one is what this file pins: encode used to start from getBytes(), where a lone
+ * surrogate is the single `?` the byte boundary writes for a character it cannot
+ * encode, so "\uD83D" went out as `00013F` and came back as `?`. Java writes
+ * `0003EDA0BD` and reads that back as 55357, which is what this prints now.
+ *
+ * The expectations are the output of t264_modified_utf8.java.ref on OpenJDK
+ * 21.0.11+10, byte for byte: the bytes each string encodes to, in hex, and what
+ * the same bytes decode to.
+ */
+
+class Main {
+  static String hex(byte[] b) {
+    String d = "0123456789ABCDEF"
+    StringBuilder s = new StringBuilder()
+    for (int i = 0 : i < b.length : i++) {
+      s.append(d.charAt((b[i] >> 4) & 0xF)).append(d.charAt(b[i] & 0xF))
+    }
+    return s.toString()
+  }
+
+  static void show(String label, String s) {
+    try {
+      ByteArrayOutputStream bo = new ByteArrayOutputStream()
+      DataOutputStream out = new DataOutputStream(bo)
+      out.writeUTF(s)
+      byte[] b = bo.toByteArray()
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(b))
+      String back = in.readUTF()
+      System.out.println(label + " bytes " + b.length + " " + hex(b) + " back length " +
+          back.length() + " char0 " + (int) back.charAt(0) + " equals " + back.equals(s))
+    } catch (IOException e) {
+      System.out.println(label + " threw " + e.getMessage())
+    }
+  }
+
+  public static void main(String[] args) {
+    // the two code units the modified form spells differently from UTF-8
+    show("nul", "\u0000")
+    show("nul-mid", "a\u0000b")
+    // a surrogate with no partner: written as itself and read back as itself
+    show("high", "\ud83d")
+    show("low", "\ude00")
+    // a pair, which is one character held as two units and six bytes here
+    show("astral", "\ud83d\ude00")
+    // the ordinary cases, as controls
+    show("ascii", "hi")
+    show("two-byte", "é")
+    show("cjk", "中")
+  }
+}

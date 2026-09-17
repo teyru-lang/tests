@@ -1,0 +1,67 @@
+import teyru.*
+
+/* The decision the audit left open: a byte stream read as a Reader answers one
+ * byte per character and does not decode.
+ *
+ * ByteArrayInputStream implements InputStream and Reader at once, and read() is
+ * one method with two contracts: Java's InputStream.read() is "the next byte as
+ * 0..255", and Reader.read() over it would be "the next character". The byte
+ * contract is the one it can keep -- the class IS a byte array, read(byte[])
+ * and skip() and available() are all over the same position -- and a class that
+ * decoded here would answer two different things from one method depending on
+ * which interface the caller was thinking of. Java never has to choose: its
+ * byte array stream is not a Reader, and decoding is a second object
+ * (InputStreamReader, or this library's Net.stringFrom) that a caller reaches
+ * for when the bytes are text.
+ *
+ * The code points below are what that means for an array that is text: three
+ * bytes, three characters 228, 184, 173 -- the UTF-8 of U+4E2D one byte at a
+ * time -- while the same three bytes through the decoder are one character.
+ * There is no Java half of this file: the JDK has no class to compare against,
+ * which is the reason this is a decision and not a bug, and this test exists so
+ * that the decision cannot be reversed without a diff.
+ */
+
+class Main {
+  public static void main(String[] args) {
+    byte[] bytes = "中".getBytes()
+    System.out.println("bytes " + bytes.length)
+
+    // the byte stream read as characters
+    ByteArrayInputStream raw = new ByteArrayInputStream(bytes)
+    BufferedReader asReader = new BufferedReader(raw)
+    StringBuilder units = new StringBuilder()
+    while (true) {
+      int c = asReader.read()
+      if (c < 0) {
+        break
+      }
+      units.append(c).append(" ")
+    }
+    System.out.println("as a Reader " + units)
+
+    // the same class read as what it is: a stream of bytes
+    ByteArrayInputStream asStream = new ByteArrayInputStream(bytes)
+    StringBuilder plain = new StringBuilder()
+    while (true) {
+      int b = asStream.read()
+      if (b < 0) {
+        break
+      }
+      plain.append(b).append(" ")
+    }
+    System.out.println("as a stream " + plain)
+
+    // and the way a caller decodes, which is the other object
+    String text = Net.stringFrom(bytes, 0, bytes.length)
+    System.out.println("decoded " + text.length() + " char0 " + (int) text.charAt(0))
+
+    // readLine over a byte stream is the same reading, so a line that is not
+    // ASCII comes back as its bytes
+    ByteArrayInputStream lines = new ByteArrayInputStream("中\nx".getBytes())
+    BufferedReader reader = new BufferedReader(lines)
+    String line = reader.readLine()
+    System.out.println("line units " + line.length() + " chars " + (int) line.charAt(0) + " " +
+        (int) line.charAt(1) + " " + (int) line.charAt(2))
+  }
+}
