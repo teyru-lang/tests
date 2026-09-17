@@ -63,14 +63,102 @@ static tythread test_state = {
 };
 _Thread_local tythread *ty_self = &test_state;
 
+/* The W5 string: a byte length, a code-unit length, and the flags that say
+   whether the ASCII fast path applies, with the bytes inline and the breadcrumb
+   table after the terminating NUL when the flags do not claim ASCII. This is
+   the layout tyrt.c's str_alloc builds and the collector's offsets are asserted
+   against; a fixture that builds some other shape hands tyrt_net.c a string
+   whose reader walks off the end. Breadcrumbs are a cache, so zero-filled is
+   the honest starting state. */
+static void measure_utf8(const char *data, int64_t len, int *ascii, int64_t *units) {
+  int64_t i = 0;
+  int64_t n = 0;
+  *ascii = 1;
+  while (i < len) {
+    unsigned char c = (unsigned char)data[i];
+    int64_t step = 1;
+    if (c >= 0x80) {
+      *ascii = 0;
+      if ((c & 0xE0) == 0xC0) {
+        step = 2;
+      } else if ((c & 0xF0) == 0xE0) {
+        step = 3;
+      } else if ((c & 0xF8) == 0xF0) {
+        step = 4;
+      }
+    }
+    /* A sequence longer than the bytes left counts as one unit, which is what
+       a truncated tail at the end of a buffer is. */
+    n += step == 4 ? 2 : 1;
+    i += step > len - i ? len - i : step;
+  }
+  *units = n;
+}
+
 tystr *ty_str_new(const char *data, int64_t len) {
-  tystr *s = (tystr *)malloc(sizeof(tystr) + (size_t)len + 1);
+  int ascii;
+  int64_t ulen;
+  size_t nbc;
+  size_t pad;
+  tystr *s;
+  if (!data) {
+    /* The caller writes the bytes itself, so the header claims the worst case:
+       every byte a sequence of its own. */
+    nbc = (size_t)(len >> 6) + 1;
+    s = (tystr *)malloc(sizeof(tystr) + (size_t)len + 1 + 3 + nbc * sizeof(int32_t));
+    s->obj.cls = NULL;
+    s->blen = len;
+    s->ulen = (int32_t)len;
+    s->flags = 0;
+    TY_STR_DATA(s)[len] = 0;
+    return s;
+  }
+  measure_utf8(data, len, &ascii, &ulen);
+  nbc = ascii ? 0 : (size_t)(ulen >> 6) + 1;
+  pad = ascii ? 0 : 3;
+  s = (tystr *)malloc(sizeof(tystr) + (size_t)len + 1 + pad + nbc * sizeof(int32_t));
   s->obj.cls = NULL;
-  s->len = len;
-  s->data = (char *)s + sizeof(tystr);
-  memcpy(s->data, data, (size_t)len);
-  s->data[len] = 0;
+  s->blen = len;
+  s->ulen = (int32_t)ulen;
+  s->flags = ascii ? TY_SF_ASCII : 0;
+  memcpy(TY_STR_DATA(s), data, (size_t)len);
+  TY_STR_DATA(s)[len] = 0;
+  if (nbc > 0) {
+    memset(TY_STR_BC(s), 0, nbc * sizeof(int32_t));
+  }
   return s;
+}
+
+/* The W5 byte-to-string constructor: tyrt_net.c's peer_addr and bytes_to_str go
+   through it, and it takes a slice of a byte array rather than a pointer. Its
+   range rule is the runtime's (tyrt.c): a slice that is not inside the array
+   raises StringIndexOutOfBoundsException, which this fixture has no frame to
+   catch, so the abort below is where that would end -- the range itself is
+   pinned by tests/programs/t196_string_bytes.teyru, which is the place with a
+   catch clause, and the in-range cases are checked here. */
+tystr *ty_str_of_bytes(tyarr *b, int32_t off, int32_t len) {
+  if (!b || off < 0 || len < 0 || (int64_t)off > b->len - (int64_t)len) {
+    abort();
+  }
+  return ty_str_new(b->data + off, (int64_t)len);
+}
+
+/* The runtime's failure path, which this fixture has to stand in for: it links
+   tyrt_net.c without the rest of the runtime (tyrt.c), and a refusal there
+   reaches TY_UNSUP through ty_make_ex and ty_throw. A refusal in a test like
+   this one is a failed expectation about the platform, so it stops the run
+   instead of unwinding: there is nothing here that can catch it. */
+tyclass *TY_UNSUP = NULL;
+
+void *ty_make_ex(tyclass *c, const char *msg) {
+  (void)c;
+  (void)msg;
+  return NULL;
+}
+
+void ty_throw(void *e) {
+  (void)e;
+  abort();
 }
 
 void *ty_alloc_arr(int64_t len, size_t elemsize) {
@@ -95,8 +183,11 @@ void *ty_alloc_arr(int64_t len, size_t elemsize) {
    layer must not have, so the test should not model it either. The argument is
    read twice, once for its length and once for its address, so it must be a
    plain expression. */
-#define TS(s) \
-  (&(tystr){.obj = {NULL}, .len = (int64_t)strlen(s), .data = (char *)(s)})
+/* A string whose bytes are inline cannot be a compound literal pointing the
+   bytes member at the literal's own array: the reader takes the bytes from
+   sizeof(tystr) past the header. So this is the constructor, which is what the
+   generated code calls for its own literals too. */
+#define TS(s) ty_str_new(s, (int64_t)strlen(s))
 
 /* A byte array over a plain buffer. Same contract: esize 1 and a length are all
    ty_net_read and ty_net_write_all look at. */
@@ -306,16 +397,20 @@ static void test_addr_text(void) {
   int32_t cl = ty_net_connect(TS("127.0.0.1"), port, 2000);
   int32_t sv = ty_net_accept(ls, 2000);
   tystr *pa = ty_net_peer_addr(sv);
-  check(pa && strncmp(pa->data, "127.0.0.1:", 10) == 0, "the server's peer is the client");
+  check(pa && strncmp(TY_STR_DATA(pa), "127.0.0.1:", 10) == 0, "the server's peer is the client");
   tystr *la = ty_net_local_addr(ls);
-  check(la && strchr(la->data, ':') != NULL, "the listener names its own port");
+  check(la && strchr(TY_STR_DATA(la), ':') != NULL, "the listener names its own port");
   check(ty_net_strerror(-ECONNREFUSED) != NULL, "strerror has a message for a refusal");
   check(ty_net_strerror(TY_NET_TIMEOUT) != NULL, "strerror has a message for a timeout");
   char raw[3] = {'a', 'b', 'c'};
   tyarr rb = bytes_of(raw, 3);
   tystr *as = ty_net_bytes_to_str(&rb, 1, 2);
-  check(as && as->len == 2 && strcmp(as->data, "bc") == 0, "bytes become a string");
-  check(ty_net_bytes_to_str(&rb, 2, 2) == NULL, "a length past the end is refused");
+  check(as && as->blen == 2 && strcmp(TY_STR_DATA(as), "bc") == 0, "bytes become a string");
+  /* An out-of-range slice raises StringIndexOutOfBoundsException here as it
+     does in the runtime, and this fixture has no frame to catch it: the range
+     checks are pinned by tests/programs/t196_string_bytes.teyru. What is
+     checked here is the slice that is inside the array. */
+  check(ty_net_bytes_to_str(&rb, 1, 1) != NULL, "a one-byte slice is a string");
   (void)ty_net_close(sv);
   (void)ty_net_close(cl);
   (void)ty_net_close(ls);
@@ -335,7 +430,7 @@ static void test_files(void) {
         "a missing path answers none rather than failing");
 
   char path[512];
-  snprintf(path, sizeof path, "%s/data.txt", dir->data);
+  snprintf(path, sizeof path, "%s/data.txt", TY_STR_DATA(dir));
   const char *text = "line one\nline two\nline three\n";
   check(ty_file_write_str(TS(path), TS(text), 0) == (int32_t)strlen(text),
         "write_str writes every byte");
@@ -357,7 +452,7 @@ static void test_files(void) {
      the case a size that was right before the write would have got wrong. */
   char big[8192];
   for (size_t i = 0; i < sizeof big; i++) big[i] = (char)(i * 7 + 1);
-  snprintf(path, sizeof path, "%s/big.bin", dir->data);
+  snprintf(path, sizeof path, "%s/big.bin", TY_STR_DATA(dir));
   tyarr bb = bytes_of(big, (int64_t)sizeof big);
   int ok = 1;
   for (int i = 0; i < 128; i++) {
@@ -384,9 +479,9 @@ static void test_files(void) {
 
   /* A second and a third entry, to show the listing is sorted rather than in
      readdir's order. */
-  snprintf(path, sizeof path, "%s/b.txt", dir->data);
+  snprintf(path, sizeof path, "%s/b.txt", TY_STR_DATA(dir));
   (void)ty_file_write_str(TS(path), TS("b"), 0);
-  snprintf(path, sizeof path, "%s/c.txt", dir->data);
+  snprintf(path, sizeof path, "%s/c.txt", TY_STR_DATA(dir));
   (void)ty_file_write_str(TS(path), TS("c"), 0);
   tyarr *names = ty_file_list(dir, &err);
   int sorted = names && names->len >= 3;
@@ -394,12 +489,12 @@ static void test_files(void) {
     for (int64_t i = 1; i < names->len; i++) {
       tystr *p = (tystr *)((void **)names->data)[i - 1];
       tystr *q = (tystr *)((void **)names->data)[i];
-      if (strcmp(p->data, q->data) >= 0) sorted = 0;
+      if (strcmp(TY_STR_DATA(p), TY_STR_DATA(q)) >= 0) sorted = 0;
     }
   }
   check(sorted, "listFiles returns the entries in sorted order");
 
-  snprintf(path, sizeof path, "%s/sub/deep", dir->data);
+  snprintf(path, sizeof path, "%s/sub/deep", TY_STR_DATA(dir));
   check(ty_file_mkdirs(TS(path)) == 0, "mkdirs creates a path a level at a time");
   check(ty_file_kind(TS(path)) == TY_FILE_DIR, "the created path is a directory");
   check(ty_file_delete(TS(path)) == 0, "an empty directory deletes");
