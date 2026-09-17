@@ -1,0 +1,12 @@
+ascii  6173636969
+empty  
+nul    610062
+pre    707265
+prefix 707265666978
+quote  7122625c
+uni    68c3a96c6c6fe28692e4b896
+pre.equals("pre") true
+prefix.startsWith(pre) true
+prefix.substring(0, 3).equals(pre) true
+nul.indexOf("b") 2
+uni.equals("héllo→世") true
