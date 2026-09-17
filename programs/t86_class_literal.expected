@@ -19,7 +19,7 @@ false
 false
 true
 Outer$Inner
-teyru.Class
+java.lang.Class
 class Point
 class Point
 teyru.Array

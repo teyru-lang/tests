@@ -1,1 +1,1 @@
-Exception in thread "main" teyru.NullPointerException: null
+Exception in thread "main" java.lang.NullPointerException: null

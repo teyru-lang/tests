@@ -1,0 +1,98 @@
+// The Java this probe was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t250_map_order.java.ref /tmp/MapOrder.java
+//   javac -d /tmp/out /tmp/MapOrder.java
+//   java -Dstdout.encoding=UTF-8 -Duser.language=en -Duser.country=US -cp /tmp/out MapOrder
+//
+// The key sets are chosen so that the walk order says which rule produced it:
+// HashMap's own layout is what these lines pin, one rule per group.
+
+import java.util.*;
+class MapOrder {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v);
+  }
+  public static void main(String[] args) {
+    // ---- the anchors: a bucket keeps the order its entries were inserted in
+    // banana and date share bucket 0, apple and cherry bucket 1, elderberry
+    // bucket 12 -- the same five keys appendix C.1 uses.
+    Map<String, Integer> m = new HashMap<>();
+    m.put("banana", 1);
+    m.put("apple", 2);
+    m.put("cherry", 3);
+    m.put("date", 4);
+    m.put("elderberry", 5);
+    p("five_strings", m);
+    p("five_keys", new ArrayList<>(m.keySet()));
+    p("five_values", new ArrayList<>(m.values()));
+    p("five_entry", m.entrySet().iterator().next());
+    // the same five the other way round: a bucket still walks insertion order,
+    // so this is not the first line reversed
+    Map<String, Integer> r = new HashMap<>();
+    r.put("elderberry", 5);
+    r.put("date", 4);
+    r.put("cherry", 3);
+    r.put("apple", 2);
+    r.put("banana", 1);
+    p("five_reversed", r);
+    // ---- one bucket: 0, 16, 32 and 48 all land in bucket 0 of a 16-slot table
+    Map<Integer, Integer> one = new HashMap<>();
+    one.put(0, 0);
+    one.put(16, 16);
+    one.put(32, 32);
+    one.put(48, 48);
+    p("one_bucket", one);
+    // the 13th key grows the table to 32, and 16 and 48 move to bucket 16 in
+    // the order they were inserted
+    for (int i = 100; i < 109; i++) {
+      one.put(i, i);
+    }
+    p("one_bucket_grown", one);
+    // ---- the copy constructor pre-sizes: tableSizeFor(ceil(3 / 0.75)) = 4
+    Map<Integer, Integer> three = new HashMap<>();
+    three.put(1, 1);
+    three.put(8, 8);
+    three.put(16, 16);
+    p("three_direct", three);
+    p("three_copied", new HashMap<>(three));
+    // ---- a load factor that does not divide the capacity: the threshold
+    // doubles on every growth, so 0.6 over 16 slots is 9, 18, 36, not 19
+    Map<Integer, Integer> lf = new HashMap<>(16, 0.6f);
+    for (int i = 0; i <= 16; i++) {
+      lf.put(i, i);
+    }
+    lf.put(33, 33);
+    lf.put(40, 40);
+    p("load_0.6_19", lf);
+    // ---- putAll on a map with no table pre-sizes from the source's size:
+    // ceil(20 / 0.6) = 34, tableSizeFor(34) = 64, so 37 keys never grow again
+    Map<Integer, Integer> g = new HashMap<>(16, 0.6f);
+    Map<Integer, Integer> src = new LinkedHashMap<>();
+    for (int i = 200; i < 220; i++) {
+      src.put(i, i);
+    }
+    g.putAll(src);
+    for (int i = 300; i < 317; i++) {
+      g.put(i, i);
+    }
+    p("putall_pre_sized", g);
+    // ---- a set is a map's key set
+    Set<String> hs = new HashSet<>();
+    hs.add("one");
+    hs.add("two");
+    hs.add("three");
+    p("hashset", hs);
+    Set<Integer> hi = new HashSet<>();
+    for (int i = 0; i < 20; i++) {
+      hi.add(i);
+    }
+    p("hashset20", hi);
+    // ---- and a map that promises insertion order still keeps it
+    Map<String, Integer> lh = new LinkedHashMap<>();
+    lh.put("z", 1);
+    lh.put("a", 2);
+    lh.put("m", 3);
+    p("linked", lh);
+  }
+}

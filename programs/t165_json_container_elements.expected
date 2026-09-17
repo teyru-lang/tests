@@ -13,21 +13,21 @@ ids=5,7
 many is teyru.Array of Person
 null in int[]: cannot bind null at $.nums[1]: the array's element type is int, which has no null
 null in Person[]: null
-field people: teyru.List -> Person
-field crew: teyru.Set -> Person
-field byName: teyru.Map -> Person
-field queue: teyru.Deque -> Person
-field plain: teyru.ArrayList -> Person
-field teams: teyru.List -> Team
-field points: teyru.List -> Point
+field people: java.util.List -> Person
+field crew: java.util.Set -> Person
+field byName: java.util.Map -> Person
+field queue: java.util.Deque -> Person
+field plain: java.util.ArrayList -> Person
+field teams: java.util.List -> Team
+field points: java.util.List -> Point
 field many: teyru.Array -> Person
 field nums: teyru.Array -> int
 field words: teyru.Array -> teyru.String
-field ids: teyru.List -> teyru.Integer
-field loose: teyru.List -> teyru.Object
-field mixed: teyru.Map -> teyru.Object
-field nested: teyru.List -> teyru.List
-field raw: teyru.List -> teyru.Object
+field ids: java.util.List -> java.lang.Integer
+field loose: java.util.List -> java.lang.Object
+field mixed: java.util.Map -> java.lang.Object
+field nested: java.util.List -> java.util.List
+field raw: java.util.List -> java.lang.Object
 field grid: teyru.Array -> teyru.Array
 [{"name":"ann","age":31},{"name":"bo","age":24}]
 {"lead":{"name":"di","age":18},"deputy":{"name":"ed","age":50}}

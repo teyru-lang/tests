@@ -1,1 +1,1 @@
-Exception in thread "main" teyru.AssertionError: one is not greater than two
+Exception in thread "main" java.lang.AssertionError: one is not greater than two

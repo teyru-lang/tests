@@ -26,6 +26,6 @@ toString=7
 == nulls, and an empty map ==
 a fresh map is {} and holds 0 isEmpty=true
 after put: {k=v} get=v toString={k=v}
-a null key was refused with teyru.NullPointerException
-a null lookup was refused with teyru.NullPointerException
+a null key was refused with java.lang.NullPointerException
+a null lookup was refused with java.lang.NullPointerException
 done

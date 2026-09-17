@@ -7,11 +7,11 @@ sorted=7,8,9
 ordered=a=1,b=2
 sortedIface=2,4
 queue=q1,q2
-impl=teyru.ArrayList teyru.LinkedHashSet teyru.LinkedHashMap teyru.TreeSet teyru.ArrayDeque
-declared=teyru.ArrayList teyru.TreeMap
-loose[0]=teyru.String
-loose[1]=teyru.Integer
-loose[2]=teyru.Boolean
+impl=java.util.ArrayList java.util.LinkedHashSet java.util.LinkedHashMap java.util.TreeSet java.util.ArrayDeque
+declared=java.util.ArrayList java.util.TreeMap
+loose[0]=java.lang.String
+loose[1]=java.lang.Integer
+loose[2]=java.lang.Boolean
 loose[3]=null
 ["a","b"]
 {"x":1,"y":2}

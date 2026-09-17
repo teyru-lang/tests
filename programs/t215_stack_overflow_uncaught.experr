@@ -1,1 +1,1 @@
-Exception in thread "main" teyru.StackOverflowError
+Exception in thread "main" java.lang.StackOverflowError

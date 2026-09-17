@@ -12,6 +12,24 @@ class Main {
     int[] dst = new int[4]
     System.arraycopy(src, 1, dst, 0, 3)
     System.out.println(dst[0] + " " + dst[2] + " " + dst[3])
+    // The same message for the two arrays the runtime builds for a string: the
+    // char[] toCharArray hands out and the byte[] getBytes hands out record no
+    // element class, and the message still names them the way Java does.
+    char[] cs = "abc".toCharArray()
+    long[] asLong = new long[3]
+    try {
+      System.arraycopy(cs, 0, asLong, 0, 3)
+      System.out.println("copied chars")
+    } catch (ArrayStoreException e) {
+      System.out.println("store " + e.getMessage())
+    }
+    byte[] bs = "abc".getBytes()
+    try {
+      System.arraycopy(bs, 0, asLong, 0, 3)
+      System.out.println("copied bytes")
+    } catch (ArrayStoreException e) {
+      System.out.println("store " + e.getMessage())
+    }
     int[] small = new int[2]
     try {
       System.arraycopy(src, 0, small, 0, 3)

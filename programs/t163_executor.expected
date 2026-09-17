@@ -6,17 +6,17 @@ increments that survived contention=12 exact=true
 == execute() runs a plain Runnable ==
 runnables that ran=5 exact=true
 == a task that throws reaches the caller ==
-get() threw teyru.ExecutionException
-the cause it carries is teyru.IllegalStateException: the task refused
+get() threw java.util.concurrent.ExecutionException
+the cause it carries is java.lang.IllegalStateException: the task refused
 that future is done=true cancelled=false
 == a task cancelled before it starts ==
 the one worker is busy=true
 cancel() took=true isCancelled=true isDone=true
-get() on the cancelled task threw teyru.CancellationException
+get() on the cancelled task threw java.util.concurrent.CancellationException
 the task that was running answered 1
 == shutdownNow hands back what never started ==
 one task was running=true dropped=2 that finished=1 terminated=true
-a task after shutdown was rejected with teyru.RejectedExecutionException
+a task after shutdown was rejected with java.util.concurrent.RejectedExecutionException
 == shutdown, then awaitTermination ==
 isShutdown=true
 awaitTermination answered true isTerminated=true

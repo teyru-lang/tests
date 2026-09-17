@@ -37,12 +37,19 @@ t231_probe_strings W5 hashCode, format width, isLetter/isWhitespace, strip and f
 
 # --- boxing: valueOf does not cache, so == differs for every wrapper type
 
-# --- collection toString: the iteration order of HashMap and HashSet is not the
-#     JDK's, which is W6's HashMap change on top of W5's hashCode
-t234_probe_collections W6 HashMap/HashSet iteration order is not the JDK's (plan 1.2; decision D7 is to match it)
+# --- collection toString: the iteration order of HashMap and HashSet is the
+#     JDK's now, so t234_probe_collections is green. t250_map_order is what
+#     pins it: one line per rule of the layout, compared against the JDK.
 
-# --- exception class names and messages
-t235_probe_exceptions W6 Throwable's class name is teyru.* rather than java.lang.* (the bound message itself matches the JDK now)
+# --- exception messages: the class names are the JDK's now (t251), so what is
+#     left here are the three messages the plan does not name. The JDK prints
+#     "class java.lang.String cannot be cast to class java.lang.Integer
+#     (java.lang.String and java.lang.Integer are in module java.base of loader
+#     'bootstrap')" where this prints the first half; the helpful
+#     NullPointerException message, which javac records a local variable's slot
+#     for; and ArrayStoreException, whose message in Java is the class of the
+#     value that did not fit rather than a sentence about the array.
+t235_probe_exceptions W6 the class names match java.lang.* now; left are the cast parenthetical, the helpful NullPointerException message and ArrayStoreException's element class
 
 # --- the whitespace and case family: strip, trim, isBlank, isWhitespace, the
 #     full-width digits, and the Greek and dotted-I case mappings

@@ -1,1 +1,1 @@
-Exception in thread "worker" teyru.StackOverflowError
+Exception in thread "worker" java.lang.StackOverflowError

@@ -12,8 +12,9 @@
 // literal's:
 //   - Class.toString is getName (lib/01_core.teyru), so printing a Class object
 //     prints the bare name where Java prints "class Point" (as t77_getclass).
-//   - A prelude class is named by its Teyru package, so the class of a Class
-//     object is "teyru.Class" where Java says "java.lang.Class".
+//   - A prelude class reports the JDK class it stands in for, so the class of a
+//     Class object is "java.lang.Class", as Java has it. A class the program
+//     declares itself is reported under its own name.
 //   - Every array value is an instance of one synthetic class, teyru.Array, so
 //     that is what `A[].class` names for any element type and `String[].class
 //     == int[].class` holds; Java gives each element type its own array class
