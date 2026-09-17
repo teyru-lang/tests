@@ -1,0 +1,70 @@
+/* A reference a program has dropped stops keeping its object alive.
+ *
+ * The shape matters and is not incidental: the method contains a `try`, and the
+ * emitter makes every local of such a method volatile, because a local assigned
+ * inside a try and read in its catch has to survive the longjmp and the C
+ * standard calls a non-volatile one indeterminate. Volatile means the compiler
+ * may not drop the store, so `big`'s word in the frame keeps pointing at the
+ * array for the rest of main, and a collector that reads the frame word by word
+ * keeps 8 MB alive that nothing can reach.
+ *
+ * The number printed is the collector's own account of what the last collection
+ * kept, in whole megabytes: 8 while the frame is scanned conservatively, 0 once
+ * the compiler names the frame's reference words and the word of a reference
+ * that is dead is cleared. Java 21 answers the same question with a null
+ * (System.gc() then Runtime.freeMemory()), and Teyru has liveBytes() for it.
+ *
+ * The expectation is the answer with the frame maps on, which is the default:
+ * `true` and `0`. Both configurations are runnable from the same source and the
+ * same binary layout, and the difference is the whole point of the case:
+ *
+ *	teyru build -O1 -o /tmp/t245 t245_dropped_reference.teyru && /tmp/t245
+ *	# true
+ *	# 0
+ *	TEYRU_NO_FRAME_MAPS=1 teyru build -O1 -o /tmp/t245c t245_dropped_reference.teyru
+ *	/tmp/t245c
+ *	# true
+ *	# 8
+ *
+ * The suite runs the first form (the maps are the default), so the .expected
+ * file is the 0. The second form is what the entry in AGENTS.md is about, and
+ * it is why the collector's own live set -- not a wall-clock number -- is what
+ * is printed: an over-retentive collector and a correct one differ by exactly
+ * the array, and the array is 8 MB.
+ *
+ * The case is Teyru's, not Java's: java.lang.System has no liveBytes, so the
+ * JDK differential has nothing to run (tests/jdk-diff-allow.txt says so).
+ */
+class DroppedReference {
+  static long fill(int[] a) {
+    long s = 0
+    for (int i = 0 : i < a.length : i++) {
+      a[i] = i
+    }
+    for (int i = 0 : i < a.length : i++) {
+      s += a[i]
+    }
+    return s
+  }
+
+  static void churn(int n) {
+    Object[] keep = new Object[64]
+    for (int i = 0 : i < n : i++) {
+      keep[i % 64] = new Object()
+    }
+  }
+
+  public static void main(String[] a) {
+    int[] big = new int[2 * 1024 * 1024]
+    long sum = fill(big)
+    try {
+      churn(1000)
+    } catch (Throwable t) {
+      System.out.println(t)
+    }
+    churn(300000)
+    System.gc()
+    System.out.println(sum > 0)
+    System.out.println(System.liveBytes() / (1024 * 1024))
+  }
+}

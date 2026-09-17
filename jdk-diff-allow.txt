@@ -95,3 +95,4 @@ t60_expr_chain java none javac overflows its own stack attributing the chain thi
 t214_stack_overflow java W2 the printer omits `throws InterruptedException` for a body calling Thread.join
 t216_stack_overflow_thread_uncaught java W2 the same, in a body that installs an uncaught-exception handler
 t217_class_initializer_race java W2 the same, in a body that awaits a class initialiser
+t245_dropped_reference java none System.liveBytes is Teyru's; java.lang.System has no such method, so javac rejects the printed file and there is nothing to compare the collector's live set with
