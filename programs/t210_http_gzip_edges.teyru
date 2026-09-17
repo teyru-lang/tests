@@ -56,10 +56,14 @@ class GzipApi {
   @GetMapping("/truncated")
   HttpResponse truncated() {
     truncated.incrementAndGet()
-    String packed = Gzip.compress(Bodies.big())
+    // Gzip is bytes at both ends now (the string work took the last binary
+    // format out of String), so the truncation below is a byte range rather than
+    // a substring: the case is a gzip member cut in half, and half of it is half
+    // its bytes.
+    byte[] packed = Gzip.compress(Bodies.big())
     HttpResponse res = new HttpResponse()
     res.header("Content-Encoding", "gzip")
-    res.body = packed.substring(0, packed.length() / 2)
+    res.bodyBytes = Arrays.copyOfRange(packed, 0, packed.length / 2)
     return res
   }
 
@@ -96,8 +100,8 @@ class T210 {
         " encoding=[" + packed.header("Content-Encoding") + "]" +
         " vary=[" + packed.header("Vary") + "]" +
         " length=" + packed.header("Content-Length") +
-        " decodes=" + Gzip.decompress(packed.body).equals(Bodies.big()) +
-        " shorter=" + (packed.body.length() < Bodies.big().length()))
+        " decodes=" + Gzip.decompressText(packed.bodyBytes).equals(Bodies.big()) +
+        " shorter=" + (packed.bodyBytes.length < Bodies.big().length()))
     RawResponse plain = raw(port, "GET /api/big HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
     System.out.println("gzip-not-offered -> " + plain.statusLine +
         " encoding=[" + plain.header("Content-Encoding") + "]" +
@@ -110,8 +114,14 @@ class T210 {
     System.out.println("request-body-claimed-gzip -> " + junk.statusLine + " body=[" + junk.body + "]")
     // and one that really is: a server that does not decode request bodies
     // hands the handler the bytes that arrived, which is the answer it can give
-    String real = Gzip.compress(Bodies.big())
-    RawResponse gz = raw(port, "POST /api/echo HTTP/1.1\r\nHost: x\r\nContent-Encoding: gzip\r\nContent-Length: " + real.length() + "\r\nConnection: close\r\n\r\n" + real)
+    byte[] real = Gzip.compress(Bodies.big())
+    // The head is text and the body is bytes, sent as such: a compressed body
+    // through a String is the thing this file is about not doing.
+    RawClient body = new RawClient(port)
+    body.send("POST /api/echo HTTP/1.1\r\nHost: x\r\nContent-Encoding: gzip\r\nContent-Length: " + real.length + "\r\nConnection: close\r\n\r\n")
+    body.sendBytes(real)
+    RawResponse gz = body.read()
+    body.close()
     System.out.println("request-body-real-gzip -> " + gz.statusLine + " body=[" + gz.body + "]")
 
     // ---------- a response body that lies, through the client ----------
