@@ -1,0 +1,47 @@
+public class T213 {
+  static void p(String k, boolean v) { System.out.println(k + " = " + v); }
+
+  public static void main(String[] args) {
+    p("int_valueOf_127", Integer.valueOf(127) == Integer.valueOf(127));
+    p("int_valueOf_128", Integer.valueOf(128) == Integer.valueOf(128));
+    p("int_valueOf_minus128", Integer.valueOf(-128) == Integer.valueOf(-128));
+    p("int_valueOf_minus129", Integer.valueOf(-129) == Integer.valueOf(-129));
+
+    Integer ai = 127;
+    Integer bi = 127;
+    p("int_box_127", ai == bi);
+    Integer ci = 128;
+    Integer di = 128;
+    p("int_box_128", ci == di);
+
+    Short as = 127;
+    Short bs = 127;
+    p("short_box_127", as == bs);
+    Short cs = 128;
+    Short ds = 128;
+    p("short_box_128", cs == ds);
+
+    Long al = 127L;
+    Long bl = 127L;
+    p("long_box_127", al == bl);
+    Long cl = 128L;
+    Long dl = 128L;
+    p("long_box_128", cl == dl);
+
+    Boolean x = true;
+    Boolean y = true;
+    p("bool_box_true", x == y);
+    p("bool_valueOf", Boolean.valueOf(false) == Boolean.FALSE);
+
+    p("byte_valueOf_minus128", Byte.valueOf((byte) -128) == Byte.valueOf((byte) -128));
+    p("byte_valueOf_127", Byte.valueOf((byte) 127) == Byte.valueOf((byte) 127));
+    p("short_valueOf_minus128", Short.valueOf((short) -128) == Short.valueOf((short) -128));
+    p("char_cached_a", Character.valueOf('a') == Character.valueOf('a'));
+    p("char_cached_127", Character.valueOf((char) 127) == Character.valueOf((char) 127));
+    p("char_not_cached", Character.valueOf('中') == Character.valueOf('中'));
+
+    p("equals_1000", Integer.valueOf(1000).equals(Integer.valueOf(1000)));
+    p("unbox_sum", (ai + bi) == 254);
+    p("cached_is_still_a_value", Integer.valueOf(127).intValue() == 127);
+  }
+}
