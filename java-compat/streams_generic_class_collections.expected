@@ -1,0 +1,12 @@
+box[text]
+box[41]
+box[changed]
+age=30
+30=age
+sorted [1, 2, 3, 4, 5]
+reversed [5, 4, 3, 2, 1]
+max 5
+min 1
+wordsSorted [apple, fig, pear]
+wordsMax pear
+wordsReversed [pear, fig, apple]

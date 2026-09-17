@@ -1,0 +1,7 @@
+toList [apple, fig, kiwi, pear, fig]
+toSet [apple, fig, kiwi, pear]
+joining apple, fig, kiwi, pear, fig
+joining3 [apple-fig-kiwi-pear-fig]
+counting 5
+summingInt 19
+averagingInt 3.8

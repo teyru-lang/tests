@@ -1,0 +1,16 @@
+0-0
+0-1
+0-2
+1-0
+1-1
+1-2
+do 3
+low 1
+low 2
+three
+four-or-three 3
+low 1
+four-or-three 4
+while 3
+after label 5
+found 2,3

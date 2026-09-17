@@ -1,0 +1,15 @@
+both
+Base[both]
+Base[both]Base[both]
+left+right
+== teyru 1.0 ==
+1.0/100
+Counting(5)
+full
+5
+Complete:full
+Base[anon]
+left
+Base[both] twice=Base[both]Base[both]
+Counting(5) twice=Counting(5)Counting(5)
+Base[anon] twice=Base[anon]Base[anon]

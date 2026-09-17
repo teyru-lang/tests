@@ -1,0 +1,13 @@
+lookup finished for alpha
+value-alpha
+lookup finished for missing
+APP:not found: missing code=404 type=NotFoundException msg=not found: missing
+lookup finished for 
+outer failed / 500 / IllegalStateException / root cause
+not-found code=404
+runtime ValidationException
+app code=7
+runtime IllegalStateException
+true
+false
+npe caught: NullPointerException

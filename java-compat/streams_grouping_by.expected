@@ -1,0 +1,10 @@
+2 -> [ox]
+3 -> [fig]
+4 -> [kiwi, pear, plum]
+5 -> [apple]
+count 2 -> 1
+count 3 -> 1
+count 4 -> 3
+count 5 -> 1
+even -> [kiwi, pear, plum, ox]
+odd -> [apple, fig]

@@ -1,0 +1,7 @@
+natural [2, 2, 4, 7, 9]
+reverse [9, 7, 4, 2, 2]
+byLen [fig, pear, kiwi, apple]
+byLenThenWord [fig, kiwi, pear, apple]
+lenDescThenWord [apple, kiwi, pear, fig]
+sorted [a, b, c, d]
+min a max d

@@ -1,0 +1,34 @@
+open one
+close one
+data-of-one
+open a
+open b
+data-of-a
+data-of-b
+close b
+close a
+done
+open x
+open y
+open z
+close z
+close y
+close x
+data-of-x+data-of-y+data-of-z
+open pre
+close pre
+data-of-pre
+finally ran, boom=false
+try;ok;
+finally ran, boom=true
+try;catch:boom;
+open outer
+open inner
+close inner
+close outer
+data-of-outer|data-of-inner
+open outer
+open inner
+close inner
+close outer
+data-of-outer|caught:inner boom

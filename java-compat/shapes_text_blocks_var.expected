@@ -1,0 +1,30 @@
+Hello, world!
+This is line two.
+
+    indented line
+      more indented
+back
+---
+he said "hi" and left
+a backslash \ here
+escape: first
+second
+---
+only one line
+---
+true
+{
+  "name": "teyru",
+  "tags": ["java", "compat"],
+  "nested": {
+    "value": 42
+  }
+}
+---
+LOCAL localhost:8080
+REMOTE example.org:443
+6
+14
+3
+<<only one line>>
+Config[host=abc, port=1]

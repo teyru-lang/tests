@@ -1,0 +1,15 @@
+MERCURY ordinal=0 weight=277.7270042224455
+EARTH ordinal=1 weight=735.1989557502847
+MARS ordinal=2 weight=278.44718220790054
+MARS
+true
+3
+ADD + 6,7 -> 13
+SUB - 6,7 -> -1
+MUL * 6,7 -> 42
+11
+LOW: low priority
+MEDIUM: medium priority
+HIGH: high priority
+2
+true

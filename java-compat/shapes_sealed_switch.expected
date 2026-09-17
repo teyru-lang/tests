@@ -1,0 +1,7 @@
+circle 2.5 | C2.5 | round 2.5 | circle of 2.5 | 1
+square 3.0 | S3.0 | flat 3.0 | square of 3.0 | 4
+rect 4.0x5.0 | R4.0x5.0 | box 4.0x5.0 | rect 4.0 by 5.0 | 4
+circle 11.0 | C11.0 | round 11.0 | big circle | 1
+square 1.0 | S1.0 | flat 1.0 | unit square | 4
+rect 6.0x6.0 | R6.0x6.0 | box 6.0x6.0 | degenerate square 6.0 | 4
+nothing
