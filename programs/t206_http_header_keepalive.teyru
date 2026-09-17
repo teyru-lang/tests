@@ -1,0 +1,212 @@
+import teyru.*
+
+/* Header forms, and the answers that have no body.
+
+   Two questions, both about a request or an answer that is syntactically fine
+   and that a framework's own tests cannot ask, because MockServer builds the
+   request it sends:
+
+   * A header with no value. `X-Foo:` is a header the client sent and meant
+     nothing by, and `@RequestHeader(defaultValue = ...)` answers "" for it, as
+     Spring's does -- the default is for a header that is not there. `X-Foo`,
+     with no colon at all, is not a header: RFC 9112's field-line grammar has a
+     colon, so the line is malformed and the request is a 400. `Host:` empty is
+     a Host field with an empty value, which the grammar allows (a reg-name may
+     be empty), so it is present and the request is answered; a request with no
+     Host field at all is refused, which is what RFC 9112 asks of HTTP/1.1 and
+     what a 1.0 request may do without.
+
+   * A keep-alive connection whose first answer has no body. A `HEAD` carries
+     the headers its GET would have carried, Content-Length among them, and no
+     body; a 204 carries none at all; a 302 carries the redirect the client
+     follows. All three are followed by a second request on the same connection,
+     which is the only thing that says the first answer was framed correctly:
+     the second request's answer is read from the position the first answer
+     ended at, so a body sent when there was none, or a length claimed when
+     there was no body, shows up as the second answer being wrong.
+
+   The server runs on a thread of its own and the port is asked for, never
+   printed, so two runs of this program produce the same bytes. */
+
+@RestController
+@RequestMapping("/api")
+class HeaderApi {
+  // The default is what a request with no X-Foo at all gets; a request that
+  // sent `X-Foo:` gets the empty value it sent.
+  @GetMapping("/hdr")
+  String hdr(@RequestHeader(value = "X-Foo", defaultValue = "none") String foo) {
+    return "x-foo=[" + foo + "]"
+  }
+
+  @GetMapping("/one")
+  String one() {
+    return "1"
+  }
+
+  // An answer that is a redirect, which is the shape a client follows rather
+  // than reads.
+  @GetMapping("/redir")
+  HttpResponse redir() {
+    HttpResponse res = new HttpResponse()
+    res.status = 302
+    res.header("Location", "/api/one")
+    res.body = "go"
+    return res
+  }
+
+  // An answer defined not to have a body, whatever a length would say.
+  @GetMapping("/nocontent")
+  HttpResponse nocontent() {
+    HttpResponse res = new HttpResponse()
+    res.status = 204
+    res.body = "this body is not sent"
+    return res
+  }
+}
+
+class T206 {
+  public static void main(String[] args) throws Exception {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.bind()
+    int port = server.getPort()
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "server")
+    serving.start()
+
+    // ---------- case 2: headers with no value, and lines that are not headers ----------
+    probe(port, "x-foo-empty", "GET /api/hdr HTTP/1.1\r\nHost: x\r\nX-Foo:\r\nConnection: close\r\n\r\n")
+    probe(port, "x-foo-space", "GET /api/hdr HTTP/1.1\r\nHost: x\r\nX-Foo: \r\nConnection: close\r\n\r\n")
+    probe(port, "x-foo-absent", "GET /api/hdr HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    probe(port, "x-foo-value", "GET /api/hdr HTTP/1.1\r\nHost: x\r\nX-Foo: bar\r\nConnection: close\r\n\r\n")
+    probe(port, "x-foo-no-colon", "GET /api/hdr HTTP/1.1\r\nHost: x\r\nX-Foo\r\nConnection: close\r\n\r\n")
+    probe(port, "empty-name", "GET /api/hdr HTTP/1.1\r\nHost: x\r\n: v\r\nConnection: close\r\n\r\n")
+    probe(port, "host-empty", "GET /api/one HTTP/1.1\r\nHost:\r\nConnection: close\r\n\r\n")
+    probe(port, "host-absent-1.1", "GET /api/one HTTP/1.1\r\nConnection: close\r\n\r\n")
+    probe(port, "host-absent-1.0", "GET /api/one HTTP/1.0\r\n\r\n")
+
+    // ---------- case 3: keep-alive whose first answer has no body ----------
+    // The first answer is read as headers only, which is what a client does
+    // with a HEAD: the length it carries is the length of a body that is not
+    // sent, and reading that many bytes would eat the next answer.
+    pair(port, "head-then-get", "HEAD /api/one HTTP/1.1\r\nHost: x\r\n\r\n",
+        "GET /api/one HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    twoHeads(port, "head-then-head", "HEAD /api/one HTTP/1.1\r\nHost: x\r\n\r\n",
+        "HEAD /api/one HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    pair(port, "204-then-get", "GET /api/nocontent HTTP/1.1\r\nHost: x\r\n\r\n",
+        "GET /api/one HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    twoHeads(port, "204-then-head", "HEAD /api/nocontent HTTP/1.1\r\nHost: x\r\n\r\n",
+        "HEAD /api/one HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    wholePair(port, "redirect-then-get", "GET /api/redir HTTP/1.1\r\nHost: x\r\n\r\n",
+        "GET /api/one HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    // both requests on the wire before either answer is read, which is
+    // pipelining: the server answers them in order
+    pipelined(port, "two-gets-at-once", "GET /api/one HTTP/1.1\r\nHost: x\r\n\r\nGET /api/hdr HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+
+    task.stop()
+    serving.join()
+    server.close()
+    System.out.println("done")
+  }
+
+  static String summary(RawResponse res) {
+    if (res == null) {
+      return "<no answer>"
+    }
+    StringBuilder b = new StringBuilder()
+    b.append(res.statusLine)
+    if (res.header("Content-Length").length() > 0) {
+      b.append(" len=").append(res.header("Content-Length"))
+    }
+    if (res.header("Location").length() > 0) {
+      b.append(" location=").append(res.header("Location"))
+    }
+    if (res.body.length() > 0) {
+      b.append(" body=").append(res.body)
+    }
+    return b.toString()
+  }
+
+  static void probe(int port, String label, String request) {
+    RawClient c = new RawClient(port)
+    try {
+      c.send(request)
+      System.out.println(label + " -> " + summary(c.read()))
+    } catch (IOException e) {
+      System.out.println(label + " -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+
+  // pair sends two requests down one connection. The first answer is read as a
+  // client reads the answer to a HEAD or a 204 -- the headers, and no body --
+  // and the second whole, so that the second one is proof of where the first
+  // one ended.
+  static void pair(int port, String label, String first, String second) {
+    RawClient c = new RawClient(port)
+    try {
+      c.send(first)
+      c.send(second)
+      RawResponse a = c.readHead()
+      RawResponse b = c.read()
+      System.out.println(label + " -> A[" + summary(a) + "] B[" + summary(b) + "]")
+    } catch (IOException e) {
+      System.out.println(label + " -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+
+  // twoHeads is pair for a second request that is also a HEAD: neither answer
+  // has a body, so reading either as a whole answer would be reading the next
+  // one's status line as this one's body.
+  static void twoHeads(int port, String label, String first, String second) {
+    RawClient c = new RawClient(port)
+    try {
+      c.send(first)
+      c.send(second)
+      RawResponse a = c.readHead()
+      RawResponse b = c.readHead()
+      System.out.println(label + " -> A[" + summary(a) + "] B[" + summary(b) + "]")
+    } catch (IOException e) {
+      System.out.println(label + " -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+
+  // wholePair is pair for an answer that does have a body -- a redirect is a
+  // response like any other -- and reads both answers whole.
+  static void wholePair(int port, String label, String first, String second) {
+    RawClient c = new RawClient(port)
+    try {
+      c.send(first)
+      c.send(second)
+      RawResponse a = c.read()
+      RawResponse b = c.read()
+      System.out.println(label + " -> A[" + summary(a) + "] B[" + summary(b) + "]")
+    } catch (IOException e) {
+      System.out.println(label + " -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+
+  // pipelined sends both requests before reading either answer, and reads both
+  // as whole answers: the first is a GET and has a body.
+  static void pipelined(int port, String label, String requests) {
+    RawClient c = new RawClient(port)
+    try {
+      c.send(requests)
+      RawResponse a = c.read()
+      RawResponse b = c.read()
+      System.out.println(label + " -> A[" + summary(a) + "] B[" + summary(b) + "]")
+    } catch (IOException e) {
+      System.out.println(label + " -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+}

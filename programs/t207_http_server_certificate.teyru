@@ -1,0 +1,213 @@
+import teyru.*
+
+/* The certificate a server is configured with.
+
+   Two things are being pinned here, and the second is the one that was wrong.
+
+   * A pair that does not belong together is refused where it is configured,
+     naming the problem, rather than failing every client that arrives: the
+     context is built when the server is given the pair, so a certificate whose
+     key is not its key is a program that stops with `key values mismatch` in
+     its message. A path that is not there is refused the same way, by name.
+
+   * Both entry points honour the properties. `Application.serve` did; the
+     Boot-shaped `SpringApplication.run` built its own server and never read
+     `server.ssl.certificate`, so a program whose configuration said "encrypt"
+     served *plain HTTP*, and nothing it printed said otherwise. That is the
+     worst answer this layer can give, and the two entry points now go through
+     one call (`Application.configureServer`) rather than each applying the
+     properties it happens to know about.
+
+   Whether the properties work on the Boot path is observed end to end: a
+   plaintext client is not answered at all, and a TLS client that trusts the
+   certificate gets the body. A plaintext client being answered with a 200 is
+   the shape the defect had, and it is what the first line below would say if
+   the property went unread again.
+
+   The certificate and the key are constants in this file rather than files
+   beside it, the way t163 does it: the suite hands a program its sources and
+   nothing else. The port is asked for, never printed, so two runs of this
+   program produce the same bytes. */
+
+@RestController
+class Hello {
+  @GetMapping("/hello")
+  String hello() {
+    return "hello over TLS"
+  }
+}
+
+class T207 {
+  public static void main(String[] args) throws Exception {
+    Path dir = Files.createTempDirectory("t207-")
+    String certA = write(dir, "cert-a.pem", CERT_A)
+    String keyA = write(dir, "key-a.pem", KEY_A)
+    String keyB = write(dir, "key-b.pem", KEY_B)
+
+    // ---------- the Boot entry point, configured by properties ----------
+    ApplicationContext ctx = SpringApplication.run(new String[] {
+      "--server.port=0",
+      "--spring.web.idle-ms=50",
+      "--server.ssl.certificate=" + certA,
+      "--server.ssl.certificate-private-key=" + keyA,
+    })
+    HttpServer server = ctx.getServer()
+    System.out.println("boot isSecure=" + server.isSecure())
+
+    // A plaintext client connects and writes: the kernel queues it, and then
+    // the server is asked to serve one connection. A server that reads the
+    // certificate does not answer it -- there is a handshake before there is a
+    // request -- and a server that ignored the property answers it with a 200,
+    // which is the defect this line exists for.
+    Socket plain = new Socket("127.0.0.1", server.getPort())
+    plain.setSoTimeout(3000)
+    plain.getOutputStream().write("GET /hello HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    plain.getOutputStream().flush()
+    int answered = server.serveIdle(300)
+    String status = ""
+    try {
+      status = firstLine(readAll(plain))
+    } catch (IOException e) {
+      // a handshake that could not parse a request line ends the connection,
+      // and how it ends -- reset or close -- is not what this test is about
+      status = ""
+    }
+    plain.close()
+    System.out.println("plaintext answered=" + answered + " with=[" + status + "]")
+
+    // and the same server answers a client that speaks TLS
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "server")
+    serving.start()
+    HttpClient client = HttpClient.newHttpClient().connectTimeout(5000).trustStore(certA)
+    try {
+      HttpClientResponse res = client.send(
+          HttpClientRequest.of("GET", "https://127.0.0.1:" + server.getPort() + "/hello"))
+      System.out.println("tls status=" + res.statusCode() + " body=[" + res.body() + "]")
+    } catch (IOException e) {
+      System.out.println("tls refused: " + e.getClass().getName())
+    } finally {
+      client.close()
+      task.stop()
+      serving.join()
+      server.close()
+    }
+
+    // ---------- the pair the hand-written entry point is given ----------
+    // The same configuration call, on a server built the way a main that is
+    // not Boot-shaped builds one: this is the seam both entry points go
+    // through, so a property honoured here cannot be ignored there.
+    ApplicationContext direct = Application.boot(new String[] {
+      "--server.ssl.certificate=" + certA,
+      "--server.ssl.certificate-private-key=" + keyA,
+    })
+    HttpServer built = new HttpServer(0, Application.routerFrom(direct), direct)
+    Application.configureServer(direct, built)
+    System.out.println("direct isSecure=" + built.isSecure())
+    built.close()
+
+    // ---------- a pair that does not belong together ----------
+    String[] bad = {
+      "--server.ssl.certificate=" + certA,
+      "--server.ssl.certificate-private-key=" + keyB,
+    }
+    configures("mismatched", bad)
+
+    // ---------- a certificate that is not there ----------
+    configures("missing", new String[] {
+      "--server.ssl.certificate=" + File.join(dir.toString(), "absent.pem"),
+      "--server.ssl.certificate-private-key=" + keyA,
+    })
+
+    // ---------- a certificate with no key named ----------
+    configures("no-key", new String[] { "--server.ssl.certificate=" + certA })
+
+    // the directory this program made, taken back the way t163 takes its own
+    Files.delete(certA)
+    Files.delete(keyA)
+    Files.delete(keyB)
+    Files.delete(dir.toString())
+    System.out.println("done")
+  }
+
+  // configures applies a configuration and prints what it did, which for a
+  // pair that cannot be used is the exception that names the problem.
+  static void configures(String label, String[] args) {
+    try {
+      ApplicationContext ctx = Application.boot(args)
+      HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+      Application.configureServer(ctx, server)
+      System.out.println(label + " -> accepted the pair (isSecure=" + server.isSecure() + ")")
+      server.close()
+    } catch (TlsException e) {
+      System.out.println(label + " -> TlsException: " + tail(e.getMessage()))
+    } catch (Exception e) {
+      System.out.println(label + " -> " + e.getClass().getName() + ": " + tail(e.getMessage()))
+    }
+  }
+
+  // tail is a message without the directory it names. The files this program
+  // makes live in a directory `mkdtemp` names, and that name is different on
+  // every run: printing a whole path would make two runs of this program
+  // differ, and what the message is worth reading for is the file it ends with
+  // and the reason after it.
+  static String tail(String message) {
+    int slash = message.lastIndexOf('/')
+    return slash < 0 ? message : message.substring(slash + 1)
+  }
+
+  static String write(Path dir, String name, String text) {
+    String path = File.join(dir.toString(), name)
+    Files.writeString(path, text + "\n")
+    return path
+  }
+
+  static String readAll(Socket s) {
+    SocketInputStream in = s.getInputStream()
+    StringBuilder b = new StringBuilder()
+    while (true) {
+      int c = in.read()
+      if (c < 0) {
+        break
+      }
+      b.append((char) c)
+    }
+    return b.toString()
+  }
+
+  static String firstLine(String text) {
+    int nl = text.indexOf("\r\n")
+    return nl < 0 ? text : text.substring(0, nl)
+  }
+
+  // The pair t163 uses, and its key: made with `openssl req -x509 ... -subj
+  // "/CN=teyru test"`, which is what a deployment makes one with too. KEY_B is
+  // a second key of the same shape, and it is here to be the wrong one.
+  static final String CERT_A = """
+-----BEGIN CERTIFICATE-----
+MIIBkjCCATigAwIBAgIUY7HGBQ3Vv5DJjs7pao+ZNTzCKoEwCgYIKoZIzj0EAwIw
+FTETMBEGA1UEAwwKdGV5cnUgdGVzdDAgFw0yNjA5MTUwOTIwNDVaGA8yMTI2MDgy
+MjA5MjA0NVowFTETMBEGA1UEAwwKdGV5cnUgdGVzdDBZMBMGByqGSM49AgEGCCqG
+SM49AwEHA0IABJezzdg2dsElVPGyfjROwkR9N9cCIomuCOHx6RHdcU4KLd1VXLhM
+2Kx0j3bk+SmJI74AYl7ArzS6pU8PYRza7IKjZDBiMB0GA1UdDgQWBBRg5tBK8emj
+sUSGgvHw5c/7/JRD2zAfBgNVHSMEGDAWgBRg5tBK8emjsUSGgvHw5c/7/JRD2zAP
+BgNVHRMBAf8EBTADAQH/MA8GA1UdEQQIMAaHBH8AAAEwCgYIKoZIzj0EAwIDSAAw
+RQIgbzpcPuILKcnRNrcBl+UcVwni/cMcawupurQo2TerQy8CIQDyAiTfgr+nPHG4
+lZFpZl+H059fk9Fa1VppxipgALyQcQ==
+-----END CERTIFICATE-----
+"""
+  static final String KEY_A = """
+-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgX6cwTKzUxknb+0uT
+gzkvtOggWp3vg2CodL3Fn/WJ+RmhRANCAASXs83YNnbBJVTxsn40TsJEfTfXAiKJ
+rgjh8ekR3XFOCi3dVVy4TNisdI925PkpiSO+AGJewK80uqVPD2Ec2uyC
+-----END PRIVATE KEY-----
+"""
+  static final String KEY_B = """
+-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgvIykaFT4MWTYi71t
+2vVuTBUG3ErMSLaf924Hr3u3JMihRANCAAS8jKlDzTtB+kg0LdgPfBQLLFnLTwPT
+Ym7h4r2wT42YtLj05pjzGfsybvu9x/IMGmjW5vbNoPHtGPYEnQX+76/s
+-----END PRIVATE KEY-----
+"""
+}

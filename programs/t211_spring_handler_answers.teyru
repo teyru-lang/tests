@@ -1,0 +1,172 @@
+import teyru.*
+
+/* A handler that answers with nothing, and one that throws where a catch cannot
+   reach it.
+
+   Both are ordinary Java and both are answered by the framework rather than by
+   a route's own code, so both are questions about the layer above the route:
+
+   * A handler that returns null answers with an empty 200. That is what Spring
+     does -- a controller method whose result is null is an answer with no body,
+     not a 404 and not a 500 -- and the framing has to say so, because an answer
+     with no Content-Length at all is a client waiting for a close that a
+     keep-alive connection never sends.
+
+   * A throw from a `finally` replaces the return that was on its way out, which
+     is Java's own rule for `finally`. The route is called reflectively, so the
+     exception arrives wrapped in an InvocationTargetException: the 500 below is
+     the message the controller meant, which only happens if the wrapper is
+     taken off. The same throw with an advice for its type is answered by the
+     advice, which is the other half of the same question.
+
+   A third thing is pinned by being on the same connection as the second: a
+   handler that fails does not end the connection, so the next request on it is
+   answered. */
+
+class BoomException extends RuntimeException {
+  public BoomException(String message) {
+    super(message)
+  }
+}
+
+class AdviceBoomException extends RuntimeException {
+  public AdviceBoomException(String message) {
+    super(message)
+  }
+}
+
+@ControllerAdvice
+@Service
+class Advice {
+  @ExceptionHandler(BoomException.class)
+  String boom(BoomException e) {
+    return "advised: " + e.getMessage()
+  }
+}
+
+// An advice that fails while answering. It is a program's own code like any
+// other, so it can throw, and the request still has to get an answer: the route
+// failed and the thing that was supposed to answer for it failed too, which is a
+// 500 and not a server that stops. Nothing catches this above the connection
+// loop -- which is one thread for every client there is -- so it is caught where
+// the answer is built.
+@ControllerAdvice
+@Service
+class FailingAdvice {
+  @ExceptionHandler(AdviceBoomException.class)
+  String handle(AdviceBoomException e) {
+    throw new IllegalStateException("the advice threw too")
+  }
+}
+
+@RestController
+@RequestMapping("/api")
+class HandlerApi {
+  // Three ways to answer with nothing: a String handler, an Object handler, and
+  // a handler that returns the response type itself.
+  @GetMapping("/null")
+  String returnsNull() {
+    return null
+  }
+
+  @GetMapping("/null-object")
+  Object returnsNullObject() {
+    return null
+  }
+
+  @GetMapping("/null-response")
+  HttpResponse returnsNullResponse() {
+    return null
+  }
+
+  // The return is left behind by the throw, so the client gets the failure.
+  @GetMapping("/finally")
+  String throwsInFinally() {
+    try {
+      return "the try block's answer"
+    } finally {
+      throw new IllegalStateException("from finally")
+    }
+  }
+
+  // The same shape with an advice for the exception the finally raised.
+  @GetMapping("/finally-advised")
+  String advisedInFinally() {
+    try {
+      return "the try block's answer"
+    } finally {
+      throw new BoomException("from finally")
+    }
+  }
+
+  @GetMapping("/ok")
+  String ok() {
+    return "1"
+  }
+
+  @GetMapping("/advice-throws")
+  String adviceThrows() {
+    throw new AdviceBoomException("the route threw")
+  }
+}
+
+class T211 {
+  public static void main(String[] args) throws Exception {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.bind()
+    int port = server.getPort()
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "server")
+    serving.start()
+
+    probe(port, "null", "GET /api/null HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    probe(port, "null-object", "GET /api/null-object HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    probe(port, "null-response", "GET /api/null-response HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    probe(port, "finally", "GET /api/finally HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    probe(port, "finally-advised", "GET /api/finally-advised HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    probe(port, "advice-throws", "GET /api/advice-throws HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    // and the server is still the server: the next client is answered, on a new
+    // connection, after a route and its advice both failed
+    probe(port, "after-the-failing-advice", "GET /api/ok HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    System.out.println("serving-thread-alive=" + serving.isAlive())
+
+    // the failing route and then a good one, on one connection: a handler that
+    // threw is a failed request, not a failed connection
+    RawClient c = new RawClient(port)
+    try {
+      c.send("GET /api/finally HTTP/1.1\r\nHost: x\r\n\r\n")
+      c.send("GET /api/ok HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+      System.out.println("failure-then-success -> A[" + summary(c.read()) + "] B[" + summary(c.read()) + "]")
+    } catch (IOException e) {
+      System.out.println("failure-then-success -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+
+    task.stop()
+    serving.join()
+    server.close()
+    System.out.println("done")
+  }
+
+  static void probe(int port, String label, String request) {
+    RawClient c = new RawClient(port)
+    try {
+      c.send(request)
+      System.out.println(label + " -> " + summary(c.read()))
+    } catch (IOException e) {
+      System.out.println(label + " -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+
+  static String summary(RawResponse res) {
+    if (res == null) {
+      return "<no answer>"
+    }
+    return res.statusLine + " length=" + res.header("Content-Length") + " body=[" + res.body + "]"
+  }
+}

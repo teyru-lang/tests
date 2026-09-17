@@ -1,0 +1,236 @@
+import teyru.*
+
+/* The frames a client sends, and what the server does with them.
+
+   Everything here is a frame a real client sends and a framework test cannot
+   produce, because MockServer has no socket to put a frame on:
+
+   * a frame written in two pieces, with the split inside the payload. The
+     server reads the header and part of the payload in one read and waits for
+     the rest, which is the normal case on a network: a frame that is one write
+     on this side is not one read on the other.
+   * the largest payload a two-byte length holds -- 65535 bytes, the last size
+     that fits in the 126 form -- so the server's own length decoding is
+     exercised on the frame it reads and on the one it writes.
+   * a control frame in the middle of a fragmented message. RFC 6455 allows a
+     ping between the fragments of a message, and the message has to survive it:
+     the handler must see one message, not a message and a half.
+   * a close frame with a body -- a status code and a reason -- which is what
+     every real client sends when it says goodbye, and which must not be read as
+     a message.
+   * a client that disappears in the middle of a frame. The connection ends, the
+     handler's onClose still runs, and the server answers the next client: a
+     peer that can stop the server by leaving is a peer that can break it.
+
+   The frames the server sends are read back through RawClient.readFrame, and
+   the handler's own counts are AtomicIntegers read only after the next
+   connection has been answered -- which is what proves the previous connection
+   was finished, since the server answers one at a time. Nothing here sleeps and
+   nothing prints a duration. */
+
+class EchoHandler implements WebSocketHandler {
+  // Counted rather than printed: onClose runs on the serving thread, and a
+  // print from there would race with the main thread's output, which is the one
+  // thing a test compared byte for byte cannot have.
+  public static AtomicInteger opened = new AtomicInteger()
+  public static AtomicInteger messages = new AtomicInteger()
+  public static AtomicInteger closed = new AtomicInteger()
+
+  public void onOpen(WebSocketSession s) {
+    opened.incrementAndGet()
+  }
+
+  public void onMessage(WebSocketSession s, String text) {
+    messages.incrementAndGet()
+    s.send("echo:" + text)
+  }
+
+  public void onBinary(WebSocketSession s, byte[] data) {
+    messages.incrementAndGet()
+    s.send("bin:" + data.length)
+  }
+
+  public void onClose(WebSocketSession s) {
+    closed.incrementAndGet()
+  }
+}
+
+@RestController
+class Greeting {
+  @GetMapping("/hello")
+  String hello() {
+    return "hello"
+  }
+}
+
+class T209 {
+  public static void main(String[] args) throws Exception {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.addWebSocket("/ws", new EchoHandler())
+    server.bind()
+    int port = server.getPort()
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "server")
+    serving.start()
+
+    // ---------- the frames ----------
+    frames(port)
+
+    // A plain request on a new connection is the point to read the counts at:
+    // the server answers one connection at a time, so this answer cannot arrive
+    // until the WebSocket connection above has finished.
+    System.out.println("after-the-socket -> " + get(port))
+    System.out.println("counts opened=" + EchoHandler.opened.get() +
+        " messages=" + EchoHandler.messages.get() +
+        " closed=" + EchoHandler.closed.get())
+
+    // ---------- a client that disappears in the middle of a frame ----------
+    half(port)
+    System.out.println("after-the-disappearing-client -> " + get(port))
+    System.out.println("counts opened=" + EchoHandler.opened.get() +
+        " messages=" + EchoHandler.messages.get() +
+        " closed=" + EchoHandler.closed.get())
+    System.out.println("serving-thread-alive=" + serving.isAlive())
+
+    task.stop()
+    serving.join()
+    server.close()
+    System.out.println("done")
+  }
+
+  // frames runs one connection through the frames above, reading each answer
+  // the server sends before sending the next thing.
+  static void frames(int port) {
+    RawClient c = new RawClient(port, 3000)
+    try {
+      c.send("GET /ws HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
+          "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n")
+      RawResponse up = c.readHead()
+      System.out.println("handshake -> " + (up == null ? "<no answer>" : up.statusLine + " accept=" + up.header("Sec-WebSocket-Accept")))
+
+      // one whole masked frame, which is what every frame below is
+      c.sendFrame(WebSocketFrame.TEXT, "hi", true)
+      System.out.println("whole -> " + show(c.readFrame()))
+
+      // one frame in two writes, split inside the payload
+      byte[] whole = RawClient.maskedBytes(WebSocketFrame.TEXT, "split-across-two-reads".getBytes(), true)
+      byte[] head = new byte[7]
+      System.arraycopy(whole, 0, head, 0, head.length)
+      byte[] rest = new byte[whole.length - head.length]
+      System.arraycopy(whole, head.length, rest, 0, rest.length)
+      c.sendBytes(head)
+      c.sendBytes(rest)
+      System.out.println("split -> " + show(c.readFrame()))
+
+      // a ping and a pong between the halves of a fragmented message: the ping
+      // is answered, the pong is not, and the message is one message
+      c.sendFrame(WebSocketFrame.TEXT, "frag", false)
+      c.sendFrame(WebSocketFrame.PING, "?", true)
+      c.sendFrame(WebSocketFrame.PONG, "!", true)
+      c.sendFrame(WebSocketFrame.CONT, "mented", true)
+      System.out.println("control-in-fragments -> " + show(c.readFrame()) + " then " + show(c.readFrame()))
+
+      // the largest payload a two-byte length holds, sent and echoed
+      c.sendFrame(WebSocketFrame.TEXT, repeat("x", 65535), true)
+      WebSocketFrame big = c.readFrame()
+      String echoed = WebSocketFrame.text(big)
+      System.out.println("max16 -> opcode=" + big.opcode + " len=" + big.payload.length +
+          " head=[" + head(echoed, 5) + "] tail-is-x=" + allX(echoed, 5, 65535))
+
+      // a binary frame, which is the other kind of message
+      c.sendFrame(WebSocketFrame.BINARY, new byte[3], true)
+      System.out.println("binary -> " + show(c.readFrame()))
+
+      // a close frame with a body: a status code and a reason
+      byte[] closeBody = { 0x03, (byte) 0xe8, 'b', 'y', 'e' }
+      c.sendFrame(WebSocketFrame.CLOSE, closeBody, true)
+      System.out.println("close -> " + show(c.readFrame()))
+      System.out.println("after-close=" + c.readByte())
+    } catch (IOException e) {
+      System.out.println("frames -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+
+  // half sends the first four bytes of a frame -- a header that names 8192
+  // bytes of payload -- and then goes away. The server is left waiting for the
+  // rest of a frame that will never arrive.
+  static void half(int port) {
+    RawClient c = new RawClient(port, 3000)
+    try {
+      c.send("GET /ws HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
+          "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n")
+      RawResponse up = c.readHead()
+      System.out.println("half handshake -> " + (up == null ? "<no answer>" : up.statusLine))
+      byte[] header = { (byte) 0x81, (byte) 0xfe, 0x20, 0x00 }
+      c.sendBytes(header)
+      c.disconnect()
+    } catch (IOException e) {
+      System.out.println("half -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+
+  // get sends one plain request and answers the status line plus the body, so
+  // that "the server is still answering" is one line of output.
+  static String get(int port) {
+    RawClient c = new RawClient(port)
+    try {
+      c.send("GET /hello HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+      RawResponse res = c.read()
+      return res == null ? "<no answer>" : res.statusLine + " body=[" + res.body + "]"
+    } catch (IOException e) {
+      return e.getClass().getName() + ": " + e.getMessage()
+    } finally {
+      c.close()
+    }
+  }
+
+  static String show(WebSocketFrame f) {
+    if (f == null) {
+      return "<closed>"
+    }
+    String kind = "op" + f.opcode
+    if (f.opcode == WebSocketFrame.TEXT) {
+      kind = "text"
+    } else if (f.opcode == WebSocketFrame.BINARY) {
+      kind = "binary"
+    } else if (f.opcode == WebSocketFrame.PONG) {
+      kind = "pong"
+    } else if (f.opcode == WebSocketFrame.CLOSE) {
+      kind = "close"
+    }
+    return kind + " fin=" + f.fin + " len=" + f.payload.length + " payload=[" + head(WebSocketFrame.text(f), 24) + "]"
+  }
+
+  static String repeat(String s, int n) {
+    StringBuilder b = new StringBuilder()
+    for (int i = 0 : i < n : i++) {
+      b.append(s)
+    }
+    return b.toString()
+  }
+
+  static String head(String s, int n) {
+    return s.length() <= n ? s : s.substring(0, n)
+  }
+
+  // allX is true when the last n characters are all 'x' and there are exactly
+  // that many of them after the prefix: the whole 65535-byte payload arrived,
+  // checked without printing it.
+  static boolean allX(String s, int prefix, int n) {
+    if (s.length() != prefix + n) {
+      return false
+    }
+    for (int i = prefix : i < s.length() : i++) {
+      if (s.charAt(i) != 'x') {
+        return false
+      }
+    }
+    return true
+  }
+}

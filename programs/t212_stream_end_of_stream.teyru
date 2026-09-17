@@ -1,0 +1,203 @@
+import teyru.*
+
+/* The end of a stream, on a socket and on a TLS socket.
+
+   `Net.read0` answers 0 at the end of a stream -- that is its contract, and what
+   `SocketInputStream.fill()` checks for -- and `SocketInputStream.read` is the
+   layer that speaks Java, where the end of a stream is -1. It used to pass the 0
+   through, so `readFully`, whose loop is `if (n < 0) throw EOFException; have +=
+   n`, asked again forever: a read at the end of a stream that made no progress
+   and never threw. Two lines of this program are the whole bug, and they are the
+   first two: a read at the end of a stream answers -1, and a readFully for bytes
+   that will never arrive throws.
+
+   Why it mattered: any peer that disappears mid-frame turned the serving thread
+   into a spin at 100% CPU, with no way for a program to defend itself -- a
+   WebSocket client that closes in the middle of a frame was enough. t209 pins
+   the server's face of it; this pins the layer underneath, for a plain socket
+   and for a TLS one, because the two share the read path (`SocketInputStream`
+   calls `socket.read`, which a `TlsSocket` overrides) and a fix that only worked
+   for one of them would be half a fix.
+
+   The readFully is done on a thread with a bounded wait rather than inline,
+   because the failure this test is for is a *spin*: a socket timeout cannot
+   bound it, so the test bounds it instead and stops the program with a line
+   that says the bug is back. A suite that meets this test after a regression
+   gets a failure and not a machine that never comes back. */
+
+// BoundedRead reads len bytes and remembers how it went. The flag is written
+// under the monitor and read under it: the reader of the flag is another thread,
+// and a plain field would be a race whose symptom is a test that fails once.
+class BoundedRead implements Runnable {
+  private SocketInputStream in
+  private int len
+  private boolean done = false
+  private String outcome = ""
+
+  public BoundedRead(SocketInputStream in, int len) {
+    this.in = in
+    this.len = len
+  }
+
+  public void run() {
+    String said
+    try {
+      byte[] b = new byte[len]
+      in.readFully(b, 0, len)
+      said = "returned"
+    } catch (IOException e) {
+      said = e.getClass().getName() + ": " + e.getMessage()
+    } catch (Exception e) {
+      said = e.getClass().getName() + ": " + e.getMessage()
+    }
+    synchronized (this) {
+      outcome = said
+      done = true
+    }
+  }
+
+  public boolean finished() {
+    synchronized (this) {
+      return done
+    }
+  }
+
+  public String result() {
+    synchronized (this) {
+      return outcome
+    }
+  }
+}
+
+// Peer accepts one connection on the listener it is given, says three bytes, and
+// closes. With tls set it does the handshake first, so that the client's read
+// side is a TLS stream rather than a plain one.
+class Peer implements Runnable {
+  private ServerSocket listener
+  private boolean tls
+  private String cert
+  private String key
+
+  public Peer(ServerSocket listener, boolean tls, String cert, String key) {
+    this.listener = listener
+    this.tls = tls
+    this.cert = cert
+    this.key = key
+  }
+
+  public void run() {
+    try {
+      listener.setSoTimeout(5000)
+      Socket plain = listener.accept()
+      plain.setSoTimeout(5000)
+      Socket peer = plain
+      if (tls) {
+        peer = TlsSocket.accept(plain, Tls.serverContext(cert, key))
+      }
+      peer.write("abc".getBytes(), 0, 3)
+      peer.close()
+      listener.close()
+    } catch (Exception e) {
+      // Nothing is printed from here: this runs on its own thread, and the
+      // client's side of the same exchange is what this program asserts. A peer
+      // that could not say its three bytes leaves the client reading bytes that
+      // never arrive, which the client says in its own line.
+    }
+  }
+}
+
+class T212 {
+  public static void main(String[] args) throws Exception {
+    Path dir = Files.createTempDirectory("t212-")
+    String cert = write(dir, "cert.pem", CERT_A)
+    String key = write(dir, "key.pem", KEY_A)
+
+    // ---------- a plain socket ----------
+    ServerSocket plainListener = new ServerSocket(0)
+    Thread plainPeer = new Thread(new Peer(plainListener, false, "", ""), "peer")
+    plainPeer.start()
+    Socket client = new Socket("127.0.0.1", plainListener.getLocalPort())
+    client.setSoTimeout(3000)
+    SocketInputStream in = client.getInputStream()
+    byte[] three = new byte[3]
+    in.readFully(three, 0, 3)
+    System.out.println("plain bytes=[" + Net.stringFrom(three, 0, 3) + "]")
+    System.out.println("plain read-at-end=" + in.read(three, 0, 3))
+    System.out.println("plain readLine-at-end=" + (in.readLine() == null ? "null" : "<a line>"))
+    bounded("plain", in, 16)
+    client.close()
+
+    // ---------- a TLS socket ----------
+    // The same read path with a handshake in front of it: TlsSocket.read answers
+    // 0 at the end of the stream like the plain one, and the same conversion
+    // above it has to make it -1.
+    ServerSocket tlsListener = new ServerSocket(0)
+    Thread tlsPeer = new Thread(new Peer(tlsListener, true, cert, key), "peer-tls")
+    tlsPeer.start()
+    Socket raw = new Socket("127.0.0.1", tlsListener.getLocalPort())
+    raw.setSoTimeout(5000)
+    TlsSocket secure = TlsSocket.start(raw, "127.0.0.1", cert)
+    SocketInputStream tin = secure.getInputStream()
+    byte[] tthree = new byte[3]
+    tin.readFully(tthree, 0, 3)
+    System.out.println("tls bytes=[" + Net.stringFrom(tthree, 0, 3) + "]")
+    System.out.println("tls read-at-end=" + tin.read(tthree, 0, 3))
+    bounded("tls", tin, 16)
+    secure.close()
+
+    Files.delete(cert)
+    Files.delete(key)
+    Files.delete(dir.toString())
+    System.out.println("done")
+  }
+
+  // bounded runs one readFully on a thread and waits for it with a deadline that
+  // this test owns. A readFully that does not return is the bug this program is
+  // about, so it is said in one line and the program stops: the alternative is a
+  // thread spinning for as long as the machine is left on.
+  static void bounded(String label, SocketInputStream in, int len) throws Exception {
+    BoundedRead read = new BoundedRead(in, len)
+    Thread thread = new Thread(read, "read-" + label)
+    thread.start()
+    int waited = 0
+    while (read.finished() == false && waited < 5000) {
+      Thread.sleep(50)
+      waited = waited + 50
+    }
+    if (read.finished() == false) {
+      System.out.println(label + " readFully did not return within " + waited + "ms: the 0-means-end-of-stream bug is back")
+      System.out.println("done")
+      System.exit(1)
+    }
+    System.out.println(label + " readFully-at-end -> " + read.result())
+  }
+
+  static String write(Path dir, String name, String text) {
+    String path = File.join(dir.toString(), name)
+    Files.writeString(path, text + "\n")
+    return path
+  }
+
+  // The pair t163 and t207 use, made with `openssl req -x509 ... -subj
+  // "/CN=teyru test" -addext "subjectAltName=IP:127.0.0.1"`.
+  static final String CERT_A = """
+-----BEGIN CERTIFICATE-----
+MIIBkjCCATigAwIBAgIUY7HGBQ3Vv5DJjs7pao+ZNTzCKoEwCgYIKoZIzj0EAwIw
+FTETMBEGA1UEAwwKdGV5cnUgdGVzdDAgFw0yNjA5MTUwOTIwNDVaGA8yMTI2MDgy
+MjA5MjA0NVowFTETMBEGA1UEAwwKdGV5cnUgdGVzdDBZMBMGByqGSM49AgEGCCqG
+SM49AwEHA0IABJezzdg2dsElVPGyfjROwkR9N9cCIomuCOHx6RHdcU4KLd1VXLhM
+2Kx0j3bk+SmJI74AYl7ArzS6pU8PYRza7IKjZDBiMB0GA1UdDgQWBBRg5tBK8emj
+sUSGgvHw5c/7/JRD2zAfBgNVHSMEGDAWgBRg5tBK8emjsUSGgvHw5c/7/JRD2zAP
+BgNVHRMBAf8EBTADAQH/MA8GA1UdEQQIMAaHBH8AAAEwCgYIKoZIzj0EAwIDSAAw
+RQIgbzpcPuILKcnRNrcBl+UcVwni/cMcawupurQo2TerQy8CIQDyAiTfgr+nPHG4
+lZFpZl+H059fk9Fa1VppxipgALyQcQ==
+-----END CERTIFICATE-----
+"""
+  static final String KEY_A = """
+-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgX6cwTKzUxknb+0uT
+gzkvtOggWp3vg2CodL3Fn/WJ+RmhRANCAASXs83YNnbBJVTxsn40TsJEfTfXAiKJ
+rgjh8ekR3XFOCi3dVVy4TNisdI925PkpiSO+AGJewK80uqVPD2Ec2uyC
+-----END PRIVATE KEY-----
+"""
+}

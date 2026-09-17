@@ -1,0 +1,16 @@
+x-foo-empty -> HTTP/1.1 200 OK len=8 body=x-foo=[]
+x-foo-space -> HTTP/1.1 200 OK len=8 body=x-foo=[]
+x-foo-absent -> HTTP/1.1 200 OK len=12 body=x-foo=[none]
+x-foo-value -> HTTP/1.1 200 OK len=11 body=x-foo=[bar]
+x-foo-no-colon -> HTTP/1.1 400 Bad Request len=23 body=malformed header: X-Foo
+empty-name -> HTTP/1.1 400 Bad Request len=21 body=malformed header: : v
+host-empty -> HTTP/1.1 200 OK len=1 body=1
+host-absent-1.1 -> HTTP/1.1 400 Bad Request len=29 body=HTTP/1.1 request without Host
+host-absent-1.0 -> HTTP/1.0 200 OK len=1 body=1
+head-then-get -> A[HTTP/1.1 200 OK len=1] B[HTTP/1.1 200 OK len=1 body=1]
+head-then-head -> A[HTTP/1.1 200 OK len=1] B[HTTP/1.1 200 OK len=1]
+204-then-get -> A[HTTP/1.1 204 No Content] B[HTTP/1.1 200 OK len=1 body=1]
+204-then-head -> A[HTTP/1.1 204 No Content] B[HTTP/1.1 200 OK len=1]
+redirect-then-get -> A[HTTP/1.1 302 Found len=2 location=/api/one body=go] B[HTTP/1.1 200 OK len=1 body=1]
+two-gets-at-once -> A[HTTP/1.1 200 OK len=1 body=1] B[HTTP/1.1 200 OK len=12 body=x-foo=[none]]
+done

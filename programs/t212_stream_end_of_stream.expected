@@ -1,0 +1,8 @@
+plain bytes=[abc]
+plain read-at-end=-1
+plain readLine-at-end=null
+plain readFully-at-end -> teyru.EOFException: end of stream after 0 of 16 bytes
+tls bytes=[abc]
+tls read-at-end=-1
+tls readFully-at-end -> teyru.EOFException: end of stream after 0 of 16 bytes
+done

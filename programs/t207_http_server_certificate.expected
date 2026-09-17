@@ -1,0 +1,8 @@
+boot isSecure=true
+plaintext answered=0 with=[]
+tls status=200 body=[hello over TLS]
+direct isSecure=true
+mismatched -> TlsException: key-b.pem: key values mismatch
+missing -> teyru.NoSuchFileException: absent.pem
+no-key -> teyru.IOException: cannot read : no error
+done

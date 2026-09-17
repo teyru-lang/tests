@@ -1,0 +1,231 @@
+import teyru.*
+
+/* The request body as it arrives on the wire.
+
+   Five questions a client can ask of a server just by writing bytes, none of
+   which the framework's own tests could ask because MockServer builds a request
+   rather than sending one:
+
+   * a body of no bytes at all, and bodies at, one before and one past the
+     8192-byte buffer the connection reads through: a body is read by length
+     rather than by line, so the buffer boundary must not be a boundary in the
+     answer. The same body is then sent in two writes, with the split inside it,
+     because a request that arrives in two packets is not an exceptional
+     request.
+   * a `Content-Length` that promises more than the client sends. The client
+     disappears in the middle of its own request, and the answer must not be a
+     route being handed half a document: the message is incomplete, and RFC 9112
+     says so -- the recipient MUST consider it incomplete and close the
+     connection -- which is a 400 here.
+   * a chunked body with a chunk extension, with a trailer after the last chunk,
+     and with junk after the last chunk. The extension is not part of the size
+     the trailer section ends at a blank line and not at the first line; and the
+     junk is the next request from the connection's point of view, which is what
+     pipelining means and what makes a 400 for it correct rather than a second
+     answer to the first request.
+
+   The server runs on a thread of its own and the port is asked for, not chosen,
+   so two runs of this program produce the same bytes. */
+
+@RestController
+@RequestMapping("/api")
+class BodyApi {
+  // The body, as the handler sees it: its length and its first eight bytes are
+  // the whole of what a test needs to say the body arrived, and printing the
+  // whole body would make this program's output depend on 16 KB of 'a'.
+  @PostMapping("/body")
+  String body(@RequestBody String text) {
+    return "len=" + text.length() + " head=" + head(text)
+  }
+
+  @GetMapping("/one")
+  String one() {
+    return "1"
+  }
+
+  static String head(String s) {
+    return s.length() <= 8 ? s : s.substring(0, 8)
+  }
+}
+
+class T205 {
+  public static void main(String[] args) throws Exception {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.bind()
+    int port = server.getPort()
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "server")
+    serving.start()
+
+    // ---------- case 1: no bytes, and the ones around a buffer boundary ----------
+    post(port, "empty", 0, "")
+    int[] sizes = { 1, 8191, 8192, 8193, 16384 }
+    for (int i = 0 : i < sizes.length : i++) {
+      post(port, "" + sizes[i], sizes[i], repeat("a", sizes[i]))
+    }
+    // the same request in two writes, with the split inside the body
+    split(port, "8193-split-5000", "POST /api/body HTTP/1.1\r\nHost: x\r\nContent-Length: 8193\r\nConnection: close\r\n\r\n",
+        repeat("a", 5000), repeat("b", 3193))
+
+    // ---------- case 6: a Content-Length the client does not honour ----------
+    truncated(port, "short-0-of-10", "POST /api/body HTTP/1.1\r\nHost: x\r\nContent-Length: 10\r\n\r\n", "")
+    truncated(port, "short-4-of-10", "POST /api/body HTTP/1.1\r\nHost: x\r\nContent-Length: 10\r\n\r\n", "abcd")
+
+    // ---------- case 7: chunked, its extension, its trailers, and what follows ----------
+    probe(port, "chunked-plain", "POST /api/body HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n" +
+        "5\r\nhello\r\n1\r\n!\r\n0\r\n\r\n")
+    probe(port, "chunked-extension", "POST /api/body HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n" +
+        "5;name=value\r\nhello\r\n0\r\n\r\n")
+    // a trailer, and then the next request on the same connection: the answer
+    // to the second says whether the trailer section was read to its end
+    two(port, "chunked-trailer-then-get",
+        "POST /api/body HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\nX-Trailer: v\r\n\r\n",
+        "GET /api/one HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    // junk where a request line would be: the request before it was complete,
+    // so the junk is the next request and is refused as a malformed one
+    junk(port, "chunked-then-junk",
+        "POST /api/body HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\nX\r\n")
+    // a chunk that ends before the size it named
+    truncated(port, "chunked-cut-short", "POST /api/body HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n", "5\r\nhel")
+
+    // ---------- a client that asks to be told to go ahead ----------
+    // `Expect: 100-continue` is a client saying it will send the body once the
+    // server says so, which is what a client that is about to upload something
+    // large does to avoid sending it to a server that will refuse it. The
+    // interim answer comes first and the body after it, and this sends them in
+    // that order: the length the handler reads is the proof that the body was
+    // read after the answer rather than around it.
+    expect100(port, "expect-continue",
+        "POST /api/body HTTP/1.1\r\nHost: x\r\nContent-Length: 5\r\nExpect: 100-continue\r\nConnection: close\r\n\r\n",
+        "hello")
+
+    task.stop()
+    serving.join()
+    server.close()
+    System.out.println("done")
+  }
+
+  static String repeat(String s, int n) {
+    StringBuilder b = new StringBuilder()
+    for (int i = 0 : i < n : i++) {
+      b.append(s)
+    }
+    return b.toString()
+  }
+
+  // summary is one answer in one line, with the body on it: a status, the length
+  // the server declared, and what the body says.
+  static String summary(RawResponse res) {
+    if (res == null) {
+      return "<no answer>"
+    }
+    return res.statusLine + " len=" + res.header("Content-Length") + " body=" + res.body
+  }
+
+  static void post(int port, String label, int size, String body) {
+    RawClient c = new RawClient(port)
+    try {
+      c.send("POST /api/body HTTP/1.1\r\nHost: x\r\nContent-Length: " + size + "\r\nConnection: close\r\n\r\n" + body)
+      System.out.println("body-" + label + " -> " + summary(c.read()))
+    } catch (IOException e) {
+      System.out.println("body-" + label + " -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+
+  static void split(int port, String label, String head, String first, String second) {
+    RawClient c = new RawClient(port)
+    try {
+      c.send(head + first)
+      c.send(second)
+      System.out.println("body-" + label + " -> " + summary(c.read()))
+    } catch (IOException e) {
+      System.out.println("body-" + label + " -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+
+  static void probe(int port, String label, String request) {
+    RawClient c = new RawClient(port)
+    try {
+      c.send(request)
+      System.out.println(label + " -> " + summary(c.read()))
+    } catch (IOException e) {
+      System.out.println(label + " -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+
+  // expect100 sends a head that asks for an interim answer, waits for it, and
+  // only then sends the body: the client's half of `Expect: 100-continue`, in
+  // the order a client does it in.
+  static void expect100(int port, String label, String head, String body) {
+    RawClient c = new RawClient(port)
+    try {
+      c.send(head)
+      RawResponse interim = c.read()
+      System.out.println(label + " interim -> " + (interim == null ? "<no answer>" : interim.statusLine))
+      c.send(body)
+      System.out.println(label + " -> " + summary(c.read()))
+    } catch (IOException e) {
+      System.out.println(label + " -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+
+  // truncated sends what it has and then closes its half of the connection: the
+  // client is gone in the middle of its own request.
+  static void truncated(int port, String label, String head, String body) {
+    RawClient c = new RawClient(port)
+    try {
+      c.send(head + body)
+      c.disconnect()
+      System.out.println(label + " -> " + summary(c.read()))
+    } catch (IOException e) {
+      System.out.println(label + " -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+
+  // two writes two requests on one connection and reads two answers. An empty
+  // second request means the connection is expected to close after the first.
+  static void two(int port, String label, String first, String second) {
+    RawClient c = new RawClient(port)
+    try {
+      c.send(first)
+      if (second.length() > 0) {
+        c.send(second)
+      }
+      System.out.println(label + " -> A[" + summary(c.read()) + "] B[" + summary(c.read()) + "]")
+    } catch (IOException e) {
+      System.out.println(label + " -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+
+  // junk sends a request and then one byte of something that is not a request,
+  // and closes its half: the one byte is a line the server can only complete
+  // when it sees the end of the connection, which is what makes this a test
+  // with an answer rather than a wait. The first answer and then the second are
+  // what comes back.
+  static void junk(int port, String label, String request) {
+    RawClient c = new RawClient(port)
+    try {
+      c.send(request)
+      c.disconnect()
+      System.out.println(label + " -> A[" + summary(c.read()) + "] B[" + summary(c.read()) + "]")
+    } catch (IOException e) {
+      System.out.println(label + " -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+}

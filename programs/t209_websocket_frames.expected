@@ -1,0 +1,15 @@
+handshake -> HTTP/1.1 101 Switching Protocols accept=s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
+whole -> text fin=true len=7 payload=[echo:hi]
+split -> text fin=true len=27 payload=[echo:split-across-two-re]
+control-in-fragments -> pong fin=true len=1 payload=[?] then text fin=true len=15 payload=[echo:fragmented]
+max16 -> opcode=1 len=65540 head=[echo:] tail-is-x=true
+binary -> text fin=true len=5 payload=[bin:3]
+close -> close fin=true len=0 payload=[]
+after-close=-1
+after-the-socket -> HTTP/1.1 200 OK body=[hello]
+counts opened=1 messages=5 closed=1
+half handshake -> HTTP/1.1 101 Switching Protocols
+after-the-disappearing-client -> HTTP/1.1 200 OK body=[hello]
+counts opened=2 messages=5 closed=2
+serving-thread-alive=true
+done

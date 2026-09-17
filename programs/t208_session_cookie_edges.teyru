@@ -1,0 +1,211 @@
+import teyru.*
+
+/* The session cookie a client can get wrong.
+
+   A cookie is a string a client made up from what it once received, so the
+   server has to read one that is stale, empty, malformed, enormous, or in a
+   shape it never wrote. None of those is a session, and none of them is an
+   error either: the request is answered, and a request that wants a session
+   gets a new one -- which is what a container does when the cookie the client
+   is holding names nothing.
+
+   What is being pinned is that answer, and the one header that says which
+   answer it was. The session id itself is never printed: it is random, so
+   printing it would make two runs of this program differ, and the questions
+   here are about the shape of the cookie rather than its value.
+
+   The requests are raw bytes rather than MockServer's, because the parsing
+   under test is the Cookie header's: `TEYRUSSESSIONID` with no `=`, with
+   nothing after it, with a huge value, and surrounded by junk that a hostile
+   or merely broken client would send. */
+
+@RestController
+@RequestMapping("/api")
+class SessionApi {
+  // A handler that wants a session: the request that had none is given one,
+  // and the cookie for it goes out on this answer.
+  @GetMapping("/new")
+  String create(HttpRequest req) {
+    HttpSession s = Sessions.of(req)
+    s.setAttribute("n", "1")
+    return "new=" + s.isNew()
+  }
+
+  // Two asks in one request are one session, and one cookie: a handler that
+  // asks twice must not leave the client holding two ids for the same
+  // conversation.
+  @GetMapping("/twice")
+  String twice(HttpRequest req) {
+    HttpSession a = Sessions.of(req)
+    HttpSession b = Sessions.of(req)
+    return "new=" + a.isNew() + "," + b.isNew() + " same=" + a.getId().equals(b.getId())
+  }
+
+  // The second request of a conversation: the session it finds is the one the
+  // first one made, and what it put there is still there.
+  @GetMapping("/hit")
+  String hit(HttpRequest req) {
+    HttpSession s = Sessions.of(req)
+    return "hit new=" + s.isNew() + " n=[" + s.getString("n") + "]"
+  }
+
+  // The question a login page asks: is there a session already, without
+  // starting one.
+  @GetMapping("/find")
+  String find(HttpRequest req) {
+    HttpSession s = Sessions.find(req)
+    return "found=" + (s != null)
+  }
+}
+
+class T208 {
+  public static void main(String[] args) throws Exception {
+    Sessions.clear()
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.bind()
+    int port = server.getPort()
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "server")
+    serving.start()
+
+    // ---------- a session is made, and its cookie is used again ----------
+    RawResponse made = ask(port, "GET /api/new HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    System.out.println("new -> " + summary(made))
+    String cookie = cookieOf(made)
+    System.out.println("cookie name-and-value=" + shape(cookie))
+    System.out.println("again -> " + body(ask(port, "GET /api/hit HTTP/1.1\r\nHost: x\r\nCookie: " + cookie + "\r\nConnection: close\r\n\r\n")))
+    // the attributes are not part of what a client sends back, so a client that
+    // sends the whole Set-Cookie value is sending a cookie the server did not
+    // write -- and the value it parses is everything up to the first "; "
+    System.out.println("with-attributes -> " + body(ask(port, "GET /api/find HTTP/1.1\r\nHost: x\r\nCookie: " + cookie + "; a=b\r\nConnection: close\r\n\r\n")))
+
+    // ---------- one request, two asks ----------
+    // The store is counted around it, because the answer and the count are the
+    // two halves of the question: two asks in one request are one session, and
+    // a second session would be one that no cookie names and nothing will ever
+    // ask for again.
+    Sessions.clear()
+    System.out.println("count-empty=" + Sessions.count())
+    System.out.println("twice -> " + summary(ask(port, "GET /api/twice HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")))
+    System.out.println("count-after-twice=" + Sessions.count())
+    Sessions.clear()
+
+    // ---------- cookies that are not a session ----------
+    find(port, "stale", "TEYRUSSESSIONID=deadbeef")
+    find(port, "empty-value", "TEYRUSSESSIONID=")
+    find(port, "no-equals", "TEYRUSSESSIONID")
+    find(port, "junk", "=; TEYRUSSESSIONID=; a=b")
+    find(port, "spaced", " TEYRUSSESSIONID = x ")
+    find(port, "huge", "TEYRUSSESSIONID=" + repeat("z", 8000))
+    find(port, "other-cookie", "OTHER=1")
+    // and a request with no Cookie header at all
+    System.out.println("none -> " + body(ask(port, "GET /api/find HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")))
+    // an empty Cookie header is a header a client sent and meant nothing by
+    System.out.println("empty-header -> " + body(ask(port, "GET /api/find HTTP/1.1\r\nHost: x\r\nCookie:\r\nConnection: close\r\n\r\n")))
+
+    // ---------- the same cookie, on the second connection ----------
+    // A stale cookie does not stop a handler that wants a session: it is given
+    // a new one, and the answer carries the cookie for it.
+    RawResponse revived = ask(port, "GET /api/new HTTP/1.1\r\nHost: x\r\nCookie: TEYRUSSESSIONID=deadbeef\r\nConnection: close\r\n\r\n")
+    System.out.println("stale-asking-for-one -> " + summary(revived))
+    System.out.println("stale-cookie-replaced=" + (cookieOf(revived).indexOf("deadbeef") < 0))
+
+    task.stop()
+    serving.join()
+    server.close()
+    System.out.println("done")
+  }
+
+  static String repeat(String s, int n) {
+    StringBuilder b = new StringBuilder()
+    for (int i = 0 : i < n : i++) {
+      b.append(s)
+    }
+    return b.toString()
+  }
+
+  static RawResponse ask(int port, String request) {
+    RawClient c = new RawClient(port)
+    try {
+      c.send(request)
+      return c.read()
+    } finally {
+      c.close()
+    }
+  }
+
+  static String body(RawResponse res) {
+    return res == null ? "<no answer>" : res.body
+  }
+
+  // summary is a status and the Set-Cookie headers, counted and named but not
+  // valued: an id is random and a test that printed one would not be the same
+  // test twice.
+  static String summary(RawResponse res) {
+    if (res == null) {
+      return "<no answer>"
+    }
+    StringBuilder b = new StringBuilder()
+    b.append(res.statusLine).append(" body=").append(res.body)
+    int cookies = 0
+    for (int i = 0 : i < res.headerCount() : i++) {
+      if (res.headerName(i).toLowerCase().equals("set-cookie")) {
+        cookies++
+        b.append(" set-cookie=").append(nameOf(res.headerValue(i))).append(" with-value=").append(hasValue(res.headerValue(i)))
+      }
+    }
+    if (cookies == 0) {
+      b.append(" set-cookie=<none>")
+    }
+    return b.toString()
+  }
+
+  // cookieOf is the cookie a client would keep: the name and the value, without
+  // the attributes that follow them.
+  static String cookieOf(RawResponse res) {
+    if (res == null) {
+      return ""
+    }
+    for (int i = 0 : i < res.headerCount() : i++) {
+      if (res.headerName(i).toLowerCase().equals("set-cookie")) {
+        String value = res.headerValue(i)
+        int semi = value.indexOf(';')
+        return semi < 0 ? value : value.substring(0, semi)
+      }
+    }
+    return ""
+  }
+
+  static String nameOf(String setCookie) {
+    int eq = setCookie.indexOf('=')
+    return eq < 0 ? setCookie : setCookie.substring(0, eq)
+  }
+
+  static boolean hasValue(String setCookie) {
+    int eq = setCookie.indexOf('=')
+    if (eq < 0) {
+      return false
+    }
+    int semi = setCookie.indexOf(';')
+    String value = semi < 0 ? setCookie.substring(eq + 1) : setCookie.substring(eq + 1, semi)
+    return value.length() > 0
+  }
+
+  static String shape(String cookie) {
+    int eq = cookie.indexOf('=')
+    if (eq < 0) {
+      return "<no equals: " + cookie + ">"
+    }
+    // The name, and whether a value followed it. The value's length is not
+    // printed: an id is hex of two random longs, and a long that happens to be
+    // small is a short hex string, so a length would differ between two runs of
+    // a program that is otherwise the same.
+    return cookie.substring(0, eq) + " with-value=" + (cookie.length() > eq + 1)
+  }
+
+  static void find(int port, String label, String cookie) {
+    System.out.println(label + " -> " + body(ask(port, "GET /api/find HTTP/1.1\r\nHost: x\r\nCookie: " + cookie + "\r\nConnection: close\r\n\r\n")))
+  }
+}

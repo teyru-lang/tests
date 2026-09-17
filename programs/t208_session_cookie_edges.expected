@@ -1,0 +1,19 @@
+new -> HTTP/1.1 200 OK body=new=true set-cookie=TEYRUSSESSIONID with-value=true
+cookie name-and-value=TEYRUSSESSIONID with-value=true
+again -> hit new=false n=[1]
+with-attributes -> found=true
+count-empty=0
+twice -> HTTP/1.1 200 OK body=new=true,true same=true set-cookie=TEYRUSSESSIONID with-value=true
+count-after-twice=1
+stale -> found=false
+empty-value -> found=false
+no-equals -> found=false
+junk -> found=false
+spaced -> found=false
+huge -> found=false
+other-cookie -> found=false
+none -> found=false
+empty-header -> found=false
+stale-asking-for-one -> HTTP/1.1 200 OK body=new=true set-cookie=TEYRUSSESSIONID with-value=true
+stale-cookie-replaced=true
+done

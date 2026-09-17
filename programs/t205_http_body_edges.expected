@@ -1,0 +1,17 @@
+body-empty -> HTTP/1.1 200 OK len=11 body=len=0 head=
+body-1 -> HTTP/1.1 200 OK len=12 body=len=1 head=a
+body-8191 -> HTTP/1.1 200 OK len=22 body=len=8191 head=aaaaaaaa
+body-8192 -> HTTP/1.1 200 OK len=22 body=len=8192 head=aaaaaaaa
+body-8193 -> HTTP/1.1 200 OK len=22 body=len=8193 head=aaaaaaaa
+body-16384 -> HTTP/1.1 200 OK len=23 body=len=16384 head=aaaaaaaa
+body-8193-split-5000 -> HTTP/1.1 200 OK len=22 body=len=8193 head=aaaaaaaa
+short-0-of-10 -> HTTP/1.1 400 Bad Request len=42 body=the request body ended after 0 of 10 bytes
+short-4-of-10 -> HTTP/1.1 400 Bad Request len=42 body=the request body ended after 4 of 10 bytes
+chunked-plain -> HTTP/1.1 200 OK len=17 body=len=6 head=hello!
+chunked-extension -> HTTP/1.1 200 OK len=16 body=len=5 head=hello
+chunked-trailer-then-get -> A[HTTP/1.1 200 OK len=16 body=len=5 head=hello] B[HTTP/1.1 200 OK len=1 body=1]
+chunked-then-junk -> A[HTTP/1.1 200 OK len=16 body=len=5 head=hello] B[HTTP/1.1 400 Bad Request len=25 body=malformed request line: X]
+chunked-cut-short -> HTTP/1.1 400 Bad Request len=44 body=the chunked body ended in a chunk of 5 bytes
+expect-continue interim -> HTTP/1.1 100 Continue
+expect-continue -> HTTP/1.1 200 OK len=16 body=len=5 head=hello
+done
