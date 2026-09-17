@@ -1,0 +1,13 @@
+lf [97][98] hasNextLine false
+crlf [97][98] hasNextLine false
+cr [97][98] hasNextLine false
+line-separator [97][98] hasNextLine false
+paragraph-separator [97][98] hasNextLine false
+next-line [97][98] hasNextLine false
+trailing [97] hasNextLine false
+leading [][97] hasNextLine false
+empty-between [97][][98] hasNextLine false
+crlf-then-cr [97][][98] hasNextLine false
+mixed [97][98][99][100][101][102][103] hasNextLine false
+no-terminator [97 98 99] hasNextLine false
+empty  hasNextLine false

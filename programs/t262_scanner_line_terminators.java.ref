@@ -1,0 +1,41 @@
+import java.util.Scanner;
+
+/* The Java half of t262_scanner_line_terminators.teyru: the same program, whose
+ * output on OpenJDK 21.0.11+10 is the .expected file beside it. */
+public class Main {
+  static String codes(String s) {
+    StringBuilder b = new StringBuilder("[");
+    for (int i = 0; i < s.length(); i++) {
+      if (i > 0) {
+        b.append(" ");
+      }
+      b.append((int) s.charAt(i));
+    }
+    return b.append("]").toString();
+  }
+
+  static void lines(String label, String source) {
+    Scanner in = new Scanner(source);
+    StringBuilder b = new StringBuilder();
+    while (in.hasNextLine()) {
+      b.append(codes(in.nextLine()));
+    }
+    System.out.println(label + " " + b + " hasNextLine " + in.hasNextLine());
+  }
+
+  public static void main(String[] args) {
+    lines("lf", "a\nb");
+    lines("crlf", "a\r\nb");
+    lines("cr", "a\rb");
+    lines("line-separator", "a\u2028b");
+    lines("paragraph-separator", "a\u2029b");
+    lines("next-line", "a\u0085b");
+    lines("trailing", "a\u2028");
+    lines("leading", "\u2028a");
+    lines("empty-between", "a\u2029\u2029b");
+    lines("crlf-then-cr", "a\r\n\rb");
+    lines("mixed", "a\u2028b\u2029c\u0085d\r\ne\rf\ng");
+    lines("no-terminator", "abc");
+    lines("empty", "");
+  }
+}

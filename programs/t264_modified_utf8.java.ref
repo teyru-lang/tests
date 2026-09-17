@@ -1,0 +1,44 @@
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+
+/* The Java half of t264_modified_utf8.teyru: the same program, whose output on
+ * OpenJDK 21.0.11+10 is the .expected file beside it. */
+public class Main {
+  static String hex(byte[] b) {
+    String d = "0123456789ABCDEF";
+    StringBuilder s = new StringBuilder();
+    for (int i = 0; i < b.length; i++) {
+      s.append(d.charAt((b[i] >> 4) & 0xF)).append(d.charAt(b[i] & 0xF));
+    }
+    return s.toString();
+  }
+
+  static void show(String label, String s) {
+    try {
+      ByteArrayOutputStream bo = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bo);
+      out.writeUTF(s);
+      byte[] b = bo.toByteArray();
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(b));
+      String back = in.readUTF();
+      System.out.println(label + " bytes " + b.length + " " + hex(b) + " back length " +
+          back.length() + " char0 " + (int) back.charAt(0) + " equals " + back.equals(s));
+    } catch (IOException e) {
+      System.out.println(label + " threw " + e.getMessage());
+    }
+  }
+
+  public static void main(String[] args) {
+    show("nul", "\u0000");
+    show("nul-mid", "a\u0000b");
+    show("high", "\uD83D");
+    show("low", "\uDE00");
+    show("astral", "\uD83D\uDE00");
+    show("ascii", "hi");
+    show("two-byte", "é");
+    show("cjk", "中");
+  }
+}

@@ -1,0 +1,53 @@
+import java.util.Scanner;
+
+/* The Java half of t261_scanner_delimiters.teyru: the same program, whose output
+ * on OpenJDK 21.0.11+10 is the .expected file beside it. */
+public class Main {
+  static String hex4(int cp) {
+    String d = "0123456789ABCDEF";
+    StringBuilder s = new StringBuilder();
+    for (int shift = 12; shift >= 0; shift = shift - 4) {
+      s.append(d.charAt((cp >> shift) & 0xF));
+    }
+    return s.toString();
+  }
+
+  static String codes(String s) {
+    if (s.length() == 0) {
+      return "[]";
+    }
+    StringBuilder b = new StringBuilder("[");
+    for (int i = 0; i < s.length(); i++) {
+      if (i > 0) {
+        b.append(" ");
+      }
+      b.append((int) s.charAt(i));
+    }
+    return b.append("]").toString();
+  }
+
+  static void delimit(int cp) {
+    String source = "" + (char) cp + "5";
+    System.out.println("U+" + hex4(cp) + " token " + codes(new Scanner(source).next()) +
+        " control " + codes(new Scanner("x" + (char) cp + "y").next()));
+  }
+
+  public static void main(String[] args) {
+    delimit(0x3000);
+    delimit(0x2000);
+    delimit(0x200A);
+    delimit(0x205F);
+    delimit(0x1680);
+    delimit(0x00A0);
+    delimit(0x2007);
+    delimit(0x202F);
+    delimit(0x0085);
+    delimit(0x2028);
+    delimit(0x2029);
+    delimit(0x20);
+    delimit(0x09);
+    delimit(0x1C);
+    delimit(0x1F);
+    delimit(0x41);
+  }
+}
