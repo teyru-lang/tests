@@ -125,12 +125,15 @@ class Main {
     String renderedText = res.respond("HTTP/1.1", true, false)
     String length = rendered(renderedText, "content-length")
     String original = path.equals("/api/small") ? GzipBody.small() : GzipBody.big()
-    String decoded = encoding.equals("gzip") ? Gzip.decompress(res.body) : res.body
+    // The body's length is its byte count -- what a Content-Length is counted
+    // in -- and a compressed body is only ever the bytes: gunzip is what turns
+    // it back into the text the handler wrote.
+    String decoded = encoding.equals("gzip") ? Gzip.decompressText(res.bodyBytes) : res.body
     p(label +
       " encoding=[" + encoding + "]" +
       " vary=[" + vary + "]" +
-      " compressed=" + (res.body.length() < original.length()) +
-      " content-length-is-body=" + length.equals("" + res.body.length()) +
+      " compressed=" + (res.bodyLength() < original.getBytes().length) +
+      " content-length-is-body=" + length.equals("" + res.bodyLength()) +
       " decodes=" + decoded.equals(original) +
       " crc=" + crc(decoded))
   }
