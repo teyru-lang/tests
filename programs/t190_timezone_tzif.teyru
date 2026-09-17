@@ -10,6 +10,14 @@ package teyru
    no rules, one whose footer is malformed, a file with leap-second records, and
    a file with the standard/wall and UT/local indicator series present.
 
+   It also writes the files for negative DST -- Ireland in both of the layouts
+   tzdata has been built in, and Morocco's Ramadan rule, with a footer that is one
+   permanent offset. That belongs here rather than in t189's reading of the host's
+   Europe/Dublin, because which layout the host's files are in is the host's
+   business: Debian and Ubuntu build tzdata from the rearguard layout, where
+   Dublin's isdst type is the summer one, and a test that asserted either answer
+   against the host would be a test of the host.
+
    The second half of the test reads the host's own database at instants past
    every transition table in it, which is where the footer rule decides and where
    the odd rules live: Africa/Cairo's last-Friday-of-April at 00:00 and
@@ -18,8 +26,7 @@ package teyru
    hour (M9.5.0/2:45), America/Santiago's Saturday rule at 24:00 (M9.1.6/24),
    America/Nuuk's negative transition time (M3.5.0/-1), Australia/Lord_Howe's
    half-hour of DST, Pacific/Norfolk's explicit DST offset (<+11>-11<+12>), a
-   zone whose footer is a single permanent offset (Africa/Casablanca, <+01>-1),
-   and one with no DST at all (Asia/Tehran, <+0330>-3:30).
+   zone with no DST at all (Asia/Tehran, <+0330>-3:30).
 
    The instants are the transitions `zdump -v <zone>` prints for 2060, on both
    sides of each one, converted from its UT timestamps; the values the test
@@ -192,6 +199,80 @@ class T190 {
     Files.write(f, data)
   }
 
+  /* Ireland, in the two layouts tzdata has been built in. Both have the same
+     four transitions and the same two offsets; they differ in which type carries
+     the isdst octet. Vanguard: the standard type is IST (+01:00, isdst=0) and
+     the winter type is GMT (+00:00, isdst=1) -- a saving of minus one hour, which
+     is what the note at the top of lib/46_timezone.teyru describes. Rearguard:
+     GMT is standard and IST is the isdst type, which is how Debian and Ubuntu
+     have built tzdata for years.
+
+     This is the pair the host cannot decide for us. `dublin 2026 jan` answers
+     `dst` where the host's files are vanguard and `std` where they are rearguard,
+     so a test that reads Europe/Dublin and asserts one of them is a test of the
+     host rather than of the reader. These two files are the reader's test: the
+     flag has to be the octet the file carries, and the standard offset has to be
+     the file's non-DST type, in both. */
+  static byte[] ireland(boolean vanguard) {
+    int winterIsdst = vanguard ? 1 : 0
+    int summerIsdst = vanguard ? 0 : 1
+    TzFile f = new TzFile()
+    f.header(50, 0, 0, 0, 0, 2, 8)
+    f.type(0, winterIsdst, 0)
+    f.type(3600, summerIsdst, 4)
+    f.ascii("GMT")
+    f.u8(0)
+    f.ascii("IST")
+    f.u8(0)
+    f.header(50, 0, 0, 0, 4, 2, 8)
+    f.i64(1743296400L)
+    f.i64(1761440400L)
+    f.i64(1774746000L)
+    f.i64(1792890000L)
+    f.u8(1)
+    f.u8(0)
+    f.u8(1)
+    f.u8(0)
+    f.type(0, winterIsdst, 0)
+    f.type(3600, summerIsdst, 4)
+    f.ascii("GMT")
+    f.u8(0)
+    f.ascii("IST")
+    f.u8(0)
+    f.ascii("\n\n")
+    return f.toArray()
+  }
+
+  /* Morocco, which is the same negative saving the other way up: the standard
+     type is +01:00 and the Ramadan type is +00:00 with isdst=1, and the footer is
+     the single permanent offset `<+01>-1` that outlives the table. Africa/
+     Casablanca reads this way on a vanguard host, so a test that asks the host
+     about it is asking about the host's build; this file is the same question
+     with the answer written down. */
+  static byte[] morocco() {
+    TzFile f = new TzFile()
+    f.header(50, 0, 0, 0, 0, 2, 8)
+    f.type(3600, 0, 0)
+    f.type(0, 1, 4)
+    f.ascii("+01")
+    f.u8(0)
+    f.ascii("+00")
+    f.u8(0)
+    f.header(50, 0, 0, 0, 2, 2, 8)
+    f.i64(2842819200L)
+    f.i64(2848003200L)
+    f.u8(1)
+    f.u8(0)
+    f.type(3600, 0, 0)
+    f.type(0, 1, 4)
+    f.ascii("+01")
+    f.u8(0)
+    f.ascii("+00")
+    f.u8(0)
+    f.ascii("\n<+01>-1\n")
+    return f.toArray()
+  }
+
   // One zone's answer for one instant, from the file rather than from a JVM.
   static void zone(String label, String id, long second) {
     ZoneId z = ZoneId.of(id)
@@ -298,6 +379,33 @@ class T190 {
     zone("day of year 2060 october 26", "Syn/DayOfYear", 2866055400L)
     zone("day of year 2061 february 28", "Syn/DayOfYear", 2876855400L)
 
+    // ---------- negative DST, which the host's build decides ----------
+    /* The same zone in both layouts: the offsets and the designations agree, and
+       the flag is the opposite one, because that is what the files say. A reader
+       that answered a convention instead of the octet would answer the same thing
+       for both of these. */
+    put(dir, "Syn/IrelandVanguard", ireland(true))
+    put(dir, "Syn/IrelandRearguard", ireland(false))
+    zone("ireland vanguard january", "Syn/IrelandVanguard", 1768478400L)
+    zone("ireland vanguard july", "Syn/IrelandVanguard", 1784116800L)
+    zone("ireland rearguard january", "Syn/IrelandRearguard", 1768478400L)
+    zone("ireland rearguard july", "Syn/IrelandRearguard", 1784116800L)
+    Instant irelandWinter = Instant.ofEpochSecond(1768478400L)
+    ZoneRules vanguard = ZoneId.of("Syn/IrelandVanguard").getRules()
+    ZoneRules rearguard = ZoneId.of("Syn/IrelandRearguard").getRules()
+    p("ireland vanguard january is DST " + vanguard.isDaylightSavings(irelandWinter) +
+        " standard " + vanguard.getStandardOffset(irelandWinter))
+    p("ireland rearguard january is DST " + rearguard.isDaylightSavings(irelandWinter) +
+        " standard " + rearguard.getStandardOffset(irelandWinter))
+
+    /* Morocco: the saving is negative the other way up, the isdst period being
+       the one at +00:00, and the footer is a single permanent offset. */
+    put(dir, "Syn/Morocco", morocco())
+    zone("negative dst in its +01 period", "Syn/Morocco", 2850638400L)
+    zone("negative dst in its +00 period", "Syn/Morocco", 2844072000L)
+    zone("negative dst past its last row", "Syn/Morocco", 3168849600L)
+    localZone("negative dst past its last row", "Syn/Morocco", 3168849600L)
+
     // ---------- leap seconds, and files that are not TZif files ----------
     put(dir, "Syn/Leap", version2("\nSYN-2\n", false, 1))
     refuses("a file with a leap-second record", "Syn/Leap", "leap-second records")
@@ -335,26 +443,18 @@ class T190 {
     zone("lord howe 2060 at its start", "Australia/Lord_Howe", 2863956600L)
     zone("norfolk 2060 at its end", "Pacific/Norfolk", 2848230000L)
     zone("norfolk 2060 at its start", "Pacific/Norfolk", 2863954800L)
-    zone("casablanca 2060 in its +00 period", "Africa/Casablanca", 2842826400L)
-    zone("casablanca 2060 in its +01 period", "Africa/Casablanca", 2845850400L)
     zone("tehran 2060", "Asia/Tehran", 2855908800L)
     p("tehran has no transitions left: " + (ZoneId.of("Asia/Tehran").getRules().nextTransition(Instant.ofEpochSecond(2855908800L)) == null))
 
     /* A local time in a gap and one that exists twice, on both sides of the
        database: in the table (Kathmandu's fifteen-minute jump of 1986, which is
-       a gap smaller than the hour a reader that assumes whole hours would expect,
-       and the last row of Casablanca's table) and after it (Dublin's rule-era
-       pair, whose offsets are the ones the JVM computes even though the JVM
-       calls the other half of the year the standard one, and Lord Howe's
-       half-hour gap). A footer with no DST half at all -- Casablanca's <+01>-1 --
-       is the case a reader that assumed every rule has two halves gets wrong:
-       there is no transition out there at all, and a local time past the table's
-       last row is simply that offset. */
+       a gap smaller than the hour a reader that assumes whole hours would expect)
+       and after it (Dublin's rule-era pair, whose offsets are the ones the JVM
+       computes even though the JVM calls the other half of the year the standard
+       one, and Lord Howe's half-hour gap). */
     localZone("kathmandu 1986 before its gap", "Asia/Kathmandu", 504921599L)
     localZone("kathmandu 1986 in its 15 minute gap", "Asia/Kathmandu", 504921600L)
     localZone("kathmandu 1986 after its gap", "Asia/Kathmandu", 504922500L)
-    localZone("casablanca 2087 past its last row", "Africa/Casablanca", 3703460400L)
-    localZone("casablanca 2087 in the table's last gap", "Africa/Casablanca", 3703460399L)
     localZone("dublin 2050 in the rule's gap", "Europe/Dublin", 2531957400L)
     localZone("dublin 2050 in the rule's overlap", "Europe/Dublin", 2550706200L)
     localZone("lord howe 2060 in its half hour gap", "Australia/Lord_Howe", 2863995300L)

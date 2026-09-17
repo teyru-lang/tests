@@ -41,8 +41,8 @@ nuuk 2050 jan -02:00 std -02
 nuuk 2050 jul -01:00 dst -01
 kiritimati 2050 +14:00 std +14
 etc gmt-8 +08:00 std +08
-dublin 2026 jan Z dst GMT
-dublin 2026 jul +01:00 std IST
-dublin 2050 jan Z dst GMT
-dublin winter dst true offset Z standard +01:00
-dublin summer dst false offset +01:00 standard +01:00
+dublin 2026 jan Z GMT
+dublin 2026 jul +01:00 IST
+dublin 2050 jan Z GMT
+dublin one side of the year is DST: true
+dublin the standard offset is the side that is not DST: true

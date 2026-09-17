@@ -28,6 +28,16 @@ day of year 2060 february 28 +02:00 std TST
 day of year 2060 february 29 +03:00 dst TDT
 day of year 2060 october 26 +02:00 std TST
 day of year 2061 february 28 +02:00 std TST
+ireland vanguard january Z dst GMT
+ireland vanguard july +01:00 std IST
+ireland rearguard january Z std GMT
+ireland rearguard july +01:00 dst IST
+ireland vanguard january is DST true standard +01:00
+ireland rearguard january is DST false standard Z
+negative dst in its +01 period +01:00 std +01
+negative dst in its +00 period Z dst +00
+negative dst past its last row +01:00 std +01
+negative dst past its last row +01:00 [+01:00] null 2070-06-01T12:00+01:00[Syn/Morocco]
 a file with a leap-second record refused with its reason: true
 a file that is not a TZif file refused with its reason: true
 a file with an unknown version octet refused with its reason: true
@@ -49,15 +59,11 @@ lord howe 2060 at its end +10:30 std +1030
 lord howe 2060 at its start +11:00 dst +11
 norfolk 2060 at its end +11:00 std +11
 norfolk 2060 at its start +12:00 dst +12
-casablanca 2060 in its +00 period Z dst +00
-casablanca 2060 in its +01 period +01:00 std +01
 tehran 2060 +03:30 std +0330
 tehran has no transitions left: true
 kathmandu 1986 before its gap +05:30 [+05:30] null 1985-12-31T23:59:59+05:30[Asia/Kathmandu]
 kathmandu 1986 in its 15 minute gap +05:30 [] Transition[Gap at 1986-01-01T00:00+05:30 to +05:45] 1986-01-01T00:15+05:45[Asia/Kathmandu]
 kathmandu 1986 after its gap +05:45 [+05:45] null 1986-01-01T00:15+05:45[Asia/Kathmandu]
-casablanca 2087 past its last row +01:00 [+01:00] null 2087-05-11T03:00+01:00[Africa/Casablanca]
-casablanca 2087 in the table's last gap Z [] Transition[Gap at 2087-05-11T02:00Z to +01:00] 2087-05-11T03:59:59+01:00[Africa/Casablanca]
 dublin 2050 in the rule's gap Z [] Transition[Gap at 2050-03-27T01:00Z to +01:00] 2050-03-27T02:30+01:00[Europe/Dublin]
 dublin 2050 in the rule's overlap +01:00 [+01:00, Z] Transition[Overlap at 2050-10-30T02:00+01:00 to Z] 2050-10-30T01:30+01:00[Europe/Dublin]
 lord howe 2060 in its half hour gap +10:30 [] Transition[Gap at 2060-10-03T02:00+10:30 to +11:00] 2060-10-03T02:45+11:00[Australia/Lord_Howe]
