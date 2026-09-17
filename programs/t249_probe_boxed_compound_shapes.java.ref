@@ -1,0 +1,79 @@
+/* The Java twin of t249_probe_boxed_compound_shapes.teyru, printed by
+   `teyru emit-java` from the same source and compiled with javac 21 to produce
+   the .expected file:
+
+     javac -d /tmp t249_probe_boxed_compound_shapes.java && java -cp /tmp Main
+
+   The compound assignment's other shapes: a boxed instance field, the
+   assignment as an expression, a right operand that runs after the target's
+   value has been read, the boolean forms, and the wrapper the store replaces. */
+class Main {
+  Integer f = 5;
+  static Integer S = 5;
+  static int calls = 0;
+  static int bump() {
+    calls++;
+    return 2;
+  }
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v);
+  }
+  public static void main(String[] args) {
+    Main m = new Main();
+    m.f += 1;
+    p("instance field Integer += 1", m.f);
+    m.f -= 3;
+    p("instance field Integer -= 3", m.f);
+    Integer i = 1;
+    Integer r = i += 4;
+    p("(i += 4)", r);
+    p("i after (i += 4)", i);
+    Long l = 1L;
+    Long q = l <<= 33;
+    p("(l <<= 33)", q);
+    p("l after (l <<= 33)", l);
+    p("(S &= 3)", S &= 3);
+    p("S after (S &= 3)", S);
+    Integer s = 5;
+    s += bump();
+    p("Integer += bump()", s);
+    p("calls after += bump()", calls);
+    Long t = 5L;
+    t *= bump();
+    p("Long *= bump()", t);
+    p("calls after *= bump()", calls);
+    Boolean b = true;
+    b &= false;
+    p("Boolean &= false", b);
+    Boolean c = false;
+    c |= true;
+    p("Boolean |= true", c);
+    Boolean d = true;
+    d ^= true;
+    p("Boolean ^= true", d);
+    Boolean e = true;
+    Boolean g = true;
+    e &= g;
+    p("Boolean &= Boolean", e);
+    Integer w = 1000;
+    Integer w2 = w;
+    w += 1;
+    p("Integer w += 1", w);
+    p("the wrapper w held", w2);
+    p("w is the same object as w2", w == w2);
+    m.f = null;
+    try {
+      m.f += 1;
+      p("field null += 1", m.f);
+    } catch (NullPointerException ne) {
+      p("field null += 1", "NullPointerException");
+    }
+    Boolean nb = null;
+    try {
+      nb &= true;
+      p("Boolean null &= true", nb);
+    } catch (NullPointerException ne) {
+      p("Boolean null &= true", "NullPointerException");
+    }
+  }
+}

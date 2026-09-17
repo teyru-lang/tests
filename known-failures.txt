@@ -58,12 +58,3 @@ t237_probe_missing_api W5 the checker rejects String.codePointCount, String.code
 #     rejects it at compile time
 t239_probe_negative_array W7 a negative array size is a compile error here and a run-time exception in Java (plan 1.2)
 
-# --- the compound assignment whose target is boxed (W8, the compound-assignment
-#     and boxing families): neither back end unboxes the target, so the operator
-#     is applied to the wrapper reference. The suite's driver builds with the C
-#     back end, where t246 segfaults and t247/t248 do not compile at all; the
-#     cross-back-end view of the same three cases is
-#     scripts/backend-matrix-allow.txt in the compiler repository.
-t246_probe_boxed_compound W8 a boxed compound-assignment target is not unboxed: `(*p) += 1` walks the wrapper reference by one element and segfaults
-t247_probe_boxed_bitwise W8 a boxed `&=`, `|=`, `^=` is emitted against the wrapper reference, and the generated C does not compile
-t248_probe_boxed_shift W8 a boxed `<<=`, `>>=`, `>>>=` is emitted against the wrapper reference, and the generated C does not compile

@@ -1,0 +1,107 @@
+/* The shapes of a boxed compound assignment that t246-t248 do not carry: an
+ * instance field rather than a local or a static one, the assignment used as an
+ * expression, a right operand with a side effect, the boolean forms, and what
+ * the store does to the wrapper the target held.
+ *
+ * `m.f += 1` is `m.f = Integer.valueOf(((int) m.f.intValue()) + 1)` and
+ * `r = (i += 4)` is the same assignment whose value is the new wrapper, so the
+ * two spellings must agree. The right operand is evaluated after the target's
+ * value has been read (JLS 15.7.1), which is why `s += bump()` uses the 5 the
+ * target held before bump ran rather than reading the target twice.
+ *
+ * The boolean forms are the ones the compound assignment accepts on a wrapper
+ * and `int` cannot stand in for: `Boolean b; b &= c` is `b.booleanValue() &
+ * c.booleanValue()` boxed again, and Java has no narrowing conversion back into
+ * a Boolean, so it is legal exactly where the operation's type is boolean.
+ *
+ * A compound assignment replaces the wrapper -- `Integer w = 1000; Integer w2 =
+ * w; w += 1` leaves w2 reading 1000, because a wrapper is immutable -- and it
+ * raises NullPointerException on a null target before the operation runs.
+ *
+ * The expectation is the same program compiled by javac 21:
+ *   javac -d /tmp t249_probe_boxed_compound_shapes.java && java -cp /tmp Main
+ *   (see the .java.ref) */
+import teyru.*
+
+class Main {
+  Integer f = 5
+  static Integer S = 5
+  static int calls = 0
+
+  static int bump() {
+    calls++
+    return 2
+  }
+
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v)
+  }
+
+  public static void main(String[] args) {
+    // a boxed instance field
+    Main m = new Main()
+    m.f += 1
+    p("instance field Integer += 1", m.f)
+    m.f -= 3
+    p("instance field Integer -= 3", m.f)
+
+    // the assignment used as an expression: its value is the new wrapper
+    Integer i = 1
+    Integer r = (i += 4)
+    p("(i += 4)", r)
+    p("i after (i += 4)", i)
+    Long l = 1L
+    Long q = (l <<= 33)
+    p("(l <<= 33)", q)
+    p("l after (l <<= 33)", l)
+    p("(S &= 3)", (S &= 3))
+    p("S after (S &= 3)", S)
+
+    // the right operand runs after the target's value is read
+    Integer s = 5
+    s += bump()
+    p("Integer += bump()", s)
+    p("calls after += bump()", calls)
+    Long t = 5L
+    t *= bump()
+    p("Long *= bump()", t)
+    p("calls after *= bump()", calls)
+
+    // the boolean forms
+    Boolean b = true
+    b &= false
+    p("Boolean &= false", b)
+    Boolean c = false
+    c |= true
+    p("Boolean |= true", c)
+    Boolean d = true
+    d ^= true
+    p("Boolean ^= true", d)
+    Boolean e = true
+    Boolean g = true
+    e &= g
+    p("Boolean &= Boolean", e)
+
+    // the store replaces the wrapper, and the null check comes first
+    Integer w = 1000
+    Integer w2 = w
+    w += 1
+    p("Integer w += 1", w)
+    p("the wrapper w held", w2)
+    p("w is the same object as w2", w == w2)
+    m.f = null
+    try {
+      m.f += 1
+      p("field null += 1", m.f)
+    } catch (NullPointerException ne) {
+      p("field null += 1", "NullPointerException")
+    }
+    Boolean nb = null
+    try {
+      nb &= true
+      p("Boolean null &= true", nb)
+    } catch (NullPointerException ne) {
+      p("Boolean null &= true", "NullPointerException")
+    }
+  }
+}

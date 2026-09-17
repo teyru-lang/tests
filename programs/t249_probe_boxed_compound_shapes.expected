@@ -1,0 +1,21 @@
+instance field Integer += 1 = 6
+instance field Integer -= 3 = 3
+(i += 4) = 5
+i after (i += 4) = 5
+(l <<= 33) = 8589934592
+l after (l <<= 33) = 8589934592
+(S &= 3) = 1
+S after (S &= 3) = 1
+Integer += bump() = 7
+calls after += bump() = 1
+Long *= bump() = 10
+calls after *= bump() = 2
+Boolean &= false = false
+Boolean |= true = true
+Boolean ^= true = false
+Boolean &= Boolean = true
+Integer w += 1 = 1001
+the wrapper w held = 1000
+w is the same object as w2 = false
+field null += 1 = NullPointerException
+Boolean null &= true = NullPointerException
