@@ -1,0 +1,95 @@
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.DayOfWeek;
+import java.time.Month;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/* The same program in Java: eight threads are the first to use six classes
+   whose statics a class initializer builds. The JVM runs each initializer once
+   and makes the other threads wait for it, so no worker is ever handed a class
+   with its statics still null, and halfbuilt is always 0 -- which is where the
+   expected output comes from. */
+public class t217_class_initializer_race {
+  static class First implements Runnable {
+    private final CountDownLatch gate;
+    private final AtomicInteger complete;
+    private final AtomicInteger halfbuilt;
+
+    First(CountDownLatch gate, AtomicInteger complete, AtomicInteger halfbuilt) {
+      this.gate = gate;
+      this.complete = complete;
+      this.halfbuilt = halfbuilt;
+    }
+
+    public void run() {
+      try {
+        gate.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return;
+      }
+      boolean ok = true;
+      try {
+        ok = ok && ZoneOffset.MAX.getTotalSeconds() == 64800;
+      } catch (NullPointerException e) {
+        ok = false;
+        halfbuilt.incrementAndGet();
+      }
+      try {
+        ok = ok && BigInteger.TEN.toString().equals("10");
+      } catch (NullPointerException e) {
+        ok = false;
+        halfbuilt.incrementAndGet();
+      }
+      try {
+        ok = ok && UUID.randomUUID().toString().length() == 36;
+      } catch (NullPointerException e) {
+        ok = false;
+        halfbuilt.incrementAndGet();
+      }
+      try {
+        ok = ok && BigDecimal.ONE.toString().equals("1");
+      } catch (NullPointerException e) {
+        ok = false;
+        halfbuilt.incrementAndGet();
+      }
+      try {
+        ok = ok && Month.JANUARY.getValue() == 1;
+      } catch (NullPointerException e) {
+        ok = false;
+        halfbuilt.incrementAndGet();
+      }
+      try {
+        ok = ok && DayOfWeek.MONDAY.getValue() == 1;
+      } catch (NullPointerException e) {
+        ok = false;
+        halfbuilt.incrementAndGet();
+      }
+      if (ok) {
+        complete.incrementAndGet();
+      }
+    }
+  }
+
+  public static void main(String[] args) throws InterruptedException {
+    CountDownLatch gate = new CountDownLatch(1);
+    AtomicInteger complete = new AtomicInteger();
+    AtomicInteger halfbuilt = new AtomicInteger();
+    List<Thread> pool = new ArrayList<Thread>();
+    for (int t = 0; t < 8; t++) {
+      Thread thread = new Thread(new First(gate, complete, halfbuilt), "first-" + t);
+      pool.add(thread);
+      thread.start();
+    }
+    gate.countDown();
+    for (Thread thread : pool) {
+      thread.join();
+    }
+    System.out.println("workers=8 complete=" + complete.get() + " halfbuilt=" + halfbuilt.get());
+  }
+}

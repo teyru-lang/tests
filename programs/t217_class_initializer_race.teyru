@@ -1,0 +1,123 @@
+/* Eight threads are the first to use six classes whose statics a class
+   initializer builds, and every one of them must be handed those classes
+   finished.
+
+   What this is here to prove: a class initializer runs once, and a thread that
+   uses a class while another thread is initializing it waits for that
+   initializer instead of walking past it -- Java's rule (JLS 12.4.2), and not
+   an optimization a runtime may skip. The six classes are standard library
+   classes, and this compiler defers their initializers to the first use rather
+   than running them at startup the way it runs a program's own classes, so
+   these eight workers -- released together by a CountDownLatch -- are the first
+   to touch each of them. Every one of the six is a chance for a thread to be
+   handed a class whose statics are still null.
+
+   What it detects: a class handed over half-initialized. The runtime did
+   exactly that: ty_clinit published its "initialised" flag *before* running the
+   initializer, so a thread that saw the flag called straight into a static
+   method whose static field was still null and got a NullPointerException with
+   no message. A worker that catches one of those counts it in halfbuilt, and a
+   worker that saw all six classes finished counts itself in complete, so a
+   half-initialized class turns into a byte the .expected file does not have
+   rather than into a stderr line. One worker handed a half-built class was
+   enough to lose a thousand puts in t164, which is why this case exists.
+
+   This is a race, so a run can in principle miss it: the window is an
+   initializer's own running time, and a worker has to arrive inside it. Eight
+   workers leaving one gate together miss it rarely and never by design, which
+   is the most a case in this suite can say -- a case that fails one run in five
+   would be worth having, and this one fails far more often than that against a
+   runtime that publishes the flag early.
+
+   The six classes are touched in the same order by every worker, so this is the
+   same race six times over rather than six independent ones: the worker that
+   gets there first starts an initializer and the others arrive inside it. The
+   values are the JDK's: ZoneOffset.MAX is +18:00, BigInteger.TEN prints "10", a
+   random UUID is 36 characters, BigDecimal.ONE prints "1", and January and
+   Monday are the first month and the first day of the week.
+
+   Every worker's contribution is counted and not printed, and nothing here is
+   timed, so the one line this prints does not depend on the order the threads
+   finish in. */
+class First implements Runnable {
+  private CountDownLatch gate
+  private AtomicInteger complete
+  private AtomicInteger halfbuilt
+
+  public First(CountDownLatch gate, AtomicInteger complete, AtomicInteger halfbuilt) {
+    this.gate = gate
+    this.complete = complete
+    this.halfbuilt = halfbuilt
+  }
+
+  /* Each of the six is its own try: a worker handed a half-built class stops
+     with that class and the ones before it counted, so the line still says how
+     far it got. Each check is also a value only a finished class answers --
+     calling a method on the static is what makes a null one throw here rather
+     than be quietly carried along. */
+  public void run() {
+    this.gate.await()
+    boolean ok = true
+    try {
+      ok = ok && ZoneOffset.MAX.getTotalSeconds() == 64800
+    } catch (NullPointerException e) {
+      ok = false
+      this.halfbuilt.incrementAndGet()
+    }
+    try {
+      ok = ok && BigInteger.TEN.toString().equals("10")
+    } catch (NullPointerException e) {
+      ok = false
+      this.halfbuilt.incrementAndGet()
+    }
+    try {
+      ok = ok && UUID.randomUUID().toString().length() == 36
+    } catch (NullPointerException e) {
+      ok = false
+      this.halfbuilt.incrementAndGet()
+    }
+    try {
+      ok = ok && BigDecimal.ONE.toString().equals("1")
+    } catch (NullPointerException e) {
+      ok = false
+      this.halfbuilt.incrementAndGet()
+    }
+    try {
+      ok = ok && Month.JANUARY.getValue() == 1
+    } catch (NullPointerException e) {
+      ok = false
+      this.halfbuilt.incrementAndGet()
+    }
+    try {
+      ok = ok && DayOfWeek.MONDAY.getValue() == 1
+    } catch (NullPointerException e) {
+      ok = false
+      this.halfbuilt.incrementAndGet()
+    }
+    if (ok) {
+      this.complete.incrementAndGet()
+    }
+  }
+}
+
+class Main {
+  public static void main(String[] args) {
+    CountDownLatch gate = new CountDownLatch(1)
+    AtomicInteger complete = new AtomicInteger()
+    AtomicInteger halfbuilt = new AtomicInteger()
+    List<Thread> pool = new ArrayList<Thread>()
+    for (int t = 0 : t < 8 : t++) {
+      Thread thread = new Thread(new First(gate, complete, halfbuilt), "first-" + t)
+      pool.add(thread)
+      thread.start()
+    }
+    /* every worker is waiting on the gate before it opens, so they leave it
+       together and the first of them starts each initializer with the others
+       right behind */
+    gate.countDown()
+    for (Thread thread : pool) {
+      thread.join()
+    }
+    System.out.println("workers=8 complete=" + complete.get() + " halfbuilt=" + halfbuilt.get())
+  }
+}
