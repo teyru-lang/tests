@@ -1,0 +1,43 @@
+/* The same program as t250_string_literal_shapes.teyru, so that the
+ * expectation beside it can be taken from the JDK rather than from this
+ * compiler:
+ *   /opt/jdk21/jdk-21.0.11+10/bin/javac -d /tmp t250.java
+ *   /opt/jdk21/jdk-21.0.11+10/bin/java -cp /tmp Main
+ * The body is the one in the .teyru file, with the semicolons Teyru lets a
+ * program leave out written back in. */
+
+class Main {
+  static String ascii = "ascii";
+  static String empty = "";
+  static String nul = "a\0b";
+  static String pre = "pre";
+  static String prefix = "prefix";
+  static String quote = "q\"b\\";
+  static String uni = "h\u00e9llo\u2192\u4e16";
+
+  static String hex(String s) {
+    byte[] b = s.getBytes();
+    String out = "";
+    for (int i = 0; i < b.length; i++) {
+      int v = b[i] & 0xff;
+      if (v < 16) out = out + "0";
+      out = out + Integer.toHexString(v);
+    }
+    return out;
+  }
+
+  public static void main(String[] args) {
+    System.out.println("ascii  " + hex(ascii));
+    System.out.println("empty  " + hex(empty));
+    System.out.println("nul    " + hex(nul));
+    System.out.println("pre    " + hex(pre));
+    System.out.println("prefix " + hex(prefix));
+    System.out.println("quote  " + hex(quote));
+    System.out.println("uni    " + hex(uni));
+    System.out.println("pre.equals(\"pre\") " + pre.equals("pre"));
+    System.out.println("prefix.startsWith(pre) " + prefix.startsWith(pre));
+    System.out.println("prefix.substring(0, 3).equals(pre) " + prefix.substring(0, 3).equals(pre));
+    System.out.println("nul.indexOf(\"b\") " + nul.indexOf("b"));
+    System.out.println("uni.equals(\"h\u00e9llo\u2192\u4e16\") " + uni.equals("h\u00e9llo\u2192\u4e16"));
+  }
+}

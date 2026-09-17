@@ -1,0 +1,65 @@
+/* The six shapes a string constant can have, and the shape the C back end used
+ * to emit for one of them.
+ *
+ * Every literal here is a static object the compiler lays out and the runtime
+ * reads: a header, the bytes and their terminating NUL, and -- for a literal
+ * that is not ASCII -- the breadcrumb table the first index operation fills in.
+ * An ASCII literal has no breadcrumb table, and the C back end wrote the
+ * initialiser for it with a third brace group anyway, which GCC rejects
+ * ("extra brace group at end of initializer", C11 6.7.9p2) and clang only
+ * warns about. Any program at all failed to compile under gcc because of it,
+ * so the shape the test pins is the plain ASCII literal; the rest are here
+ * because they are the literals that share that initialiser and must not be
+ * disturbed by the fix.
+ *
+ * The observations are the bytes and the ASCII-only operations, which both
+ * this runtime and the JDK answer the same way, so the expectation below is
+ * what javac 21 printed (see the .java.ref):
+ *   /opt/jdk21/jdk-21.0.11+10/bin/javac -d /tmp t250.java
+ *   /opt/jdk21/jdk-21.0.11+10/bin/java -cp /tmp Main
+ */
+import teyru.*
+
+class Main {
+  // an ASCII literal: the shape that did not compile
+  static String ascii = "ascii"
+  // the empty literal
+  static String empty = ""
+  // a NUL inside a literal, so the bytes are not the string a C string literal
+  // would hold and indexOf must cross it
+  static String nul = "a\0b"
+  // one literal that is a prefix of another: the two objects are 4 and 7 bytes
+  // and the shorter one's terminating NUL sits where the longer one's "i" does
+  static String pre = "pre"
+  static String prefix = "prefix"
+  // a quote and a backslash, which the emitted C literal has to escape
+  static String quote = "q\"b\\"
+  // non-ASCII: UTF-8 bytes here, and the four-byte sequence is two code units
+  static String uni = "h\u00e9llo\u2192\u4e16"
+
+  static String hex(String s) {
+    byte[] b = s.getBytes()
+    String out = ""
+    for (int i = 0; i < b.length; i++) {
+      int v = b[i] & 0xff
+      if (v < 16) out = out + "0"
+      out = out + Integer.toHexString(v)
+    }
+    return out
+  }
+
+  public static void main(String[] args) {
+    System.out.println("ascii  " + hex(ascii))
+    System.out.println("empty  " + hex(empty))
+    System.out.println("nul    " + hex(nul))
+    System.out.println("pre    " + hex(pre))
+    System.out.println("prefix " + hex(prefix))
+    System.out.println("quote  " + hex(quote))
+    System.out.println("uni    " + hex(uni))
+    System.out.println("pre.equals(\"pre\") " + pre.equals("pre"))
+    System.out.println("prefix.startsWith(pre) " + prefix.startsWith(pre))
+    System.out.println("prefix.substring(0, 3).equals(pre) " + prefix.substring(0, 3).equals(pre))
+    System.out.println("nul.indexOf(\"b\") " + nul.indexOf("b"))
+    System.out.println("uni.equals(\"h\u00e9llo\u2192\u4e16\") " + uni.equals("h\u00e9llo\u2192\u4e16"))
+  }
+}
