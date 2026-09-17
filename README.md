@@ -102,10 +102,10 @@ has been accepted.
 | Suffix | Meaning |
 |---|---|
 | `.teyru` | the program |
-| `.expected` | what it prints, exit status included (stdout and stderr together) |
+| `.expected` | the program's stdout, compared byte for byte |
 | `.args` | the program's arguments, split on whitespace: one per line, or several on a line. An argument cannot contain a space, which is how both drivers read the file |
 | `.exit` | the status the program must end with, when it is not 0 |
-| `.experr` | a diagnostic the *compiler* must refuse the program with instead of running it |
+| `.experr` | the program's stderr, compared byte for byte when the file is there |
 | `.java.ref` | the same program written in Java, which is where the expected output came from |
 | `.skip` | the platforms the case cannot run on (see the table above) |
 
@@ -114,8 +114,11 @@ has been accepted.
 Write `programs/t146_something.teyru`, run it, and save its output as
 `programs/t146_something.expected`. Take the next free number; there is no other
 bookkeeping. Because the comparison includes the exit status, a program that is
-supposed to fail needs a `.exit` file, and one that must not compile needs
-`.experr` and no `.expected`.
+supposed to fail needs a `.exit` file, and one that writes to stderr needs
+`.experr`. A program that must not compile does not belong here at all: both
+drivers require a `.expected` beside every program, and a case that is supposed
+to be rejected is a `diagnostics/` case (with the `.code` file naming the
+diagnostic) or a `packages/` case (with an `error` file).
 
 When the point of a program is that Teyru and Java agree, keep the Java next to
 it as `name.java.ref` (javac compiles it, run it, and use its output as
