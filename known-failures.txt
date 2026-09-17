@@ -28,7 +28,6 @@
 #     is green now -- length, charAt, substring, reverse, hashCode and the case
 #     mapping are UTF-16 code units and Unicode 15.0 -- and the one line left is
 #     the map's iteration order, which is W6's.
-t230_probe_core W6 HashMap iteration order is not the JDK's; the string lines this case also pins (length, charAt, substring, reverse, hashCode, case mapping) are answered by W5's read and write work
 
 # --- appendix C.2 is green: t231_probe_strings (hashCode, format width,
 #     isLetter/isWhitespace, strip, the full-width digits) is not listed here.
