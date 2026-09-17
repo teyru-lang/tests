@@ -1,0 +1,27 @@
+/* A compound assignment whose boxed target would have to be narrowed back into
+ * the box. `Short s = 1; s += 1` is `s = Short.valueOf((short)(s.shortValue() +
+ * 1))` only if the checker puts the narrowing somewhere, and it does not: JLS
+ * 15.26.2 makes the compound form `s = (T)((s) + (1))` with T the target's own
+ * type, and the cast to a wrapper class is a cast to a *reference* type -- a
+ * boxing conversion of the operation's value, not a narrowing primitive
+ * conversion. The operation runs at int (JLS 5.6), and an int cannot be boxed
+ * into a Short, so javac 21 rejects all three of these:
+ *
+ *   Probe.java:3: error: incompatible types: int cannot be converted to Short
+ *
+ * The loop this compiler used to be in was worse than accepting them: it did
+ * accept them, and then handed the back ends a wrapper reference to combine
+ * arithmetically, which is not C and not LLVM IR either. */
+class Main {
+  public static void main(String[] args) {
+    Short s = 1
+    s += 1
+    Byte b = 1
+    b &= 3
+    Character c = 'a'
+    c ^= 1
+    System.out.println(s)
+    System.out.println(b)
+    System.out.println(c)
+  }
+}
