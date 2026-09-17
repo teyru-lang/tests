@@ -113,7 +113,11 @@ class T210 {
     RawResponse junk = raw(port, "POST /api/echo HTTP/1.1\r\nHost: x\r\nContent-Encoding: gzip\r\nContent-Length: 7\r\nConnection: close\r\n\r\nnot-gzi")
     System.out.println("request-body-claimed-gzip -> " + junk.statusLine + " body=[" + junk.body + "]")
     // and one that really is: a server that does not decode request bodies
-    // hands the handler the bytes that arrived, which is the answer it can give
+    // hands the handler the bytes that arrived, which is the answer it can give.
+    // Those bytes are not text, so the String the handler is bound to is the
+    // UTF-8 decode with replacements, and len= is that decode's length: the JDK
+    // gives the same number for these bytes (224, 71 of them U+FFFD). Before W5
+    // the length was the byte count, because a String was one byte per character.
     byte[] real = Gzip.compress(Bodies.big())
     // The head is text and the body is bytes, sent as such: a compressed body
     // through a String is the thing this file is about not doing.
