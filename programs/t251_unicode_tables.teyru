@@ -1,0 +1,88 @@
+import teyru.*
+
+/* The Teyru half of t251_unicode_tables, whose expectation is what the JDK
+   printed for the .java.ref beside it. It walks all 1,114,112 code points --
+   the whole of Unicode 15.0 -- and asks the classification and the case
+   mappings about each one, which is the check on the generated tables: they are
+   read from UnicodeData.txt, PropList.txt and SpecialCasing.txt, and this says
+   the JDK's answers and theirs are the same answers. */
+class Uni {
+  static void p(String k, long v) {
+    System.out.println(k + " = " + v)
+  }
+  public static void main(String[] args) {
+    long[] byType = new long[31]
+    long letters = 0
+    long digits = 0
+    long letterOrDigit = 0
+    long alphabetic = 0
+    long upper = 0
+    long lower = 0
+    long title = 0
+    long ws = 0
+    long spaceChar = 0
+    long defined = 0
+    long h = 0
+    for (var cp = 0 : cp <= 0x10FFFF : cp++) {
+      int t = Character.getType(cp)
+      byType[t]++
+      if (Character.isLetter(cp)) {
+        letters++
+      }
+      if (Character.isDigit(cp)) {
+        digits++
+      }
+      if (Character.isLetterOrDigit(cp)) {
+        letterOrDigit++
+      }
+      if (Character.isAlphabetic(cp)) {
+        alphabetic++
+      }
+      if (Character.isUpperCase(cp)) {
+        upper++
+      }
+      if (Character.isLowerCase(cp)) {
+        lower++
+      }
+      if (Character.isTitleCase(cp)) {
+        title++
+      }
+      if (Character.isWhitespace(cp)) {
+        ws++
+      }
+      if (Character.isSpaceChar(cp)) {
+        spaceChar++
+      }
+      if (Character.isDefined(cp)) {
+        defined++
+      }
+      h = h * 31 + t
+      h = h * 31 + Character.toUpperCase(cp)
+      h = h * 31 + Character.toLowerCase(cp)
+      h = h * 31 + Character.toTitleCase(cp)
+      h = h * 31 + Character.digit(cp, 36)
+      h = h * 31 + Character.getNumericValue(cp)
+      h = h * 31 + Character.charCount(cp)
+      h = h * 31 + (Character.isSupplementaryCodePoint(cp) ? 1 : 0)
+      h = h * 31 + (Character.isBmpCodePoint(cp) ? 1 : 0)
+      h = h * 31 + (Character.isValidCodePoint(cp) ? 1 : 0)
+    }
+    long total = 0
+    for (var t = 0 : t < 31 : t++) {
+      p("type_" + t, byType[t])
+      total += byType[t]
+    }
+    p("type_total", total)
+    p("letters", letters)
+    p("digits", digits)
+    p("letter_or_digit", letterOrDigit)
+    p("alphabetic", alphabetic)
+    p("upper", upper)
+    p("lower", lower)
+    p("title", title)
+    p("whitespace", ws)
+    p("space_char", spaceChar)
+    p("defined", defined)
+    p("hash", h)
+  }
+}
