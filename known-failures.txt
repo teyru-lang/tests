@@ -42,7 +42,7 @@ t231_probe_strings W5 hashCode, format width, isLetter/isWhitespace, strip and f
 t234_probe_collections W6 HashMap/HashSet iteration order is not the JDK's (plan 1.2; decision D7 is to match it)
 
 # --- exception class names and messages
-t235_probe_exceptions W6 Throwable's class name is teyru.* rather than java.lang.*, and the bounds messages are lower-case (plan 1.2)
+t235_probe_exceptions W6 Throwable's class name is teyru.* rather than java.lang.* (the bound message itself matches the JDK now)
 
 # --- the whitespace and case family: strip, trim, isBlank, isWhitespace, the
 #     full-width digits, and the Greek and dotted-I case mappings
@@ -59,8 +59,3 @@ t238_probe_switch_return W7 a switch whose cases all return is reported as a mis
 # --- `new int[-1]`: javac compiles it and throws at run time, the checker
 #     rejects it at compile time
 t239_probe_negative_array W7 a negative array size is a compile error here and a run-time exception in Java (plan 1.2)
-
-
-# --- the first difference internal/tools/progen found and minimised: seed 3,
-#     twenty-six statements, one try/catch left
-t240_progen_array_bounds W6 the bounds message is Teyru's own lower-case text; Java says "Index 7 out of bounds for length 3"
