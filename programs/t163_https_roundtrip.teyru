@@ -162,7 +162,9 @@ Ym7h4r2wT42YtLj05pjzGfsybvu9x/IMGmjW5vbNoPHtGPYEnQX+76/s
     // The port is in the URL and not in the output: it is a port the kernel
     // picked, so printing it would make two runs of this program differ.
     System.out.println("GET /tls/hello over TLS -> " + hello.statusCode())
-    System.out.println("body identical=" + body.equals("hello over TLS, na\u00efve") + " bytes=" + body.length())
+    // bytes= is the byte count the label says it is: the body is not ASCII
+    // (the i-diaeresis is two bytes), so length() would count characters.
+    System.out.println("body identical=" + body.equals("hello over TLS, na\u00efve") + " bytes=" + body.getBytes().length)
     // Closed here rather than at the end, and not because of anything TLS does:
     // a server answers one connection at a time, and this connection is being
     // kept alive for the next request. The server's loop would sit on it -- the

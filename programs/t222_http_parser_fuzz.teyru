@@ -115,7 +115,12 @@ class T222 {
     String firstCrash = ""
     // a checksum of the shapes that were refused, so that "all of them were
     // refused for a reason" is not the same answer as "all of them were refused
-    // by accident"
+    // by accident". It is built from message lengths, so it moves when the unit
+    // a length counts moves: the corpus holds a non-ASCII path and the draws
+    // below are rng.below(b.length()), so the whole mutation sequence shifts
+    // with W5's character indexing. The counts that do not depend on which
+    // mutations were drawn -- multipart parsed=1500 crashed=0 -- are unchanged,
+    // and that is the part that says the parsers still classify the same shapes.
     int shapeSum = 0
     for (int i = 0 : i < MUTATIONS : i++) {
       String text = mutate(corpus.get(rng.below(corpus.size())), rng)
