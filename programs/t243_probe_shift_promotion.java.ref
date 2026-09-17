@@ -1,0 +1,92 @@
+/* The Java twin of t243_probe_shift_promotion.teyru, printed by
+   `teyru emit-java` from the same source and compiled with javac 21 to produce
+   the .expected file:
+
+     javac -d /tmp t243_probe_shift_promotion.java && java -cp /tmp Main
+
+   Before a shift, every integral operand but long is promoted to int (JLS 15.19
+   with 5.6): the promotion widens a byte or a short by sign extension and a char
+   by zero extension, so `b >>> 1` on a byte of -1 is 2147483647 rather than 127.
+   The count keeps only its low five bits (six for a long), masked in the type the
+   shift is performed in. The compound forms add the implicit narrowing back to
+   the target (JLS 15.26.2): `byte b = -1; b >>>= 1` is (byte)((int) -1 >>> 1) =
+   -1. */
+class Main {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v);
+  }
+  public static void main(String[] args) {
+    byte b = -1;
+    p("byte >>> 1", b >>> 1);
+    p("byte >> 1", b >> 1);
+    p("byte << 1", b << 1);
+    short s = -1;
+    p("short >>> 4", s >>> 4);
+    p("short >> 4", s >> 4);
+    p("short << 4", s << 4);
+    char c = (char) 65535;
+    p("char >>> 4", c >>> 4);
+    p("char >> 4", c >> 4);
+    p("char << 4", c << 4);
+    char c2 = (char) 32768;
+    p("char 0x8000 >> 1", c2 >> 1);
+    p("char 0x8000 >>> 1", c2 >>> 1);
+    p("char 0x8000 << 1", c2 << 1);
+    int n = -1;
+    p("1 << -1", 1 << n);
+    p("1L << -1", 1L << n);
+    p("1L << -65", 1L << -65);
+    p("-1 >>> -1", -1 >>> n);
+    p("1 << 32", 1 << 32);
+    p("1 << 33", 1 << 33);
+    p("1L << 64", 1L << 64);
+    p("1L << 65", 1L << 65);
+    p("1L << 32", 1L << 32);
+    p("(byte)(1 << 7)", (byte) (1 << 7));
+    p("(short)(1 << 15)", (short) (1 << 15));
+    p("(byte)(-1 >>> 24)", (byte) (-1 >>> 24));
+    p("(int)(1L << 32)", (int) (1L << 32));
+    p("(short)(-1 >>> 16)", (short) (-1 >>> 16));
+    p("MIN >>> 1", Integer.MIN_VALUE >>> 1);
+    p("MIN >> 1", Integer.MIN_VALUE >> 1);
+    p("MIN << 1", Integer.MIN_VALUE << 1);
+    p("LMIN >>> 1", Long.MIN_VALUE >>> 1);
+    p("LMIN >> 63", Long.MIN_VALUE >> 63);
+    p("MAX << 1", Integer.MAX_VALUE << 1);
+    byte sb = -1;
+    sb >>>= 1;
+    p("byte >>>= 1", sb);
+    sb >>= 1;
+    p("byte >>= 1", sb);
+    sb <<= 1;
+    p("byte <<= 1", sb);
+    short ss = -1;
+    ss >>>= 8;
+    p("short >>>= 8", ss);
+    ss >>= 8;
+    p("short >>= 8", ss);
+    char sc = (char) 32768;
+    sc >>>= 4;
+    p("char 0x8000 >>>= 4", (int) sc);
+    char sc2 = (char) 65535;
+    sc2 >>= 4;
+    p("char 0xFFFF >>= 4", (int) sc2);
+    long sl = 1L;
+    sl <<= 64;
+    p("long <<= 64", sl);
+    sl = 1L;
+    sl <<= 70;
+    p("long <<= 70", sl);
+    sl >>>= 70;
+    p("long >>>= 70", sl);
+    int si = -1;
+    si >>>= 0;
+    p("int >>>= 0", si);
+    Integer boxed = 33;
+    int q = 1;
+    p("1 << boxed", q << boxed);
+    q <<= boxed;
+    p("q <<= boxed", q);
+    p("1L << boxed", 1L << boxed);
+  }
+}

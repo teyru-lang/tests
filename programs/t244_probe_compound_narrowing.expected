@@ -1,0 +1,45 @@
+byte += 100 = -56
+byte *= 3 = 44
+byte /= -1 = -128
+byte %= -1 = 0
+short += 1 = -32768
+short *= 40000 = -25536
+char += 1 = 0
+char *= 70000 = 4464
+int *= 1.5 = 7
+int -= 0.5 = 6
+int += 0.9 = 1
+int *= 2.0 past the range = 2147483647
+int -= 0.5 under the range = -2147483648
+int %= 0.0 = 0
+int /= 0.0 = 2147483647
+int /= 0.0 negative = -2147483648
+long /= 2.5 = 2
+long %= 2.5 = 2
+long += 0.5 = 1
+long -= 0.5 under the range = -9223372036854775808
+short *= 1.5 = 4
+char += 0.5 = 65
+byte /= 2.0 = 1
+int /= 2L = 3
+int /= 2 = 3
+short /= 2L = 3
+byte /= 2L = 3
+long /= 2 = 3
+byte &= 15 = 15
+byte |= 128 = -127
+byte ^= 15 = -16
+char |= 65535 = 65535
+char &= 255 = 255
+short &= 255 = 255
+short ^= 255 = -256
+boolean &= false = false
+boolean |= true = true
+boolean ^= true = false
+String += 1 = a1
+String += 'b' = a1b
+String += null = a1bnull
+String += 1 + 2 = a1bnull3
+int /= 0 = ArithmeticException
+int %= 0 = ArithmeticException
+long /= 0 = ArithmeticException
