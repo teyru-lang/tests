@@ -31,10 +31,15 @@ class Main {
       }
       System.out.println("[" + pattern + "] ->" + b + " 1.0[" + f.format(1.0) + "] 2.0[" +
           f.format(2.0) + "] 0.5[" + f.format(0.5) + "] toPattern[" + f.toPattern() + "]")
-    } catch (IllegalArgumentException e) {
-      System.out.println("[" + pattern + "] -> java.lang.IllegalArgumentException: " + e.getMessage())
+    /* NumberFormatException first: it is a subclass of IllegalArgumentException,
+       and Java refuses a catch clause that an earlier one already subsumes
+       ("exception NumberFormatException has already been caught"). Same
+       behaviour either way -- the first clause that matches wins, and these two
+       print different messages -- but only this order is a program javac takes. */
     } catch (NumberFormatException e) {
       System.out.println("[" + pattern + "] -> java.lang.NumberFormatException: " + e.getMessage())
+    } catch (IllegalArgumentException e) {
+      System.out.println("[" + pattern + "] -> java.lang.IllegalArgumentException: " + e.getMessage())
     }
   }
 
