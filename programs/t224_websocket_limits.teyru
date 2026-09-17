@@ -1,0 +1,294 @@
+import teyru.*
+
+/* The frames a server refuses, and the code each refusal carries.
+
+   RFC 6455 gives a peer exactly one way to be told what it did wrong: the close
+   code. So every question here is "which code comes back", and every failure is
+   a connection the server failed rather than one it read:
+
+     * a client frame with no mask -- 1002. The mask is the proof that the bytes
+       were written by the peer this connection is to, and a server that reads an
+       unmasked frame is reading something it cannot attribute.
+     * a control frame over 125 bytes, and a control frame that is fragmented --
+       1002. Both are limits of the protocol, not of this server.
+     * an opcode nobody defined, a continuation with nothing to continue, and a
+       new message before the one before it ended -- 1002.
+     * a message over the limit, whole or in fragments -- 1009. The limit is on
+       the message and not on the frame, because a client that sends a megabyte
+       in a thousand pieces has sent a megabyte.
+     * a text message that is not UTF-8 -- 1007. The bytes are refused rather
+       than replaced, so that a handler is never handed a document the peer did
+       not send.
+     * an idle session -- 1001, on a server whose idle timeout is a second, so
+       that the test does not wait a minute for it.
+
+   The last question is the one about the server rather than about the protocol:
+   a session that is open must not stop a request from being answered. It is
+   asked with a session held open on one connection while a GET goes out on
+   another, and the answer must come back within a second. */
+
+@RestController
+@RequestMapping("/api")
+class SocketApi {
+  @GetMapping("/one")
+  String one() {
+    return "1"
+  }
+}
+
+// SocketEcho is a handler that answers nothing: these tests are about what the
+// server does with a frame, and a handler that answered would be a second thing
+// the output depends on.
+class SocketEcho implements WebSocketHandler {
+  public void onOpen(WebSocketSession s) {
+  }
+
+  public void onMessage(WebSocketSession s, String text) {
+    s.send("echo:" + text)
+  }
+
+  public void onBinary(WebSocketSession s, byte[] data) {
+  }
+
+  public void onClose(WebSocketSession s) {
+  }
+}
+
+class T224 {
+  public static void main(String[] args) throws Exception {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.addWebSocket("/ws", new SocketEcho())
+    server.bind()
+    int port = server.getPort()
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "server")
+    serving.start()
+
+    // ---------- a frame that is not masked ----------
+    RawClient c = handshake(port)
+    try {
+      byte[] payload = "hi".getBytes()
+      byte[] frame = new byte[2 + payload.length]
+      frame[0] = (byte) (0x80 | WebSocketFrame.TEXT)
+      frame[1] = (byte) payload.length
+      for (int i = 0 : i < payload.length : i++) {
+        frame[2 + i] = payload[i]
+      }
+      c.sendBytes(frame)
+      System.out.println("unmasked -> " + closeCode(c))
+    } finally {
+      c.close()
+    }
+
+    // ---------- what the protocol does not allow in a control frame ----------
+    frame(port, "control-126-bytes", WebSocketFrame.PING, repeat("p", 126), true)
+    frame(port, "control-fragmented", WebSocketFrame.PING, "p", false)
+    frame(port, "close-126-bytes", WebSocketFrame.CLOSE, repeat("c", 126), true)
+
+    // ---------- what it does not allow in a message ----------
+    frame(port, "opcode-3", 3, "x", true)
+    frame(port, "opcode-15", 15, "x", true)
+    frame(port, "continuation-alone", WebSocketFrame.CONT, "x", true)
+
+    RawClient c2 = handshake(port)
+    try {
+      c2.sendFrame(WebSocketFrame.TEXT, "unfinished", false)
+      c2.sendFrame(WebSocketFrame.TEXT, "another", true)
+      System.out.println("message-before-the-last -> " + closeCode(c2))
+    } finally {
+      c2.close()
+    }
+
+    // a message that is not UTF-8: a lone 0xFF is not a code point anybody has
+    RawClient c3 = handshake(port)
+    try {
+      byte[] bad = new byte[2]
+      bad[0] = (byte) 0xff
+      bad[1] = (byte) 0xfe
+      c3.sendFrame(WebSocketFrame.TEXT, bad, true)
+      System.out.println("text-not-utf8 -> " + closeCode(c3))
+    } finally {
+      c3.close()
+    }
+
+    // ---------- a message over the limit ----------
+    //
+    // The frame's header alone is sent, and that is deliberate rather than
+    // convenient: the limit is checked against the length the header declares,
+    // before a payload byte is read, and this is the test of that -- a server
+    // that read the megabyte first and refused it afterwards would pass every
+    // other line here. A client that keeps writing its payload while the server
+    // is refusing it gets a reset rather than the close frame, which is the cost
+    // of refusing something that is already on its way and the same cost HTTP's
+    // 413 has; a test cannot pin a race, so it does not send one.
+    RawClient big = handshake(port)
+    try {
+      big.sendBytes(oversizeHead(WebSocketFrame.BINARY, 1048577L))
+      System.out.println("message-over-the-limit -> " + closeCode(big))
+    } finally {
+      big.close()
+    }
+
+    // ---------- a session must not stop a request ----------
+    RawClient session = handshake(port)
+    try {
+      long t0 = System.currentTimeMillis()
+      RawClient request = new RawClient(port, 5000)
+      request.send("GET /api/one HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+      RawResponse res = request.read()
+      long took = System.currentTimeMillis() - t0
+      request.close()
+      System.out.println("http-while-a-session-is-open -> " + (res == null ? "<none>" : res.statusLine) +
+          " within-a-second=" + (took < 1000))
+      // and the session is still the session: it echoes after the request has
+      // been answered, which says the two connections did not become one
+      session.sendFrame(WebSocketFrame.TEXT, "still here", true)
+      WebSocketFrame f = session.readFrame()
+      System.out.println("session-still-open -> " + (f == null ? "<none>" : WebSocketFrame.text(f)))
+    } finally {
+      session.close()
+    }
+
+    task.stop()
+    serving.join()
+    server.close()
+
+    // ---------- the idle timeout, on a server whose timeout is a second ----------
+    idle()
+    // ---------- the message limit at a boundary small enough to send ----------
+    smallLimit()
+    System.out.println("done")
+  }
+
+  // idle asks the question on a server whose idle timeout is one second: the
+  // session says nothing and the server ends it with 1001. The default is a
+  // minute, and waiting a minute in a test is a minute of the suite nobody
+  // reads.
+  static void idle() {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.addWebSocket("/ws", new SocketEcho())
+    server.setSocketIdleTimeoutMs(1000)
+    server.bind()
+    int port = server.getPort()
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "idle")
+    serving.start()
+    RawClient c = handshake(port)
+    try {
+      System.out.println("idle -> " + closeCode(c))
+    } finally {
+      c.close()
+    }
+    task.stop()
+    serving.join()
+    server.close()
+  }
+
+  // smallLimit is the message limit at a boundary of a thousand bytes, where the
+  // fragments that go over it are two writes rather than two megabytes.
+  static void smallLimit() {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.addWebSocket("/ws", new SocketEcho())
+    server.setSocketMaxMessageBytes(1000)
+    server.bind()
+    int port = server.getPort()
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "small")
+    serving.start()
+    RawClient ok = handshake(port)
+    try {
+      ok.sendFrame(WebSocketFrame.TEXT, repeat("a", 1000), true)
+      WebSocketFrame f = ok.readFrame()
+      System.out.println("message-at-the-limit -> " + (f == null ? "<none>" : "len=" + f.payload.length))
+    } finally {
+      ok.close()
+    }
+    RawClient over = handshake(port)
+    try {
+      // two fragments of 600 bytes: neither is over the limit and the message is
+      over.sendFrame(WebSocketFrame.BINARY, new byte[600], false)
+      over.sendFrame(WebSocketFrame.CONT, new byte[600], true)
+      System.out.println("fragments-over-the-limit -> " + closeCode(over))
+    } finally {
+      over.close()
+    }
+    task.stop()
+    serving.join()
+    server.close()
+  }
+
+  // handshake opens a connection and completes the upgrade, so that the frames
+  // after it are frames rather than a request.
+  static RawClient handshake(int port) {
+    RawClient c = new RawClient(port)
+    c.send("GET /ws HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n")
+    RawResponse res = c.readHead()
+    if (res == null || res.status != 101) {
+      System.out.println("handshake failed: " + (res == null ? "<none>" : res.statusLine))
+    }
+    return c
+  }
+
+  // oversizeHead is the ten bytes of a frame header that declares a payload of
+  // more than four gigabytes' worth of eight-byte length: the flags and the
+  // opcode, the mask bit, and the length. There is no mask and no payload after
+  // it, because the server is expected to refuse at the length.
+  static byte[] oversizeHead(int opcode, long len) {
+    byte[] out = new byte[10]
+    out[0] = (byte) (0x80 | (opcode & 0x0f))
+    out[1] = (byte) (0x80 | 127)
+    for (int i = 0 : i < 8 : i++) {
+      out[2 + i] = (byte) ((len >> ((7 - i) * 8)) & 0xff)
+    }
+    return out
+  }
+
+  // frame sends one frame and reads the answer as a close code, which is what
+  // every refusal here looks like from the outside.
+  static void frame(int port, String label, int opcode, String payload, boolean fin) {
+    RawClient c = handshake(port)
+    try {
+      c.sendFrame(opcode, payload, fin)
+      System.out.println(label + " -> " + closeCode(c))
+    } finally {
+      c.close()
+    }
+  }
+
+  // closeCode reads the close frame the server sent and answers the code on it,
+  // or what happened instead. A connection that ended without a close is not a
+  // refusal with a code, and saying so is better than printing a zero.
+  static String closeCode(RawClient c) {
+    try {
+      WebSocketFrame f = c.readFrame()
+      if (f == null) {
+        return "<connection ended>"
+      }
+      if (f.opcode != WebSocketFrame.CLOSE) {
+        return "not a close: opcode=" + f.opcode
+      }
+      if (f.payload.length < 2) {
+        return "close with no code"
+      }
+      int code = ((f.payload[0] & 0xff) << 8) | (f.payload[1] & 0xff)
+      return "close " + code
+    } catch (IOException e) {
+      return "<connection ended>"
+    }
+  }
+
+  static String repeat(String s, int n) {
+    StringBuilder b = new StringBuilder()
+    for (int i = 0 : i < n : i++) {
+      b.append(s)
+    }
+    return b.toString()
+  }
+}

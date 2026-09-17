@@ -1,0 +1,8 @@
+slow-loris fast-answered=20/20 all-within-a-second=true
+slow-loris refused-with=[HTTP/1.1 408 Request Timeout]
+concurrent clients=100 requests=1000 ok=1000 not-200=0 no-answer=0 first-not-200=0
+held-0 -> HTTP/1.1 200 OK
+held-1 -> HTTP/1.1 200 OK
+held-2 -> HTTP/1.1 200 OK
+over-the-limit -> HTTP/1.1 503 Service Unavailable [the server has no room for this connection]
+done

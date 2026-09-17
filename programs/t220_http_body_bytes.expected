@@ -1,0 +1,7 @@
+upload status=200 declared=256 received=256
+upload identical=true checksum=940049
+chunked status=200 chunked=true received=256 identical=true
+text status=200 [text=[naïve 中文 éè] same=true]
+cjk declared=15 received=15 identical=true length-is-bytes=true
+keep-alive first=[中文字符串] second=[中文字符串]
+done

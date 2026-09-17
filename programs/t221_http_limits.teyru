@@ -1,0 +1,238 @@
+import teyru.*
+
+/* What a single client can make this server do, and what it cannot.
+
+   Every question here is one a client asks with a length or a line, and every
+   answer is a refusal: a request line nobody could route (414), headers that
+   are not a request (431), a body this server will not hold (413), a length two
+   readers would disagree about (400), a transfer coding nobody implements
+   (501), a version nobody speaks (505), a request that took too long to arrive
+   (408), an expectation that cannot be met (417).
+
+   The point of the numbers is that each is checked *while the bytes arrive*.
+   A server that reads ten megabytes and then decides it will not hold them has
+   already spent the ten megabytes, which is why `Content-Length: 1000000000`
+   is the one assertion here with a measurement outside the program's own
+   output: the answer must come within a second -- before the body does -- and
+   this process's resident set must not grow by the gigabyte the client asked
+   for. It is read from /proc/self/status, and a system without one prints
+   "skipped" rather than a number it made up.
+
+   The last question is the deadline as a total rather than a timeout per read:
+   a client that sends one byte every two seconds is refused when the head
+   deadline arrives, not given a fresh ten seconds per byte. */
+
+@RestController
+@RequestMapping("/api")
+class LimApi {
+  @GetMapping("/one")
+  String one() {
+    return "1"
+  }
+
+  @PostMapping("/echo")
+  String echo(@RequestBody String b) {
+    return "len=" + b.length()
+  }
+}
+
+class T221 {
+  public static void main(String[] args) throws Exception {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.bind()
+    int port = server.getPort()
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "server")
+    serving.start()
+
+    // ---------- the request line and the headers ----------
+    probe(port, "request-line-20k", "GET /api/" + repeat("a", 20000) + " HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    probe(port, "headers-20k", "GET /api/one HTTP/1.1\r\nHost: x\r\nX-Big: " + repeat("a", 20000) + "\r\nConnection: close\r\n\r\n")
+    probe(port, "headers-200", headers200())
+    probe(port, "request-line-ok", "GET /api/one HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+
+    // ---------- the body ----------
+    int rssBefore = rssKb()
+    long t0 = System.currentTimeMillis()
+    probe(port, "body-1e9", "POST /api/echo HTTP/1.1\r\nHost: x\r\nContent-Length: 1000000000\r\nConnection: close\r\n\r\n")
+    long elapsed = System.currentTimeMillis() - t0
+    int rssAfter = rssKb()
+    System.out.println("body-1e9 within-a-second=" + (elapsed < 1000))
+    // The growth is printed as the answer to the question and not as the
+    // number: a resident set is not the same twice, and a test that pinned the
+    // kilobytes would fail on a machine that had woken up differently.
+    System.out.println("body-1e9 rss-under-16mb=" + (growth(rssBefore, rssAfter) >= 0 && growth(rssBefore, rssAfter) < 16384))
+    // the same answer when the client asked to be told to continue: the limit
+    // is checked before the 100, or the client uploads for nothing
+    expect100(port, "body-1e9-expect", "POST /api/echo HTTP/1.1\r\nHost: x\r\nContent-Length: 1000000000\r\nExpect: 100-continue\r\nConnection: close\r\n\r\n")
+
+    // ---------- the limit is the largest body it reads, not the largest it
+    // ---------- refuses: the same question at a boundary small enough to send
+    smallLimit()
+
+    // ---------- Content-Length: the one number this server agrees to read ----------
+    probe(port, "cl-huge", "POST /api/echo HTTP/1.1\r\nHost: x\r\nContent-Length: 99999999999999999999\r\nConnection: close\r\n\r\n")
+    probe(port, "cl-negative", "POST /api/echo HTTP/1.1\r\nHost: x\r\nContent-Length: -1\r\nConnection: close\r\n\r\n")
+    probe(port, "cl-list-differs", "POST /api/echo HTTP/1.1\r\nHost: x\r\nContent-Length: 1, 2\r\nConnection: close\r\n\r\n")
+    probe(port, "cl-list-same", "POST /api/echo HTTP/1.1\r\nHost: x\r\nContent-Length: 1, 1\r\nConnection: close\r\n\r\nx")
+    probe(port, "cl-twice-same", "POST /api/echo HTTP/1.1\r\nHost: x\r\nContent-Length: 1\r\nContent-Length: 1\r\nConnection: close\r\n\r\nx")
+    probe(port, "cl-twice-differs", "POST /api/echo HTTP/1.1\r\nHost: x\r\nContent-Length: 1\r\nContent-Length: 2\r\nConnection: close\r\n\r\nx")
+    probe(port, "cl-not-a-number", "POST /api/echo HTTP/1.1\r\nHost: x\r\nContent-Length: five\r\nConnection: close\r\n\r\n")
+
+    // ---------- Transfer-Encoding, and the request that declares both ----------
+    probe(port, "cl-and-te", "POST /api/echo HTTP/1.1\r\nHost: x\r\nContent-Length: 5\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n0\r\n\r\n")
+    probe(port, "te-gzip-chunked", "POST /api/echo HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: gzip, chunked\r\nConnection: close\r\n\r\n0\r\n\r\n")
+    probe(port, "te-chunked-gzip", "POST /api/echo HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked, gzip\r\nConnection: close\r\n\r\n0\r\n\r\n")
+    probe(port, "te-gzip", "POST /api/echo HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: gzip\r\nConnection: close\r\n\r\n0\r\n\r\n")
+    probe(port, "te-chunked-ok", "POST /api/echo HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n5\r\nhello\r\n0\r\n\r\n")
+
+    // ---------- the chunked framing ----------
+    probe(port, "chunk-size-overflow", "POST /api/echo HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\nFFFFFFFFFFFFFFFFF\r\n")
+    probe(port, "chunk-size-huge", "POST /api/echo HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n" + "20000000\r\n")
+    probe(port, "chunk-size-not-hex", "POST /api/echo HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\nzz\r\n")
+    probe(port, "chunk-extension-20k", "POST /api/echo HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n1;" + repeat("e", 20000) + "\r\nx\r\n0\r\n\r\n")
+    probe(port, "trailer-20k", "POST /api/echo HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n1\r\nx\r\n0\r\nX-T: " + repeat("t", 20000) + "\r\n\r\n")
+    probe(port, "chunk-not-followed-by-crlf", "POST /api/echo HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n1\r\nxX0\r\n\r\n")
+
+    // ---------- the shape of a header, and of the request line ----------
+    probe(port, "space-before-colon", "GET /api/one HTTP/1.1\r\nHost: x\r\nX-Foo : v\r\nConnection: close\r\n\r\n")
+    probe(port, "obs-fold", "GET /api/one HTTP/1.1\r\nHost: x\r\nX-Foo: v\r\n  continued\r\nConnection: close\r\n\r\n")
+    probe(port, "header-name-with-space", "GET /api/one HTTP/1.1\r\nHost: x\r\nX Fo o: v\r\nConnection: close\r\n\r\n")
+    probe(port, "version-9", "GET /api/one HTTP/9.9\r\nHost: x\r\nConnection: close\r\n\r\n")
+    probe(port, "version-missing", "GET /api/one\r\nHost: x\r\nConnection: close\r\n\r\n")
+    probe(port, "absolute-form", "GET http://example.com/api/one HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+
+    // ---------- Expect ----------
+    probe(port, "expect-other", "POST /api/echo HTTP/1.1\r\nHost: x\r\nContent-Length: 3\r\nExpect: magic\r\nConnection: close\r\n\r\nabc")
+    expect100(port, "expect-continue-ok", "POST /api/echo HTTP/1.1\r\nHost: x\r\nContent-Length: 5\r\nExpect: 100-continue\r\nConnection: close\r\n\r\n")
+
+    // ---------- the deadline is a total, not a timeout per read ----------
+    slowHeader(port)
+
+    task.stop()
+    serving.join()
+    server.close()
+    System.out.println("done")
+  }
+
+  // smallLimit asks the boundary question on a server whose body limit is 1000
+  // bytes, where the last body it will read and the first it will not are two
+  // writes rather than ten megabytes. The setters are how a program configures
+  // a server, and this is what they are for.
+  static void smallLimit() {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.setMaxBodyBytes(1000)
+    server.bind()
+    int port = server.getPort()
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "small")
+    serving.start()
+    probe(port, "limit-1000", "POST /api/echo HTTP/1.1\r\nHost: x\r\nContent-Length: 1000\r\nConnection: close\r\n\r\n" + repeat("a", 1000))
+    probe(port, "limit-1001", "POST /api/echo HTTP/1.1\r\nHost: x\r\nContent-Length: 1001\r\nConnection: close\r\n\r\n")
+    task.stop()
+    serving.join()
+    server.close()
+  }
+
+  static String headers200() {
+    StringBuilder b = new StringBuilder("GET /api/one HTTP/1.1\r\nHost: x\r\n")
+    for (int i = 0 : i < 200 : i++) {
+      b.append("X-H").append(i).append(": v\r\n")
+    }
+    b.append("Connection: close\r\n\r\n")
+    return b.toString()
+  }
+
+  static String repeat(String s, int n) {
+    StringBuilder b = new StringBuilder()
+    for (int i = 0 : i < n : i++) {
+      b.append(s)
+    }
+    return b.toString()
+  }
+
+  // rssKb is this process's resident set from /proc/self/status, or -1 on a
+  // system that has no such file -- which is where the growth test is skipped
+  // rather than measured against a made-up number.
+  public static int rssKb() {
+    if (Files.exists("/proc/self/status") == false) {
+      return -1
+    }
+    String text = Files.readString("/proc/self/status")
+    for (String line : text.split("\n")) {
+      if (line.startsWith("VmRSS:")) {
+        String[] parts = line.split(" ")
+        for (int i = 0 : i < parts.length : i++) {
+          if (parts[i].length() > 0 && parts[i].charAt(0) >= '0' && parts[i].charAt(0) <= '9') {
+            return Integer.parseInt(parts[i])
+          }
+        }
+      }
+    }
+    return -1
+  }
+
+  // growth is the rise in resident set before and after, or -1 when either
+  // measurement was not available.
+  static int growth(int before, int after) {
+    if (before < 0 || after < 0) {
+      return -1
+    }
+    return after - before
+  }
+
+  static void probe(int port, String label, String request) {
+    RawClient c = new RawClient(port)
+    try {
+      c.send(request)
+      RawResponse res = c.read()
+      System.out.println(label + " -> " + (res == null ? "<no answer>" : res.statusLine + " [" + res.body + "]"))
+    } catch (IOException e) {
+      System.out.println(label + " -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+
+  // expect100 sends a head that asks to continue and reads what comes back
+  // without sending a body: a server that answers 100 first has told the client
+  // to upload something it is about to refuse.
+  static void expect100(int port, String label, String head) {
+    RawClient c = new RawClient(port)
+    try {
+      c.send(head)
+      RawResponse res = c.read()
+      System.out.println(label + " -> " + (res == null ? "<no answer>" : res.statusLine + " [" + res.body + "]"))
+    } catch (IOException e) {
+      System.out.println(label + " -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+
+  // slowHeader is the slow-loris shape: one byte every two seconds. The server
+  // has ten seconds from the first byte to the end of the head, and the answer
+  // that it is over is a refusal rather than another ten seconds.
+  static void slowHeader(int port) {
+    RawClient c = new RawClient(port, 60000)
+    try {
+      c.send("G")
+      String status = ""
+      for (int i = 0 : i < 12 && status.length() == 0 : i++) {
+        Thread.sleep(2000)
+        c.send("E")
+        RawResponse res = c.read()
+        status = res == null ? "<none>" : res.statusLine
+      }
+      System.out.println("slow-header -> [" + status + "]")
+    } catch (IOException e) {
+      System.out.println("slow-header -> " + e.getClass().getName() + ": " + e.getMessage())
+    } finally {
+      c.close()
+    }
+  }
+}

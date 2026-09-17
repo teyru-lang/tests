@@ -1,0 +1,76 @@
+import teyru.*
+
+/* serve(): the loop that runs until it is stopped.
+
+   ServerTask is the loop for a program with something else to do, and every
+   other test in this family uses it; serve() is the loop for a program that has
+   nothing else to do, and nothing exercised it. What is asserted here is the
+   part of it that a change can quietly break: the loop answers connections,
+   close() ends it, the thread that ran it finishes, and the program exits --
+   which last part is not free in this runtime, where a thread that is still
+   alive holds the process open.
+
+   The request goes through the client library rather than a socket because what
+   is being tested is the loop and not the wire: a client that retries until the
+   server answers is how this file waits for the accept loop to be in accept,
+   rather than a sleep that is either too short or too long. */
+
+@RestController
+class ServeApi {
+  @GetMapping("/one")
+  String one() {
+    return "1"
+  }
+}
+
+class T225 {
+  public static void main(String[] args) throws Exception {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    final HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.bind()
+    int port = server.getPort()
+
+    Runnable loop = new Runnable() {
+      public void run() {
+        server.serve()
+      }
+    }
+    Thread serving = new Thread(loop, "serve")
+    serving.start()
+
+    // A request is retried until it is answered rather than waited for: the
+    // first attempt may arrive before the loop is in accept.
+    boolean ready = false
+    for (int attempt = 0 : attempt < 100 && ready == false : attempt++) {
+      try {
+        ready = Http.get("http://127.0.0.1:" + port + "/one").statusCode() == 200
+      } catch (IOException e) {
+        Thread.sleep(10)
+      }
+    }
+    System.out.println("serve answered=" + ready)
+
+    // And again after a wait longer than one accept timeout. A loop that
+    // treated a quiet quarter of a second as the end of the listener would have
+    // answered the first request and then stopped -- and the first request
+    // alone cannot tell the difference, because it was already in the kernel's
+    // queue when the loop reached accept.
+    Thread.sleep(500)
+    boolean again = false
+    try {
+      again = Http.get("http://127.0.0.1:" + port + "/one").statusCode() == 200
+    } catch (IOException e) {
+      again = false
+    }
+    System.out.println("serve still answering after a quiet wait=" + again)
+
+    // close() stops the loop even though it is inside accept: the accept wait
+    // is bounded, so the loop looks at whether it is still serving. A loop that
+    // blocked in accept until a connection arrived would never notice.
+    server.close()
+    serving.join()
+    System.out.println("serve thread alive after close=" + serving.isAlive())
+    System.out.println("done")
+  }
+}

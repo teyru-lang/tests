@@ -1,0 +1,217 @@
+import teyru.*
+
+/* The request body as bytes, and the answer to one as bytes.
+
+   A body is not text. It is a JSON document, a form, an upload, a gzip member;
+   which one it is is the Content-Type's to say, and its bytes are what a
+   length, a multipart boundary, a Content-Length and a digest are counted in.
+   This program is the request that says so: a multipart upload whose part is
+   every byte value there is, 0x00 to 0xFF, echoed back by a handler that hands
+   over the bytes it was given, and compared on the client with the bytes it
+   sent.
+
+   Byte for byte is the whole assertion. A body that went through a string on
+   its way in or on its way out arrives changed for every byte that is not valid
+   UTF-8 -- and, once strings count characters rather than bytes, for every byte
+   above 0x7F -- so the comparison is the only test that can fail when one of
+   the two paths decodes something it has no business decoding.
+
+   The other two questions are about the same thing from the other side:
+
+   * a body of text still arrives as the text that was sent, which is what a
+     handler bound to a String wants, and the equality is asserted as text so
+     that it means the same before and after characters and bytes are counted
+     separately.
+   * a response body that is not ASCII has a Content-Length of its length in
+     bytes, not in characters: a client reads exactly that many bytes and then
+     the next answer on the connection, so a length that is short by the number
+     of extra bytes in each character is a connection that comes apart.
+
+   The server runs on a thread of its own and the port is asked for, not chosen,
+   so two runs of this program produce the same bytes. */
+
+@RestController
+@RequestMapping("/api")
+class ByteApi {
+  @PostMapping("/echo-part")
+  HttpResponse echoPart(HttpRequest req) {
+    MultipartFile f = req.multipart("file")
+    HttpResponse res = new HttpResponse()
+    res.contentType = "application/octet-stream"
+    if (f == null) {
+      res.status = 400
+      res.body = "no part"
+      return res
+    }
+    res.bodyBytes = f.contentBytes
+    res.header("X-Part-Size", "" + f.size())
+    return res
+  }
+
+  @PostMapping("/echo-chunked")
+  HttpResponse echoChunked(HttpRequest req) {
+    HttpResponse res = new HttpResponse()
+    res.contentType = "application/octet-stream"
+    res.bodyBytes = req.bodyBytes
+    res.chunkedBody = true
+    return res
+  }
+
+  @PostMapping("/text")
+  String text(@RequestBody String t) {
+    return "text=[" + t + "] same=" + t.equals(T220.SENT)
+  }
+
+  @GetMapping("/cjk")
+  String cjk() {
+    return T220.CJK
+  }
+}
+
+class T220 {
+  // The text the client sends and the text the server answers with. Both are
+  // written once and compared, so that neither count is in the assertion.
+  public static final String SENT = "na\u00efve \u4e2d\u6587 \u00e9\u00e8"
+  public static final String CJK = "\u4e2d\u6587\u5b57\u7b26\u4e32"
+  public static final String BOUNDARY = "TeyruBoundary26f5b1"
+
+  public static void main(String[] args) throws Exception {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.bind()
+    int port = server.getPort()
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "server")
+    serving.start()
+
+    // ---------- every byte value, through a multipart part ----------
+    byte[] every = new byte[256]
+    for (int i = 0 : i < 256 : i++) {
+      every[i] = (byte) i
+    }
+    RawClient c = new RawClient(port)
+    try {
+      c.sendBytes(multipart("file", "all.bin", "application/octet-stream", every))
+      RawResponse res = c.read()
+      System.out.println("upload status=" + res.status + " declared=" + res.header("X-Part-Size") +
+          " received=" + res.bodyBytes.length)
+      System.out.println("upload identical=" + same(every, res.bodyBytes) + " checksum=" + checksum(res.bodyBytes))
+    } finally {
+      c.close()
+    }
+
+    // ---------- the same body back, framed by chunks ----------
+    c = new RawClient(port)
+    try {
+      c.sendBytes(post("/api/echo-chunked", every))
+      RawResponse res = c.read()
+      System.out.println("chunked status=" + res.status + " chunked=" + res.chunked +
+          " received=" + res.bodyBytes.length + " identical=" + same(every, res.bodyBytes))
+    } finally {
+      c.close()
+    }
+
+    // ---------- text is still text ----------
+    c = new RawClient(port)
+    try {
+      byte[] text = SENT.getBytes()
+      c.sendBytes(post("/api/text", text))
+      RawResponse res = c.read()
+      System.out.println("text status=" + res.status + " [" + res.body + "]")
+    } finally {
+      c.close()
+    }
+
+    // ---------- a response body that is not ASCII ----------
+    c = new RawClient(port)
+    try {
+      c.send("GET /api/cjk HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+      RawResponse res = c.read()
+      int declared = Integer.parseInt(res.header("Content-Length"))
+      System.out.println("cjk declared=" + declared + " received=" + res.bodyBytes.length +
+          " identical=" + res.body.equals(CJK) + " length-is-bytes=" + (declared == res.bodyBytes.length))
+    } finally {
+      c.close()
+    }
+
+    // ---------- the same connection, twice: a length that was wrong would
+    // ---------- leave the next answer read from the middle of this one
+    c = new RawClient(port)
+    try {
+      c.send("GET /api/cjk HTTP/1.1\r\nHost: x\r\n\r\nGET /api/cjk HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+      RawResponse first = c.read()
+      RawResponse second = c.read()
+      System.out.println("keep-alive first=[" + first.body + "] second=[" + second.body + "]")
+    } finally {
+      c.close()
+    }
+
+    task.stop()
+    serving.join()
+    server.close()
+    System.out.println("done")
+  }
+
+  // multipart builds a form body whose one part is the bytes given. It is built
+  // as bytes and not as text because that is the point: a part of every byte
+  // value there is cannot be written as a string, and a client that could only
+  // write text could not send one.
+  static byte[] multipart(String name, String filename, String type, byte[] content) {
+    String head = "--" + BOUNDARY + "\r\n" +
+        "Content-Disposition: form-data; name=\"" + name + "\"; filename=\"" + filename + "\"\r\n" +
+        "Content-Type: " + type + "\r\n" +
+        "\r\n"
+    String tail = "\r\n--" + BOUNDARY + "--\r\n"
+    ByteArrayOutputStream bo = new ByteArrayOutputStream()
+    byte[] headBytes = head.getBytes()
+    bo.write(headBytes, 0, headBytes.length)
+    bo.write(content, 0, content.length)
+    byte[] tailBytes = tail.getBytes()
+    bo.write(tailBytes, 0, tailBytes.length)
+    return request(
+        "POST /api/echo-part HTTP/1.1\r\nHost: x\r\n" +
+        "Content-Type: multipart/form-data; boundary=" + BOUNDARY + "\r\n" +
+        "Content-Length: " + (headBytes.length + content.length + tailBytes.length) + "\r\n" +
+        "Connection: close\r\n\r\n", bo.toByteArray())
+  }
+
+  // post is a request whose body is bytes.
+  static byte[] post(String path, byte[] body) {
+    return request(
+        "POST " + path + " HTTP/1.1\r\nHost: x\r\n" +
+        "Content-Type: text/plain; charset=utf-8\r\n" +
+        "Content-Length: " + body.length + "\r\n" +
+        "Connection: close\r\n\r\n", body)
+  }
+
+  static byte[] request(String head, byte[] body) {
+    ByteArrayOutputStream bo = new ByteArrayOutputStream()
+    byte[] headBytes = head.getBytes()
+    bo.write(headBytes, 0, headBytes.length)
+    bo.write(body, 0, body.length)
+    return bo.toByteArray()
+  }
+
+  static boolean same(byte[] a, byte[] b) {
+    if (a.length != b.length) {
+      return false
+    }
+    for (int i = 0 : i < a.length : i++) {
+      if (a[i] != b[i]) {
+        return false
+      }
+    }
+    return true
+  }
+
+  // checksum is the sum of the bytes modulo 1000003, so that the answer is
+  // pinned to the bytes rather than to their count.
+  static int checksum(byte[] b) {
+    int sum = 0
+    for (int i = 0 : i < b.length : i++) {
+      sum = (sum * 31 + (b[i] & 0xff)) % 1000003
+    }
+    return sum
+  }
+}

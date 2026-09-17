@@ -73,6 +73,11 @@ class T207 {
       status = ""
     }
     plain.close()
+    // `answered` is what serveIdle dispatched, and since W3 the handshake is
+    // the worker's rather than the accepting thread's: the connection is taken
+    // and counted, and the handshake fails on the worker. What the line is
+    // about is `with=[]` -- a plaintext client gets no HTTP answer at all --
+    // and that is unchanged.
     System.out.println("plaintext answered=" + answered + " with=[" + status + "]")
 
     // and the same server answers a client that speaks TLS

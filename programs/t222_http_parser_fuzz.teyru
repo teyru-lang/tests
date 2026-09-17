@@ -1,0 +1,321 @@
+import teyru.*
+
+/* The request parser versus a fixed-seed mutation fuzzer.
+
+   The parser is the one part of this server that reads something an attacker
+   writes, and its contract is exact: given any text at all, it either answers
+   a request or throws IllegalArgumentException. It may not crash the process,
+   it may not return null, and it may not run forever -- and those three are the
+   failures a fuzzer finds that a hand-written test does not, because the
+   interesting inputs are the ones nobody thought to write.
+
+   The seed is fixed and the mutations are drawn from a generator of this
+   program's own, so the run is the same run every time: a fuzz test whose
+   corpus changes between runs tells a reviewer nothing about the line they are
+   reading. The corpus is ASCII -- and the mutations are drawn from ASCII -- so
+   that what the parser sees is the same text before and after strings count
+   characters rather than bytes.
+
+   Two things are mutated: whole requests, which go through HttpParser.parse,
+   and multipart bodies as bytes, which go through MultipartForm.parts. The
+   second is here because a multipart parse that runs off the end of its buffer
+   is the same class of bug and has no request-line to catch it. */
+
+// Corpus is the seed texts: well-formed requests, requests missing one thing,
+// and bodies that stop in the middle of themselves.
+class FuzzCorpus {
+  public static List<String> requests() {
+    List<String> out = new ArrayList<String>()
+    out.add("GET / HTTP/1.1\r\nHost: x\r\n\r\n")
+    out.add("GET /a/b?q=1&r=2 HTTP/1.1\r\nHost: x\r\nCookie: a=b; c=d\r\n\r\n")
+    out.add("POST /x HTTP/1.1\r\nHost: x\r\nContent-Length: 5\r\n\r\nhello")
+    out.add("POST /x HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n")
+    out.add("POST /x HTTP/1.1\r\nHost: x\r\nContent-Length: 5\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\na=1&b=2")
+    out.add("POST /x HTTP/1.1\r\nHost: x\r\nContent-Type: multipart/form-data; boundary=B\r\nContent-Length: 60\r\n\r\n--B\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\nv\r\n--B--\r\n")
+    out.add("HEAD / HTTP/1.0\r\n\r\n")
+    out.add("GET /x HTTP/1.1\r\nHost: x\r\nConnection: close\r\nX-Foo:\r\n\r\n")
+    out.add("GET /x HTTP/1.1\r\nHost: x\r\nExpect: 100-continue\r\nContent-Length: 0\r\n\r\n")
+    out.add("OPTIONS * HTTP/1.1\r\nHost: x\r\n\r\n")
+    out.add("GET http://h/p HTTP/1.1\r\nHost: h\r\n\r\n")
+    out.add("GET /\u4e2d\u6587 HTTP/1.1\r\nHost: x\r\n\r\n")
+    // the shapes that are supposed to be refused, which the fuzzer mutates into
+    // shapes nobody wrote down
+    out.add("GET /x HTTP/1.1\r\nHost: x\r\nX\r\n\r\n")
+    out.add("GET /x HTTP/1.1\r\nHost: x\r\nX-Foo : v\r\n\r\n")
+    out.add("GET /x HTTP/1.1\r\nHost: x\r\n  folded\r\n\r\n")
+    out.add("GET /x HTTP/1.1\r\nHost: x\r\nContent-Length: 1\r\nContent-Length: 2\r\n\r\n")
+    out.add("POST /x HTTP/1.1\r\nHost: x\r\nContent-Length: -1\r\n\r\n")
+    out.add("POST /x HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked, gzip\r\n\r\n0\r\n\r\n")
+    out.add("POST /x HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\nzz\r\n")
+    out.add("GET /x HTTP/9.9\r\nHost: x\r\n\r\n")
+    out.add("")
+    out.add("\r\n\r\n")
+    out.add("GET")
+    return out
+  }
+
+  public static List<String> boundaries() {
+    List<String> out = new ArrayList<String>()
+    out.add("B")
+    out.add("----WebKitFormBoundary")
+    out.add("")
+    out.add(" ")
+    out.add("\"")
+    out.add("=")
+    out.add(";")
+    out.add("--")
+    return out
+  }
+}
+
+// Rng is the program's own generator: a 64-bit linear congruential one, which
+// is not a random source and does not have to be. A fuzzer wants the same
+// sequence twice, and this is that sequence written down.
+class FuzzRng {
+  private long state
+
+  public FuzzRng(long seed) {
+    state = seed
+  }
+
+  public long next() {
+    state = state * 6364136223846793005L + 1442695040888963407L
+    return state
+  }
+
+  // below is a number in 0..n-1.
+  public int below(int n) {
+    long v = next() >> 16
+    if (v < 0) {
+      v = -v
+    }
+    return (int) (v % (long) n)
+  }
+
+  public boolean chance(int oneIn) {
+    return below(oneIn) == 0
+  }
+}
+
+class T222 {
+  // MUTATIONS is how many mutated requests are parsed. Each one is a handful of
+  // operations on a corpus entry, so this is a few thousand parses of a few
+  // hundred bytes: enough to reach the off-by-one paths and short enough to
+  // stay in a test.
+  static final int MUTATIONS = 4000
+  static final int PART_MUTATIONS = 1500
+  static final long SEED = 987654321L
+
+  public static void main(String[] args) {
+    List<String> corpus = FuzzCorpus.requests()
+    FuzzRng rng = new FuzzRng(SEED)
+    int parsedOk = 0
+    int refused = 0
+    int crashed = 0
+    String firstCrash = ""
+    // a checksum of the shapes that were refused, so that "all of them were
+    // refused for a reason" is not the same answer as "all of them were refused
+    // by accident"
+    int shapeSum = 0
+    for (int i = 0 : i < MUTATIONS : i++) {
+      String text = mutate(corpus.get(rng.below(corpus.size())), rng)
+      try {
+        HttpRequest req = HttpParser.parse(text)
+        if (req == null) {
+          crashed++
+          if (firstCrash.length() == 0) {
+            firstCrash = "returned null for " + escape(text)
+          }
+          continue
+        }
+        parsedOk++
+        shapeSum = shapeSum * 31 + req.method.length() + req.path.length()
+      } catch (IllegalArgumentException e) {
+        refused++
+        shapeSum = shapeSum * 31 + e.getMessage().length()
+      } catch (Exception e) {
+        // Anything that is not the refusal the contract names is a bug in the
+        // parser, and the input that found it is printed rather than counted:
+        // it is the whole of what a reader needs to reproduce it.
+        crashed++
+        if (firstCrash.length() == 0) {
+          firstCrash = e.getClass().getName() + " for " + escape(text)
+        }
+      }
+    }
+    System.out.println("requests parsed=" + parsedOk + " refused=" + refused + " crashed=" + crashed)
+    System.out.println("requests shapes=" + shapeSum)
+    System.out.println("requests first-crash=[" + firstCrash + "]")
+
+    // the same question of the multipart parser, whose input is bytes and whose
+    // mutations are bytes: every value from 0 to 255 is a byte a body may hold
+    List<String> boundaries = FuzzCorpus.boundaries()
+    FuzzRng brng = new FuzzRng(SEED + 1)
+    byte[] seed = multipartSeed()
+    int partsOk = 0
+    int partsCrashed = 0
+    String firstPartCrash = ""
+    int partSum = 0
+    for (int i = 0 : i < PART_MUTATIONS : i++) {
+      byte[] body = mutateBytes(seed, brng)
+      String boundary = boundaries.get(brng.below(boundaries.size()))
+      try {
+        List<MultipartFile> parts = MultipartForm.parts(body, boundary)
+        if (parts == null) {
+          partsCrashed++
+          if (firstPartCrash.length() == 0) {
+            firstPartCrash = "returned null"
+          }
+          continue
+        }
+        partsOk++
+        for (int k = 0 : k < parts.size() : k++) {
+          partSum = partSum * 31 + parts.get(k).name.length() + parts.get(k).size()
+        }
+        // the same body asked for by name, which is the call a handler makes
+        MultipartForm.part(body, boundary, "file")
+      } catch (Exception e) {
+        partsCrashed++
+        if (firstPartCrash.length() == 0) {
+          firstPartCrash = e.getClass().getName() + " for " + escapeBytes(body)
+        }
+      }
+    }
+    System.out.println("multipart parsed=" + partsOk + " crashed=" + partsCrashed)
+    System.out.println("multipart shapes=" + partSum)
+    System.out.println("multipart first-crash=[" + firstPartCrash + "]")
+
+    // a header parameter search with nothing to find: the loop that walks a
+    // header looking for a name must make progress on every input, and the one
+    // input that cannot is the empty name
+    System.out.println("parameter-empty=[" + MultipartForm.parameter("a=b", "") + "]")
+    System.out.println("parameter-no-equals=[" + MultipartForm.parameter("a b c", "b") + "]")
+    System.out.println("done")
+  }
+
+  // mutate applies one to four operations to a corpus entry. Each operation is
+  // a byte-level edit -- flip, insert, delete, duplicate, truncate -- of the
+  // kind a mangled request is made of.
+  static String mutate(String text, FuzzRng rng) {
+    StringBuilder b = new StringBuilder(text)
+    int operations = 1 + rng.below(4)
+    for (int i = 0 : i < operations : i++) {
+      if (b.length() == 0) {
+        b.append('G')
+        continue
+      }
+      int at = rng.below(b.length())
+      int choice = rng.below(5)
+      if (choice == 0) {
+        b.setCharAt(at, asciiChar(rng))
+      } else if (choice == 1) {
+        b.insert(at, asciiChar(rng))
+      } else if (choice == 2) {
+        b.deleteCharAt(at)
+      } else if (choice == 3) {
+        int end = at + 1 + rng.below(8)
+        if (end > b.length()) {
+          end = b.length()
+        }
+        b.insert(at, b.substring(at, end))
+      } else {
+        b.setLength(at)
+      }
+    }
+    return b.toString()
+  }
+
+  // asciiChar is a byte a request may contain, which is every value a header
+  // may hold and every delimiter that frames one. It is drawn from 0x01 to
+  // 0x7F so that the text means the same thing to a reader that counts bytes
+  // and to one that counts characters.
+  static char asciiChar(FuzzRng rng) {
+    return (char) (1 + rng.below(127))
+  }
+
+  static byte[] multipartSeed() {
+    String text = "--B\r\nContent-Disposition: form-data; name=\"file\"; filename=\"f.bin\"\r\n" +
+        "Content-Type: application/octet-stream\r\n\r\n" +
+        "abcdefghij" +
+        "\r\n--B\r\nContent-Disposition: form-data; name=\"note\"\r\n\r\nhello\r\n--B--\r\n"
+    return text.getBytes()
+  }
+
+  // mutateBytes is the byte-level version, over the whole range 0..255: a
+  // multipart body is bytes, and a byte that is not ASCII is a byte a part may
+  // hold.
+  static byte[] mutateBytes(byte[] seed, FuzzRng rng) {
+    ByteArrayOutputStream bo = new ByteArrayOutputStream()
+    bo.write(seed, 0, seed.length)
+    byte[] b = bo.toByteArray()
+    int operations = 1 + rng.below(4)
+    for (int i = 0 : i < operations : i++) {
+      if (b.length == 0) {
+        byte[] one = new byte[1]
+        one[0] = (byte) rng.below(256)
+        b = one
+        continue
+      }
+      int at = rng.below(b.length)
+      int choice = rng.below(4)
+      if (choice == 0) {
+        b[at] = (byte) rng.below(256)
+      } else if (choice == 1) {
+        ByteArrayOutputStream o = new ByteArrayOutputStream()
+        o.write(b, 0, at)
+        byte[] one = new byte[1]
+        one[0] = (byte) rng.below(256)
+        o.write(one, 0, 1)
+        o.write(b, at, b.length - at)
+        b = o.toByteArray()
+      } else if (choice == 2) {
+        ByteArrayOutputStream o = new ByteArrayOutputStream()
+        o.write(b, 0, at)
+        o.write(b, at + 1, b.length - at - 1)
+        b = o.toByteArray()
+      } else {
+        ByteArrayOutputStream o = new ByteArrayOutputStream()
+        o.write(b, 0, at)
+        b = o.toByteArray()
+      }
+    }
+    return b
+  }
+
+  // escape writes a text so that a crash report is one line and can be read:
+  // a CR is shown, a LF is shown, and anything else outside ASCII is shown as
+  // its code point.
+  static String escape(String text) {
+    StringBuilder b = new StringBuilder()
+    for (int i = 0 : i < text.length() : i++) {
+      char ch = text.charAt(i)
+      if (ch == '\r') {
+        b.append("\\r")
+      } else if (ch == '\n') {
+        b.append("\\n")
+      } else if (ch < 32 || ch > 126) {
+        b.append("<").append((int) ch).append(">")
+      } else {
+        b.append(ch)
+      }
+    }
+    return b.toString()
+  }
+
+  static String escapeBytes(byte[] bytes) {
+    StringBuilder b = new StringBuilder()
+    for (int i = 0 : i < bytes.length : i++) {
+      int v = bytes[i] & 0xff
+      if (v == 13) {
+        b.append("\\r")
+      } else if (v == 10) {
+        b.append("\\n")
+      } else if (v < 32 || v > 126) {
+        b.append("<").append(v).append(">")
+      } else {
+        b.append((char) v)
+      }
+    }
+    return b.toString()
+  }
+}

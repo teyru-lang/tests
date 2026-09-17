@@ -1,0 +1,16 @@
+unmasked -> close 1002
+control-126-bytes -> close 1002
+control-fragmented -> close 1002
+close-126-bytes -> close 1002
+opcode-3 -> close 1002
+opcode-15 -> close 1002
+continuation-alone -> close 1002
+message-before-the-last -> close 1002
+text-not-utf8 -> close 1007
+message-over-the-limit -> close 1009
+http-while-a-session-is-open -> HTTP/1.1 200 OK within-a-second=true
+session-still-open -> echo:still here
+idle -> close 1001
+message-at-the-limit -> len=1005
+fragments-over-the-limit -> close 1009
+done

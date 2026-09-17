@@ -59,10 +59,17 @@ class Main {
 
     System.out.println("routes=" + router.size())
 
-    exchange(server, port, "GET /pets/7 HTTP/1.1\r\nHost: x\r\n\r\n")
-    exchange(server, port, "GET /pets?q=cat HTTP/1.1\r\nHost: x\r\n\r\n")
-    exchange(server, port, "GET /pets/stat HTTP/1.1\r\nHost: x\r\n\r\n")
-    exchange(server, port, "GET /nope HTTP/1.1\r\nHost: x\r\n\r\n")
+    // Each exchange says `Connection: close`, and that is what tells the server
+    // to close the connection after the answer: exchange reads until the stream
+    // ends, and a keep-alive connection that is not told to close is one the
+    // server holds until its idle timeout (fifteen seconds by default) rather
+    // than one that ends when the answer does. The answers compared below are
+    // the same either way; what this saves is the test waiting out an idle
+    // connection four times over.
+    exchange(server, port, "GET /pets/7 HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    exchange(server, port, "GET /pets?q=cat HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    exchange(server, port, "GET /pets/stat HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    exchange(server, port, "GET /nope HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
 
     server.close()
   }

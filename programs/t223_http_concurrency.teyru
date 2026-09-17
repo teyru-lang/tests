@@ -1,0 +1,230 @@
+import teyru.*
+
+/* What many clients can do to this server, and what one slow client cannot.
+
+   Three questions, each of them the pool's reason for existing:
+
+   * a client that sends one byte every two seconds, while another client sends
+     twenty requests. Every one of the twenty must be answered, and within a
+     second -- which is the whole assertion, because a server that answers one
+     connection at a time answers the fast client when the slow one is finished,
+     and the slow one is finished when its head deadline arrives ten seconds
+     later. The slow client is refused at that deadline rather than kept.
+   * a hundred clients at once, ten keep-alive requests each, and every answer a
+     200. A hundred connections with sixty-four workers is a hundred claims on a
+     pool that holds sixty-four plus a queue: the queue is what this test is
+     about, and a client that is told 503 is a line of output rather than a
+     silence.
+   * a pool with no room left refuses with 503 rather than queueing forever. The
+     server used for it keeps its own limits -- two workers, one waiting -- so
+     that the boundary is three connections rather than a hundred and sixty.
+
+   The WebSocket question is next door in t224: the pool this file is about
+   answers requests, and a session is not one. */
+
+@RestController
+@RequestMapping("/api")
+class PoolApi {
+  @GetMapping("/one")
+  String one() {
+    return "1"
+  }
+}
+
+// PoolClient is one client of the hundred: ten requests down one connection,
+// which is ten requests on one worker. The counts are fields and not prints,
+// because a hundred threads printing is a hundred lines of output that say the
+// same thing; the test prints the sum.
+class PoolClient implements Runnable {
+  private int port
+  private int requests
+  public int ok = 0
+  public int other = 0
+  public int failed = 0
+  public int firstOther = 0
+
+  public PoolClient(int port, int requests) {
+    this.port = port
+    this.requests = requests
+  }
+
+  public void run() {
+    RawClient c = new RawClient(port, 20000)
+    try {
+      for (int i = 0 : i < requests : i++) {
+        String tail = i == requests - 1 ? "Connection: close\r\n" : ""
+        c.send("GET /api/one HTTP/1.1\r\nHost: x\r\n" + tail + "\r\n")
+        RawResponse res = c.read()
+        if (res == null) {
+          failed++
+        } else if (res.status == 200) {
+          ok++
+        } else {
+          other++
+          if (firstOther == 0) {
+            firstOther = res.status
+          }
+        }
+      }
+    } catch (IOException e) {
+      failed++
+    } finally {
+      c.close()
+    }
+  }
+}
+
+// SlowClient is the slow-loris shape: one byte every two seconds, in a thread of
+// its own, while the fast client works.
+class SlowClient implements Runnable {
+  private int port
+  public String status = "<none>"
+
+  public SlowClient(int port) {
+    this.port = port
+  }
+
+  public void run() {
+    RawClient c = new RawClient(port, 60000)
+    try {
+      c.send("G")
+      for (int i = 0 : i < 10 && status.equals("<none>") : i++) {
+        Thread.sleep(2000)
+        c.send("E")
+        RawResponse res = c.read()
+        if (res != null) {
+          status = res.statusLine
+        }
+      }
+    } catch (IOException e) {
+      status = e.getClass().getName()
+    } finally {
+      c.close()
+    }
+  }
+}
+
+class T223 {
+  public static void main(String[] args) throws Exception {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.bind()
+    int port = server.getPort()
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "server")
+    serving.start()
+
+    // ---------- a slow client must not stop the fast one ----------
+    SlowClient slow = new SlowClient(port)
+    Thread slowThread = new Thread(slow, "slow")
+    slowThread.start()
+    // let the slow client connect and say its first byte: the fast client's
+    // requests are then answered while the slow one is in the middle of one
+    Thread.sleep(500)
+    int answered = 0
+    long worst = 0
+    for (int i = 0 : i < 20 : i++) {
+      long t0 = System.currentTimeMillis()
+      RawClient c = new RawClient(port, 5000)
+      try {
+        c.send("GET /api/one HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+        RawResponse res = c.read()
+        long took = System.currentTimeMillis() - t0
+        if (took > worst) {
+          worst = took
+        }
+        if (res != null && res.status == 200) {
+          answered++
+        }
+      } catch (IOException e) {
+        // a request that timed out is a request that was not answered
+      } finally {
+        c.close()
+      }
+    }
+    System.out.println("slow-loris fast-answered=" + answered + "/20 all-within-a-second=" + (worst < 1000))
+    slowThread.join()
+    System.out.println("slow-loris refused-with=[" + slow.status + "]")
+
+    // ---------- a hundred clients, ten requests each ----------
+    int clients = 100
+    int each = 10
+    List<PoolClient> workers = new ArrayList<PoolClient>()
+    List<Thread> threads = new ArrayList<Thread>()
+    for (int i = 0 : i < clients : i++) {
+      PoolClient client = new PoolClient(port, each)
+      workers.add(client)
+      Thread t = new Thread(client, "client")
+      threads.add(t)
+      t.start()
+    }
+    int ok = 0
+    int other = 0
+    int failed = 0
+    int firstOther = 0
+    for (int i = 0 : i < threads.size() : i++) {
+      threads.get(i).join()
+      PoolClient client = workers.get(i)
+      ok = ok + client.ok
+      other = other + client.other
+      failed = failed + client.failed
+      if (firstOther == 0) {
+        firstOther = client.firstOther
+      }
+    }
+    System.out.println("concurrent clients=" + clients + " requests=" + (clients * each) +
+        " ok=" + ok + " not-200=" + other + " no-answer=" + failed + " first-not-200=" + firstOther)
+
+    // ---------- a full pool says so ----------
+    fullPool()
+
+    task.stop()
+    serving.join()
+    server.close()
+    System.out.println("done")
+  }
+
+  // fullPool is the server at its limit: two connections may be answered at
+  // once and one more may wait, so the fourth connection that is held open is
+  // the one that is told there is no room. Each held connection has had its
+  // request answered and is waiting for the next one on it, which is what makes
+  // it a worker that is not free.
+  static void fullPool() {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.setWorkerThreads(2)
+    server.setAcceptQueue(1)
+    server.bind()
+    int port = server.getPort()
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "small")
+    serving.start()
+
+    List<RawClient> held = new ArrayList<RawClient>()
+    for (int i = 0 : i < 3 : i++) {
+      RawClient c = new RawClient(port, 5000)
+      c.send("GET /api/one HTTP/1.1\r\nHost: x\r\n\r\n")
+      RawResponse res = c.read()
+      System.out.println("held-" + i + " -> " + (res == null ? "<none>" : res.statusLine))
+      held.add(c)
+    }
+    RawClient over = new RawClient(port, 5000)
+    try {
+      over.send("GET /api/one HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+      RawResponse res = over.read()
+      System.out.println("over-the-limit -> " + (res == null ? "<none>" : res.statusLine + " [" + res.body + "]"))
+    } catch (IOException e) {
+      System.out.println("over-the-limit -> " + e.getClass().getName())
+    } finally {
+      over.close()
+    }
+    for (int i = 0 : i < held.size() : i++) {
+      held.get(i).close()
+    }
+    task.stop()
+    serving.join()
+    server.close()
+  }
+}
