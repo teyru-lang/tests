@@ -1,0 +1,38 @@
+/* A StackOverflowError nothing catches: the runtime reports it and exits 1, the
+ * way it reports any other uncaught throwable.
+ *
+ * This is the path that has to be careful rather than the one that has to be
+ * fast. The throw happens with the margin -- 256 KB -- left below the frame that
+ * found itself past the limit, and the report itself is generated code: the
+ * error's toString, which the uncaught handler calls the way Java's
+ * ThreadGroup.uncaughtException does. That toString begins with the same stack
+ * check every generated function does, so reporting from below the limit threw
+ * another error from inside the reporting, which reported another one, until the
+ * stack really ran out and the process died of a fault with nothing printed --
+ * the worst of the possible outcomes, and what this program would print nothing
+ * for if the check were not switched off while the report is made (see
+ * print_uncaught in internal/runtime/src/tyrt.c).
+ *
+ * The message is the same one every uncaught throwable gets, and Java's is the
+ * same line with java.lang in it: `Exception in thread "main"
+ * java.lang.StackOverflowError` (run with javac 21 and `java DeepMain`), exit 1.
+ * The status is the other half of what this pins: an error that reaches the top
+ * of main is a report and a status, not a signal. */
+
+class Main {
+  static int frameRead(int n) {
+    if (n == 0) {
+      return 0
+    }
+    int[] frame = new int[4]
+    frame[0] = n
+    int r = frameRead(n - 1)
+    return r + frame[0] - n + 1
+  }
+
+  public static void main(String[] args) {
+    System.out.println("before")
+    System.out.println(frameRead(10000000))
+    System.out.println("unreachable")
+  }
+}

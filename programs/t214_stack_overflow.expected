@@ -1,0 +1,9 @@
+caught: teyru.StackOverflowError
+still running
+by-class: teyru.StackOverflowError message=null
+by-parent: caught VirtualMachineError
+by-error: caught Error
+thread: caught teyru.StackOverflowError
+thread: still running
+after: 01234 countdown(100)=100
+done

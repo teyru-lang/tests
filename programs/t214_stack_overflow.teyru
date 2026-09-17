@@ -1,0 +1,146 @@
+/* A recursion that goes deeper than the stack allows is a StackOverflowError
+ * the program catches, not a fault that ends it.
+ *
+ * Every generated function begins with a check of its own frame against the
+ * thread's stack limit (the runtime's ty_stack_check); the frame that finds
+ * itself past the limit throws this error instead of running, and the throw
+ * longjmps back to the nearest catch frame exactly like any other exception. The
+ * shapes below are the three a program reaches it through:
+ *
+ *   - `countdown`, a direct self-recursion;
+ *   - `throughInterface`, the same recursion through an interface call, which is
+ *     the shape the report that opened this work item used (a Step whose `next`
+ *     is itself);
+ *   - and both of those again on a thread of its own, because the limit is per
+ *     thread and a thread that overflowed must be able to carry on printing.
+ *
+ * `byParent` and `byError` pin where the error sits in the hierarchy: Java's
+ * StackOverflowError is a VirtualMachineError, which is an Error, which is a
+ * Throwable, so a program that catches any of the three takes it. A catch of the
+ * wrong one would let the error escape and the run would end with an uncaught
+ * exception instead of the line below.
+ *
+ * The last three lines are the point of the whole thing: after catching one, the
+ * thread's stack is back where it was -- the recursive frames are gone with the
+ * longjmp -- so allocating, formatting and a shallow recursion all still work,
+ * and the program goes on to its own end. Java prints the same lines for the
+ * same program except for the class name (`java.lang.StackOverflowError` rather
+ * than `teyru.StackOverflowError`, the one difference the standard-library
+ * naming has until it is aligned). */
+
+interface Step {
+  int go(int n)
+}
+
+class Rec implements Step {
+  public Step next
+
+  public int go(int n) {
+    if (n == 0) {
+      return 0
+    }
+    int[] frame = new int[4]
+    frame[0] = n
+    int r = next.go(n - 1)
+    return r + frame[0] - n + 1
+  }
+}
+
+class Main {
+  // A direct recursion, with nothing to stop it but the check.
+  static int countdown(int n) {
+    if (n == 0) {
+      return 0
+    }
+    return countdown(n - 1) + 1
+  }
+
+  // The same, in a shape no optimiser can turn into a loop: the frame's own
+  // array is read after the recursive call returns, so every level has to have
+  // one. A `countdown(n - 1) + 1` is folded into a loop by -O2 and then nothing
+  // recurses at all, which would make this test measure the optimiser.
+  static int frameRead(int n) {
+    if (n == 0) {
+      return 0
+    }
+    int[] frame = new int[4]
+    frame[0] = n
+    int r = frameRead(n - 1)
+    return r + frame[0] - n + 1
+  }
+
+  static void throughInterface() {
+    Rec r = new Rec()
+    r.next = r
+    System.out.println(r.go(10000000))
+  }
+
+  // The report's own program: a Throwable catch, a message built out of the
+  // error, and the line after it.
+  static void byThrowable() {
+    Rec r = new Rec()
+    r.next = r
+    try {
+      System.out.println(r.go(10000000))
+    } catch (Throwable t) {
+      System.out.println("caught: " + t)
+    }
+    System.out.println("still running")
+  }
+
+  static void byClass() {
+    try {
+      System.out.println(frameRead(10000000))
+    } catch (StackOverflowError e) {
+      System.out.println("by-class: " + e.getClass().getName() + " message=" + e.getMessage())
+    }
+  }
+
+  static void byParent() {
+    try {
+      System.out.println(frameRead(10000000))
+    } catch (VirtualMachineError e) {
+      System.out.println("by-parent: caught VirtualMachineError")
+    } catch (Error e) {
+      System.out.println("by-parent: caught Error")
+    }
+  }
+
+  static void byError() {
+    try {
+      throughInterface()
+    } catch (Error e) {
+      System.out.println("by-error: caught Error")
+    }
+  }
+
+  static void onThread() {
+    Thread t = new Thread(new Runnable() {
+      public void run() {
+        try {
+          throughInterface()
+        } catch (StackOverflowError e) {
+          System.out.println("thread: caught " + e.getClass().getName())
+        }
+        System.out.println("thread: still running")
+      }
+    })
+    t.start()
+    t.join()
+  }
+
+  public static void main(String[] args) {
+    byThrowable()
+    byClass()
+    byParent()
+    byError()
+    onThread()
+    // The stack the longjmp restored, used for what it is for.
+    StringBuilder sb = new StringBuilder()
+    for (int i = 0 : i < 5 : i++) {
+      sb.append("" + i)
+    }
+    System.out.println("after: " + sb.toString() + " countdown(100)=" + countdown(100))
+    System.out.println("done")
+  }
+}

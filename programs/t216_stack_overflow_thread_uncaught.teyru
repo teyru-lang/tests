@@ -1,0 +1,37 @@
+/* A StackOverflowError that reaches the top of a *thread*: the report names the
+ * thread, the thread ends, and the process goes on -- which is Java's rule for
+ * an uncaught throwable on a thread that is not the last one (ThreadGroup's
+ * uncaughtException prints the line; the thread then dies and main carries on).
+ *
+ * It is the other half of t215: there the report ends the process with a status,
+ * here it ends one thread, and the same margin has to hold the report either
+ * way. The thread's own stack is what overflowed, so a runtime that reported it
+ * on the faulting stack would have nothing to report it with.
+ *
+ * The name in the line is the one the Thread was constructed with. Java prints
+ * `Exception in thread "worker" java.lang.StackOverflowError` and then the two
+ * lines from main, exit 0. */
+
+class Main {
+  static int frameRead(int n) {
+    if (n == 0) {
+      return 0
+    }
+    int[] frame = new int[4]
+    frame[0] = n
+    int r = frameRead(n - 1)
+    return r + frame[0] - n + 1
+  }
+
+  public static void main(String[] args) {
+    Thread worker = new Thread(new Runnable() {
+      public void run() {
+        System.out.println(frameRead(10000000))
+      }
+    }, "worker")
+    worker.start()
+    worker.join()
+    System.out.println("thread alive: " + worker.isAlive())
+    System.out.println("main still running")
+  }
+}
