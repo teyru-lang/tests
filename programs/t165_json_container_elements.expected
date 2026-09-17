@@ -22,7 +22,7 @@ field teams: java.util.List -> Team
 field points: java.util.List -> Point
 field many: teyru.Array -> Person
 field nums: teyru.Array -> int
-field words: teyru.Array -> teyru.String
+field words: teyru.Array -> java.lang.String
 field ids: java.util.List -> java.lang.Integer
 field loose: java.util.List -> java.lang.Object
 field mixed: java.util.Map -> java.lang.Object
