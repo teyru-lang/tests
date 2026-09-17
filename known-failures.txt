@@ -59,3 +59,5 @@ t238_probe_switch_return W7 a switch whose cases all return is reported as a mis
 # --- `new int[-1]`: javac compiles it and throws at run time, the checker
 #     rejects it at compile time
 t239_probe_negative_array W7 a negative array size is a compile error here and a run-time exception in Java (plan 1.2)
+t196_string_bytes W5 the WTF-8 header and its decoders are not in main yet (the test landed first)
+t180_http_gzip W5 the byte-level Gzip API is not in main yet (the test landed first)

@@ -58,7 +58,24 @@ the same way:
 
 | File | Read by | Meaning |
 |---|---|---|
-| `known-failures.txt` | both | `<case> <work item> <reason>`: this case fails today and `Wn` is going to fix it |
+| `
+## A test that lands before its code
+
+The tests repository is a submodule, so a test pushed here is *in the suite* the
+moment any compiler pull request moves the pointer -- and every landing moves it to
+the tip. That means a test pushed before the change it tests makes **every other
+landing red**, which is exactly what happened twice on 2026-09-17 (t196_string_bytes
+and t180_http_gzip, both waiting on the string work, and a full gate that failed on
+nothing else).
+
+So: a test pushed to `main` here before its code is in `main` of the compiler must
+carry an entry in `known-failures.txt` in the **same commit**, naming the work item
+and saying it landed first. The mechanism then removes the entry when the code
+arrives -- a listed case that passes fails the run -- so the entry cannot outlive
+the gap it describes. The alternative, a test left on a branch, is worse: the suite
+is the thing that tells us a change is correct, and a test nobody runs tells us
+nothing.
+known-failures.txt` | both | `<case> <work item> <reason>`: this case fails today and `Wn` is going to fix it |
 | `<part>/<case>.skip` | both | the platforms the case cannot run on: `windows`, `darwin/arm64`, or `!linux` for the one platform it *can*; everything after `#` is the reason |
 | `jdk-diff-allow.txt` | `TestJDKDiff` | `<case> <kind> <work item> <reason>`: a difference from the JDK that is decided, or that Java cannot express; `kind` is `java` when javac rejects the printed Java and `out` when the two answers differ |
 
