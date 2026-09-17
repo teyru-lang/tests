@@ -1,0 +1,100 @@
+// The Java this probe was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t234_probe_collections.java.ref /tmp/Coll.java
+//   javac -d /tmp/out /tmp/Coll.java
+//   java -ea -Dstdout.encoding=UTF-8 -Duser.language=en -Duser.country=US -cp /tmp/out Coll
+
+import java.util.*;
+class Coll {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v);
+  }
+  public static void main(String[] args) {
+    List<String> xs = new ArrayList<String>();
+    xs.add("banana");
+    xs.add("apple");
+    xs.add("cherry");
+    p("list", xs);
+    p("list_sub", xs.subList(1, 3));
+    p("list_empty", new ArrayList<String>());
+    p("list_nested", Arrays.asList(Arrays.asList(1, 2), Arrays.asList(3)));
+    p("as_list", Arrays.asList("a", "b"));
+    p("as_list_one", Arrays.asList("a"));
+    p("singleton", Collections.singletonList("x"));
+    p("empty_list", Collections.emptyList());
+    p("n_copies", Collections.nCopies(3, "z"));
+    p("unmodifiable", Collections.unmodifiableList(xs));
+    p("array", Arrays.toString(new int[] {1, 2, 3}));
+    p("array_deep", Arrays.deepToString(new int[][] {{1, 2}, {3}}));
+    p("array_char", Arrays.toString(new char[] {'a', '中'}));
+    p("array_double", Arrays.toString(new double[] {1.5, 0.125}));
+    p("array_empty", Arrays.toString(new String[0]));
+    Map<String, Integer> m = new HashMap<String, Integer>();
+    m.put("banana", 1);
+    m.put("apple", 2);
+    m.put("cherry", 3);
+    m.put("date", 4);
+    m.put("elderberry", 5);
+    p("hashmap", m);
+    p("hashmap_keys", new TreeSet<String>(m.keySet()));
+    p("hashmap_values", new ArrayList<Integer>(m.values()));
+    Set<String> hs = new HashSet<String>();
+    hs.add("one");
+    hs.add("two");
+    hs.add("three");
+    p("hashset", hs);
+    p("linkedhashset", new LinkedHashSet<String>(Arrays.asList("b", "a", "c", "a")));
+    p("treemap", new TreeMap<String, Integer>(m));
+    p("treeset", new TreeSet<Integer>(Arrays.asList(5, 1, 3)));
+    LinkedHashMap<String, Integer> lhm = new LinkedHashMap<String, Integer>();
+    lhm.put("z", 1);
+    lhm.put("a", 2);
+    p("linkedhashmap", lhm);
+    ArrayDeque<String> dq = new ArrayDeque<String>();
+    dq.add("a");
+    dq.add("b");
+    p("deque", dq);
+    p("stack_push", dq.pop());
+    Iterator<String> it = xs.iterator();
+    p("iterator", it.next() + " " + it.next() + " " + it.hasNext());
+    Map.Entry<String, Integer> e = m.entrySet().iterator().next();
+    p("entry", e.getKey() + "=" + e.getValue());
+    p("entry_str", String.valueOf(e));
+    p("string_of_int_array", new int[] {1, 2, 3}.length);
+    int[] arr = new int[] {1, 2, 3};
+    p("array_clone", Arrays.toString(arr.clone()));
+    List<Integer> nums = new ArrayList<Integer>();
+    nums.add(3);
+    nums.add(1);
+    nums.add(2);
+    Collections.sort(nums);
+    p("sorted", nums);
+    Collections.reverse(nums);
+    p("reversed", nums);
+    p("max", Collections.max(nums));
+    p("contains", xs.contains("apple") + " " + m.containsKey("date") + " " + hs.contains("two"));
+    p("char_list", new StringBuilder().append((char) 0x4e2d).append('文').toString());
+    StringBuilder sb = new StringBuilder();
+    for (String s : xs) {
+      sb.append(s).append('|');
+    }
+    p("join_builder", sb);
+    p("foreach_int", sumOf(new int[] {1, 2, 3}));
+    p("hashmap_zh", zh());
+  }
+  static int sumOf(int[] xs) {
+    int total = 0;
+    for (int x : xs) {
+      total += x;
+    }
+    return total;
+  }
+  static Map<String, Integer> zh() {
+    Map<String, Integer> m = new HashMap<String, Integer>();
+    m.put("中文", 1);
+    m.put("文", 2);
+    m.put("中", 3);
+    return m;
+  }
+}

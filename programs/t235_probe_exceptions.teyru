@@ -1,0 +1,83 @@
+class Exc {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v)
+  }
+  public static void main(String[] args) {
+    try {
+      int[] arr = new int[3]
+      arr[5] = 1
+    } catch (ArrayIndexOutOfBoundsException e) {
+      p("aioobe_class", e.getClass().getName())
+      p("aioobe_str", e.toString())
+      p("aioobe_msg", e.getMessage())
+    }
+    try {
+      String s = "abc"
+      s.charAt(9)
+    } catch (StringIndexOutOfBoundsException e) {
+      p("sioobe_class", e.getClass().getName())
+      p("sioobe_msg", e.getMessage())
+    }
+    try {
+      Integer.parseInt("abc")
+    } catch (NumberFormatException e) {
+      p("nfe_class", e.getClass().getName())
+      p("nfe_msg", e.getMessage())
+    }
+    try {
+      Integer.parseInt(" 5")
+    } catch (NumberFormatException e) {
+      p("nfe_space_msg", e.getMessage())
+    }
+    try {
+      int z = 1 / 0
+      p("div", z)
+    } catch (ArithmeticException e) {
+      p("arithmetic_class", e.getClass().getName())
+      p("arithmetic_msg", e.getMessage())
+    }
+    try {
+      Object o = "str"
+      Integer bad = (Integer) o
+      p("cast", bad)
+    } catch (ClassCastException e) {
+      p("cce_class", e.getClass().getName())
+      p("cce_msg", e.getMessage())
+    }
+    try {
+      Object o = null
+      p("npe", o.toString())
+    } catch (NullPointerException e) {
+      p("npe_class", e.getClass().getName())
+      p("npe_msg", e.getMessage())
+    }
+    try {
+      throw new IllegalStateException("state")
+    } catch (RuntimeException e) {
+      p("runtime_catch", e.getMessage())
+      p("is_exception", e instanceof Exception)
+      p("is_throwable", e instanceof Throwable)
+    }
+    try {
+      throw new IllegalArgumentException("bad")
+    } catch (Exception e) {
+      p("illegal_class", e.getClass().getName())
+      p("illegal_msg", e.getMessage())
+    }
+    try {
+      throw new UnsupportedOperationException()
+    } catch (RuntimeException e) {
+      p("uoe_msg_is_null", e.getMessage() == null)
+      p("uoe_str", e.toString())
+    }
+    try {
+      Object[] os = new String[2]
+      os[0] = Integer.valueOf(1)
+      p("store", os.length)
+    } catch (ArrayStoreException e) {
+      p("ase_class", e.getClass().getName())
+      p("ase_msg", e.getMessage())
+    }
+    p("catch_var", "ok")
+  }
+}

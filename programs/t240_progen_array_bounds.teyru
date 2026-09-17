@@ -1,0 +1,19 @@
+/* The array bounds message, minimised by internal/tools/progen from the
+   twenty-six statements of seed 3 and then cut down by hand to the statement
+   that carries the difference.
+
+   Teyru prints "index 7 out of bounds for length 3" here; Java prints
+   "Index 7 out of bounds for length 3". The .expected is java's answer, so
+   this is red until W6 aligns the messages. */
+
+class ProgenArrayBounds {
+  public static void main(String[] args) {
+    try {
+      int[] v22 = new int[3]
+      v22[7] = 1
+      System.out.println("k20 = " + v22.length)
+    } catch (ArrayIndexOutOfBoundsException e) {
+      System.out.println("k20 = caught " + e.getMessage())
+    }
+  }
+}

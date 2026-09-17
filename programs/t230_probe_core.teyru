@@ -1,0 +1,97 @@
+import teyru.*
+
+class Probe {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v)
+  }
+  public static void main(String[] args) {
+    p("len_zh", "中文".length())
+    p("charAt_zh", "中文".charAt(1))
+    p("len_emoji", "😀".length())
+    p("sub_zh", "a中b".substring(1, 2))
+    p("bytes_zh", "中文".getBytes().length)
+    p("upper_ss", "ß".toUpperCase())
+    p("rev_zh", new StringBuilder("ab中").reverse())
+    p("indexOf_zh", "ab中c".indexOf("c"))
+    p("fmt_1.005", String.format("%.2f", 1.005))
+    p("fmt_0.125", String.format("%.2f", 0.125))
+    p("d_0.1+0.2", 0.1 + 0.2)
+    p("f_1/3", 1.0f / 3)
+    p("d_1e7", 1e7)
+    p("d_min", Double.MIN_VALUE)
+    p("d_f0.1", (double) 0.1f)
+    p("d_123456789", 123456789.0)
+    p("round_-2.5", Math.round(-2.5))
+    p("char_add", 'a' + 'b' + "")
+    p("str_char", "" + 'a' + 'b')
+    p("byte_200", (byte) 200)
+    p("short_70000", (short) 70000)
+    p("shift_33", 1 << 33)
+    p("ushr_-1_28", -1 >>> 28)
+    p("mod_neg", -7 % 3)
+    p("abs_min", Math.abs(Integer.MIN_VALUE))
+    p("split_trailing", "a,b,,".split(",").length)
+    p("split_leading", ",a".split(",").length)
+    p("hash_Aa_BB", "Aa".hashCode() == "BB".hashCode())
+    p("objects_hash", Objects.hash(1, 2, 3))
+    Integer a = 127
+    Integer b = 127
+    Integer c = 128
+    Integer d = 128
+    p("box_127", a == b)
+    p("box_128", c == d)
+    String s1 = "a"
+    String s2 = "b"
+    p("str_identity", (s1 + s2) == "ab")
+    p("negzero_cmp", Double.compare(-0.0, 0.0))
+    Map<String, Integer> m = new HashMap<>()
+    m.put("banana", 1)
+    m.put("apple", 2)
+    m.put("cherry", 3)
+    m.put("date", 4)
+    m.put("elderberry", 5)
+    p("hashmap_order", m)
+    Set<Integer> hs = new HashSet<>()
+    hs.add(100)
+    hs.add(3)
+    hs.add(17)
+    hs.add(64)
+    p("hashset_order", hs)
+    try {
+      int[] arr = new int[3]
+      arr[5] = 1
+    } catch (ArrayIndexOutOfBoundsException e) {
+      p("aioobe_msg", e.getMessage())
+    }
+    try {
+      Object o = "str"
+      Integer bad = (Integer) o
+      p("cast", bad)
+    } catch (ClassCastException e) {
+      p("cce", "caught")
+    }
+    try {
+      Integer.parseInt(" 5")
+    } catch (NumberFormatException e) {
+      p("nfe_msg", e.getMessage())
+    }
+    p("parse_plus", Integer.parseInt("+5"))
+    p("list_of", List.of(1, 2, 3))
+    p("tobin_-1", Integer.toBinaryString(-1).length())
+    p("dbl_str_1e-5", Double.toString(1e-5))
+    p("float_max", Float.MAX_VALUE)
+    p("long_min_div", Long.MIN_VALUE / -1)
+    p("int_min_mod", Integer.MIN_VALUE % -1)
+    p("nan_eq", Double.NaN == Double.NaN)
+    p("str_null", "x" + null)
+    char ch = 'A'
+    ch += 1
+    p("char_compound", ch)
+    p("sb_insert", new StringBuilder("abc").insert(1, 2.5f))
+    p("str_repeat", "ab".repeat(3))
+    p("strip_ws", "\u2003x\u2003".strip().length())
+    p("trim_ws", "\u2003x\u2003".trim().length())
+    p("cmp_zh", "中".compareTo("文"))
+    p("lower_I", "İ".toLowerCase().length())
+  }
+}

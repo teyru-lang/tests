@@ -1,0 +1,36 @@
+strip_3000 = [中]
+strip_2003_len = 1
+trim_2003_len = 3
+trim_0020_len = 1
+strip_0020_len = 1
+strip_tab_nl = [	
+ x 
+	]
+strip_nbsp_len = 3
+isBlank_3000 = true
+isBlank_space = true
+isBlank_x = false
+isEmpty = true false
+ws_3000 = true
+ws_2003 = true
+ws_nbsp = false
+isLetter_zh = true
+isDigit_fullwidth = true
+isDigit_ascii = true
+isAlphabetic_zh = true
+digit_value = 1
+numeric_value = 1
+upper_ss = SS
+upper_sigma = Σ
+lower_greek = οδος
+lower_I = 2
+upper_ascii = ABC
+upper_zh = 中文
+parse_fullwidth = 123
+format_d = 12
+format_d_fullwidth_arg = 123
+to_upper_char = ß
+to_lower_char = i
+bytes_len = 6
+bytes_first = -28 -72
+case_insensitive = true true

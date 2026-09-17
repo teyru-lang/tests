@@ -1,0 +1,19 @@
+// The Java this probe was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t238_probe_switch_return.java.ref /tmp/P4.java
+//   javac -d /tmp/out /tmp/P4.java
+//   java -ea -Dstdout.encoding=UTF-8 -Duser.language=en -Duser.country=US -cp /tmp/out P4
+
+class P4 {
+  static String sw(String s) {
+    switch (s) {
+      case "你好": return "hit";
+      case "再见": return "bye";
+      default: return "miss";
+    }
+  }
+  public static void main(String[] args) {
+    System.out.println(sw("你好") + " " + sw("再见") + " " + sw("x"));
+  }
+}

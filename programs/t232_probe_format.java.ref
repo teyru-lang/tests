@@ -1,0 +1,49 @@
+// The Java this probe was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t232_probe_format.java.ref /tmp/Fmt.java
+//   javac -d /tmp/out /tmp/Fmt.java
+//   java -ea -Dstdout.encoding=UTF-8 -Duser.language=en -Duser.country=US -cp /tmp/out Fmt
+
+import java.util.*;
+class Fmt {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v);
+  }
+  public static void main(String[] args) {
+    p("d", String.format("%d", 42));
+    p("d_width", String.format("[%6d]", 42));
+    p("d_left", String.format("[%-6d]", 42));
+    p("d_zero", String.format("[%06d]", -42));
+    p("d_plus", String.format("[%+d]", 42));
+    p("d_space", String.format("[% d]", 42));
+    p("d_group", String.format("[%,d]", 1234567));
+    p("d_hex", String.format("[%x]", 255));
+    p("d_oct", String.format("[%o]", 8));
+    p("d_bin_none", String.format("[%s]", Integer.toBinaryString(5)));
+    p("f", String.format("%f", 1.5));
+    p("f_prec", String.format("%.3f", 1.0 / 3));
+    p("f_width_prec", String.format("[%8.2f]", 3.14159));
+    p("f_zero", String.format("[%08.2f]", -3.14159));
+    p("f_round_1.005", String.format("%.2f", 1.005));
+    p("f_round_2.675", String.format("%.2f", 2.675));
+    p("e", String.format("%e", 1234.5678));
+    p("g", String.format("%g", 0.00001234));
+    p("s", String.format("[%10s]", "ab"));
+    p("s_prec", String.format("[%.2s]", "abcdef"));
+    p("s_null", String.format("%s", (Object) null));
+    p("b", String.format("%b %b", true, null));
+    p("c", String.format("%c", 'A'));
+    p("c_digit", String.format("%c", 20013));
+    p("nested", String.format("%2$s %1$s", "b", "a"));
+    p("percent", String.format("100%%"));
+    p("dbl_str", Double.toString(1234.5678) + " " + Double.toString(0.001));
+    p("int_str", Integer.toString(255, 16) + " " + Integer.toString(-255, 2).length());
+    p("long_hex", Long.toHexString(255L) + " " + Long.toOctalString(8L));
+    p("parse_radix", Integer.parseInt("ff", 16));
+    p("printf", "printed");
+    System.out.printf("printf_d=%d printf_s=%S%n", 7, "ab");
+    p("round", Math.round(2.5) + " " + Math.round(-2.5) + " " + Math.round(2.4));
+    p("min_max", Math.min(3, 5) + " " + Math.max(3.5, 2.5));
+  }
+}

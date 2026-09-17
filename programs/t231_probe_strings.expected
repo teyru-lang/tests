@@ -1,0 +1,12 @@
+hash_zh = 646394
+fmt_pad = [    中|ab中 ]
+isLetter_zh = true
+isWs_3000 = true
+parse_fullwidth = 123
+char_int = 20013
+strip_3000 = 中
+split_zh = [甲, 乙, 丙]
+replace_zh = 中字中字
+upper_greek = οδος
+lastIndexOf_zh = 2
+map_get_zh = 1

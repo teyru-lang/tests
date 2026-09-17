@@ -1,0 +1,33 @@
+// The Java this probe was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t231_probe_strings.java.ref /tmp/P2.java
+//   javac -d /tmp/out /tmp/P2.java
+//   java -ea -Dstdout.encoding=UTF-8 -Duser.language=en -Duser.country=US -cp /tmp/out P2
+
+import java.util.*;
+class P2 {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v);
+  }
+  public static void main(String[] args) {
+    p("hash_zh", "中文".hashCode());
+    p("fmt_pad", String.format("[%5s|%-4s]", "中", "ab中"));
+    p("isLetter_zh", Character.isLetter('中'));
+    p("isWs_3000", Character.isWhitespace('\u3000'));
+    try {
+      p("parse_fullwidth", Integer.parseInt("１２３"));
+    } catch (NumberFormatException e) {
+      p("parse_fullwidth", "NumberFormatException");
+    }
+    p("char_int", (int) '中');
+    p("strip_3000", "\u3000中\u3000".strip());
+    p("split_zh", Arrays.toString("甲，乙，丙".split("，")));
+    p("replace_zh", "中文中文".replace("文", "字"));
+    p("upper_greek", "ΟΔΟΣ".toLowerCase());
+    p("lastIndexOf_zh", "中文中文".lastIndexOf("中"));
+    Map<String, Integer> m = new HashMap<>();
+    m.put("中文", 1);
+    p("map_get_zh", m.get("中文"));
+  }
+}

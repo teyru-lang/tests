@@ -1,0 +1,19 @@
+// The Java this probe was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t239_probe_negative_array.java.ref /tmp/Neg.java
+//   javac -d /tmp/out /tmp/Neg.java
+//   java -ea -Dstdout.encoding=UTF-8 -Duser.language=en -Duser.country=US -cp /tmp/out Neg
+
+class Neg {
+  public static void main(String[] args) {
+    try {
+      int[] arr = new int[-1];
+      System.out.println("length = " + arr.length);
+    } catch (NegativeArraySizeException e) {
+      System.out.println("nase_class = " + e.getClass().getName());
+      System.out.println("nase_msg = " + e.getMessage());
+    }
+    System.out.println("still running");
+  }
+}

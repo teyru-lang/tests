@@ -1,0 +1,3 @@
+nase_class = java.lang.NegativeArraySizeException
+nase_msg = -1
+still running
