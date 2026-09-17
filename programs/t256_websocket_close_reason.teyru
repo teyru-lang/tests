@@ -1,0 +1,68 @@
+import teyru.*
+
+/* A close frame's reason that has to be cut is cut at a character boundary.
+ *
+ * RFC 6455 section 5.5.1: the close frame carries a status code and a reason,
+ * "the latter following the status code ... MUST be valid UTF-8". The whole
+ * frame is 125 bytes, so the reason has room for 123 -- a bound the JDK's own
+ * java.net.http.WebSocket holds a caller to as a BYTE count and not a character
+ * count (WebSocketImpl.isLegalReason encodes the reason with UTF-8 and answers
+ * no when the result is over 123 bytes) -- and this library cuts rather than
+ * refuse, because a server that is already ending the connection has nothing to
+ * refuse with.
+ *
+ * What a cut must not do is leave half a character, which is what a cut at a
+ * byte count alone does: the peer reads a truncated sequence and answers 1007,
+ * so "the reason was long" arrives as "the frame was broken". Java never sends
+ * it -- it refuses the call instead -- and that is why the numbers below are
+ * this library's own observable output and not a JDK run: the two disagree
+ * about whether to cut at all, and this file is about cutting, which the JDK
+ * does not do.
+ */
+
+class Main {
+  static byte[] payloadOf(byte[] body) {
+    byte[] payload = new byte[body.length - 2]
+    for (int i = 0 : i < payload.length : i++) {
+      payload[i] = body[2 + i]
+    }
+    return payload
+  }
+
+  static int codeOf(byte[] body) {
+    return ((body[0] & 0xff) << 8) | (body[1] & 0xff)
+  }
+
+  static void show(String label, int code, String reason) {
+    byte[] body = WebSocketConnection.closeBody(code, reason)
+    byte[] payload = payloadOf(body)
+    System.out.println(label + " frame " + body.length + " reason bytes " + payload.length +
+        " code " + codeOf(body) + " valid " + WebSocketText.valid(payload) +
+        " chars " + Net.stringFrom(payload, 0, payload.length).length())
+  }
+
+  public static void main(String[] args) {
+    // three bytes each: 150 bytes of reason, and the 123rd byte lands inside the
+    // 42nd character
+    show("cjk", 1000, "中".repeat(50))
+
+    // four bytes each: 124 bytes, and the 123rd lands inside the 31st character
+    show("astral", 1000, "\ud83d\ude00".repeat(31))
+
+    // two bytes each: 124 bytes, and the 123rd lands inside the 62nd character
+    show("latin", 1000, "é".repeat(62))
+
+    // ASCII: nothing to cut around, so the cut is at 123 exactly
+    show("ascii", 1000, "a".repeat(200))
+
+    // exactly 123 bytes fits, and is not cut at all
+    show("fits", 1000, "中".repeat(41))
+
+    // one byte over, so one whole character has to go
+    show("over", 1000, "中".repeat(41) + "a")
+
+    // no reason, and the codes a server sends when it refuses a message
+    show("none", 1000, "")
+    show("utf8", 1007, "a text message that is not UTF-8")
+  }
+}

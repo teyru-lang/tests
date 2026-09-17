@@ -1,0 +1,49 @@
+import java.io.*;
+import java.net.*;
+import java.net.http.*;
+import java.nio.charset.StandardCharsets;
+
+/* What the JDK reads out of an answer with no framing at all: the body ends
+ * when the connection does. */
+public class Main {
+  static String codes(String s) {
+    StringBuilder b = new StringBuilder();
+    for (int i = 0; i < s.length(); i++) b.append((int) s.charAt(i)).append(' ');
+    return b.toString().trim();
+  }
+
+  public static void main(String[] args) throws Exception {
+    ServerSocket ss = new ServerSocket(0, 4, InetAddress.getLoopbackAddress());
+    Thread t = new Thread(() -> {
+      try {
+        Socket s = ss.accept();
+        InputStream in = s.getInputStream();
+        int state = 0;
+        while (state < 4) { int c = in.read(); if (c < 0) return;
+          if ((state == 0 || state == 2) && c == '\r') state++;
+          else if ((state == 1 || state == 3) && c == '\n') state++;
+          else state = 0; }
+        OutputStream out = s.getOutputStream();
+        out.write("HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+        out.write("中文".getBytes(StandardCharsets.UTF_8));
+        out.flush();
+        s.close();
+        ss.close();
+      } catch (IOException e) { }
+    });
+    t.setDaemon(true);
+    t.start();
+    HttpClient client = HttpClient.newHttpClient();
+    try {
+      HttpResponse<byte[]> res = client.send(
+          HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + ss.getLocalPort() + "/x")).GET().build(),
+          HttpResponse.BodyHandlers.ofByteArray());
+      byte[] body = res.body();
+      String text = new String(body, StandardCharsets.UTF_8);
+      System.out.println("status " + res.statusCode() + " body bytes " + body.length + " chars " +
+          text.length() + " [" + codes(text) + "]");
+    } catch (Exception e) {
+      System.out.println("failed: " + e);
+    }
+  }
+}

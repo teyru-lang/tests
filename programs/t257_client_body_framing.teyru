@@ -1,0 +1,58 @@
+import teyru.*
+
+/* A response that is already in hand is framed in bytes, which is what the
+ * client's stream half does with readFully and readChunks and what this half
+ * has to do with the same counts.
+ *
+ * Two counts decide where a body ends: Content-Length, which is a count of
+ * bytes, and a chunk size, which is also a count of bytes. Reading either as a
+ * count of characters is wrong for every body that is not ASCII, and it fails
+ * in both directions: a length smaller than the body's byte count but larger
+ * than its character count took the whole body instead of the length it
+ * declared, and a chunk of three bytes is not a chunk of three characters.
+ *
+ * The expectations are the JDK's, and they are the same bytes: the Java half
+ * serves these three answers from a ServerSocket and reads them with
+ * java.net.http.HttpClient, so the numbers below are what a Java client makes
+ * of the same wire. Its output on OpenJDK 21.0.11+10 is the .expected file.
+ */
+
+class Main {
+  static String codes(String s) {
+    StringBuilder b = new StringBuilder()
+    for (int i = 0 : i < s.length() : i++) {
+      b.append((int) s.charAt(i)).append(" ")
+    }
+    return b.toString().trim()
+  }
+
+  static void show(HttpClientResponse res) {
+    System.out.println("status " + res.statusCode() + " body bytes " + res.bodyBytes.length +
+        " chars " + res.body().length() + " [" + codes(res.body()) + "]")
+  }
+
+  public static void main(String[] args) {
+    /* A length the body is longer than: four bytes of a six-byte body are the
+       body, and the last of those four is a character cut short. */
+    show(ClientResponseParser.of("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\n中文"))
+
+    /* A chunked body whose chunks are not ASCII: three bytes and three bytes,
+       which are one character each. */
+    show(ClientResponseParser.of(
+        "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n3\r\n中\r\n3\r\n文\r\n0\r\n\r\n"))
+
+    /* The control: a length that is the whole body. */
+    show(ClientResponseParser.of("HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\n中文"))
+
+    /* unchunk is the same framing on its own, and it is public. */
+    System.out.println("unchunk [" + ClientResponseParser.unchunk(
+        "3\r\n中\r\n3\r\n文\r\n0\r\n\r\n") + "]")
+    System.out.println("unchunk ascii [" + ClientResponseParser.unchunk(
+        "5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n") + "]")
+
+    /* And the sentence a response prints about itself: the number it calls
+       bytes is the byte count of the body that arrived. */
+    System.out.println("describe " + ClientResponseParser.of(
+        "HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\n中文").toString())
+  }
+}

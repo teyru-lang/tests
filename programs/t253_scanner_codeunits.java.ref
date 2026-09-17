@@ -1,0 +1,34 @@
+import java.util.Scanner;
+
+/* The Java half of t253_scanner_codeunits.teyru: the same program, whose output
+ * on OpenJDK 21.0.11+10 is the .expected file beside it. It is what makes the
+ * claim in the Teyru file checkable rather than asserted. */
+
+public class Main {
+  public static void main(String[] args) {
+    Scanner bare = new Scanner("\u010A");
+    System.out.println("bare hasNext " + bare.hasNext());
+    System.out.println("bare hasNextLine " + bare.hasNextLine());
+
+    Scanner line = new Scanner("\u010A 5");
+    String held = line.nextLine();
+    System.out.println("line length " + held.length() + " chars " + (int) held.charAt(0) +
+        " " + (int) held.charAt(2));
+
+    Scanner cr = new Scanner("p\u010D\u010Aq");
+    String whole = cr.nextLine();
+    System.out.println("cr length " + whole.length() + " chars " + (int) whole.charAt(0) + " " +
+        (int) whole.charAt(1) + " " + (int) whole.charAt(2) + " " + (int) whole.charAt(3));
+    System.out.println("cr hasNextLine " + cr.hasNextLine());
+
+    Scanner wide = new Scanner("\u010A\u010D x");
+    System.out.println("wide hasNext " + wide.hasNext());
+    String token = wide.next();
+    System.out.println("wide token length " + token.length() + " chars " + (int) token.charAt(0) +
+        " " + (int) token.charAt(1));
+    System.out.println("wide next " + wide.next());
+
+    Scanner nl = new Scanner("a\nb");
+    System.out.println("nl [" + nl.nextLine() + "][" + nl.nextLine() + "] " + nl.hasNextLine());
+  }
+}

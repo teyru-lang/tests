@@ -1,0 +1,121 @@
+import teyru.*
+
+/* The number a request declares for its body is the number of BYTES the body
+ * puts on the wire, and a body's length in characters is a different number as
+ * soon as one character is not ASCII.
+ *
+ * The first four lines are the JDK's answer for the same four bodies --
+ * HttpRequest.BodyPublishers.ofString(text).contentLength() is text's UTF-8
+ * length, and t255_body_length_bytes.java.ref prints it -- so what this file
+ * holds the library to is a number Java also computes, not one written down
+ * here. The library already says so where it writes the header from bytes
+ * (HttpResponse.bodyLength is `bodyBytes.length`, and the server's lineBytes is
+ * `getBytes().length`); the client's render and the test double are the two
+ * places that still counted characters.
+ *
+ * The round trip at the end is why the number matters: a server reads the bytes
+ * the header declares, so a header that declares 25 for a 33-byte body leaves
+ * eight bytes of body on the connection, where they are read as the start of
+ * the next request.
+ */
+
+class Order {
+  String item
+  int count
+  Order() {
+    item = ""
+    count = 0
+  }
+}
+
+@RestController
+class ApiController {
+  @GetMapping("/ping")
+  String ping() {
+    return "pong"
+  }
+
+  @PostMapping("/echo")
+  String echo(@RequestBody Order o) {
+    return "order " + o.count + " x " + o.item
+  }
+
+  @PostMapping("/declared")
+  String declared(@RequestHeader("Content-Length") String length) {
+    return "declared " + length
+  }
+}
+
+class Main {
+  /* The value of one header of a rendered request, which is what a client puts
+     on the wire and what the assertion is about. */
+  static String headerOf(String rendered, String name) {
+    String[] lines = rendered.split("\r\n")
+    for (int i = 0 : i < lines.length : i++) {
+      if (lines[i].startsWith(name + ": ")) {
+        return lines[i].substring(name.length() + 2)
+      }
+    }
+    return ""
+  }
+
+  public static void main(String[] args) throws Exception {
+    // ---- what the client declares, without a socket ----
+    String[] bodies = {
+      "{\"item\":\"coffee\",\"count\":3}",
+      "{\"item\":\"中文咖啡\",\"count\":3}",
+      "中文咖啡",
+      "coffee",
+    }
+    for (int i = 0 : i < bodies.length : i++) {
+      String b = bodies[i]
+      HttpClientRequest r = HttpClientRequest.of("POST", "http://example.com/items")
+          .contentType("application/json").body(b)
+      String rendered = r.render(HttpUrl.of(r.url))
+      System.out.println("body chars " + b.length() + " bytes " + b.getBytes().length +
+          " declared " + headerOf(rendered, "Content-Length"))
+    }
+
+    // ---- what the test double declares, without a socket ----
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    MockServer mock = new MockServer(ctx)
+    System.out.println("mock " + mock.request("POST", "/declared", "中文咖啡", "text/plain").body)
+    System.out.println("mock ascii " + mock.request("POST", "/declared", "coffee", "text/plain").body)
+
+    // ---- the same request over a socket, where the count is load-bearing ----
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.bind()
+    int port = server.getPort()
+    String base = "http://127.0.0.1:" + port
+
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "server")
+    serving.start()
+
+    boolean ready = false
+    for (int attempt = 0 : attempt < 100 && ready == false : attempt++) {
+      try {
+        ready = Http.get(base + "/ping").statusCode() == 200
+      } catch (IOException e) {
+        Thread.sleep(10)
+      }
+    }
+    System.out.println("server ready=" + ready)
+    if (ready == false) {
+      System.out.println("the server never answered on the port it bound")
+      task.stop()
+      serving.join()
+      server.close()
+      return
+    }
+
+    HttpClientResponse echo = Http.postJson(base + "/echo", bodies[1])
+    System.out.println("echo -> " + echo.statusCode() + " [" + echo.body() + "]")
+
+    task.stop()
+    serving.join()
+    server.close()
+    System.out.println("done")
+  }
+}

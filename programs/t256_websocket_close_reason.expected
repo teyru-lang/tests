@@ -1,0 +1,8 @@
+cjk frame 125 reason bytes 123 code 1000 valid true chars 41
+astral frame 122 reason bytes 120 code 1000 valid true chars 60
+latin frame 124 reason bytes 122 code 1000 valid true chars 61
+ascii frame 125 reason bytes 123 code 1000 valid true chars 123
+fits frame 125 reason bytes 123 code 1000 valid true chars 41
+over frame 125 reason bytes 123 code 1000 valid true chars 41
+none frame 2 reason bytes 0 code 1000 valid true chars 0
+utf8 frame 34 reason bytes 32 code 1007 valid true chars 32

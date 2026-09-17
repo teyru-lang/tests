@@ -1,0 +1,107 @@
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+
+/* The Java half of t257_client_body_framing.teyru: what java.net.http.HttpClient
+ * reads out of the same three answers the Teyru half feeds its parser directly.
+ *
+ * The Teyru half has the response in hand as text; this half puts those bytes on
+ * a socket and reads them with the JDK's own client, so the framing the two
+ * agree on is the framing, and the three "status ... body bytes ... chars ..."
+ * lines of the .expected file are this program's output on OpenJDK 21.0.11+10.
+ *
+ * The three answers are: a Content-Length shorter than the body is in bytes (six
+ * bytes of body under a declared four), a chunked body whose chunks are not
+ * ASCII (three bytes, three bytes), and a Content-Length that is the whole body.
+ */
+public class Main {
+  static byte[] lying = concat("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\n".getBytes(StandardCharsets.UTF_8),
+      "中文".getBytes(StandardCharsets.UTF_8));
+
+  static byte[] chunked = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n3\r\n中\r\n3\r\n文\r\n0\r\n\r\n"
+      .getBytes(StandardCharsets.UTF_8);
+
+  static byte[] exact = concat("HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\n".getBytes(StandardCharsets.UTF_8),
+      "中文".getBytes(StandardCharsets.UTF_8));
+
+  static byte[] concat(byte[] a, byte[] b) {
+    byte[] out = new byte[a.length + b.length];
+    System.arraycopy(a, 0, out, 0, a.length);
+    System.arraycopy(b, 0, out, a.length, b.length);
+    return out;
+  }
+
+  static String codes(String s) {
+    StringBuilder b = new StringBuilder();
+    for (int i = 0; i < s.length(); i++) {
+      b.append((int) s.charAt(i)).append(' ');
+    }
+    return b.toString().trim();
+  }
+
+  public static void main(String[] args) throws Exception {
+    byte[][] responses = { lying, chunked, exact };
+    int port = serve(responses);
+    HttpClient client = HttpClient.newHttpClient();
+    for (int i = 0; i < responses.length; i++) {
+      try {
+        HttpResponse<byte[]> res = client.send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/x")).GET().build(),
+            HttpResponse.BodyHandlers.ofByteArray());
+        byte[] body = res.body();
+        String text = new String(body, StandardCharsets.UTF_8);
+        System.out.println("status " + res.statusCode() + " body bytes " + body.length +
+            " chars " + text.length() + " [" + codes(text) + "]");
+      } catch (IOException e) {
+        System.out.println("request " + i + " failed: " + e);
+      }
+    }
+  }
+
+  static int serve(byte[][] responses) throws IOException {
+    ServerSocket ss = new ServerSocket(0, 4, InetAddress.getLoopbackAddress());
+    Thread t = new Thread(() -> {
+      try {
+        for (byte[] r : responses) {
+          Socket s = ss.accept();
+          readHead(s.getInputStream());
+          OutputStream out = s.getOutputStream();
+          out.write(r);
+          out.flush();
+          s.close();
+        }
+        ss.close();
+      } catch (IOException e) {
+        // the client is gone, which is the end of the run
+      }
+    });
+    t.setDaemon(true);
+    t.start();
+    return ss.getLocalPort();
+  }
+
+  static void readHead(InputStream in) throws IOException {
+    int state = 0;
+    while (state < 4) {
+      int c = in.read();
+      if (c < 0) {
+        return;
+      }
+      if ((state == 0 || state == 2) && c == '\r') {
+        state++;
+      } else if ((state == 1 || state == 3) && c == '\n') {
+        state++;
+      } else {
+        state = 0;
+      }
+    }
+  }
+}
