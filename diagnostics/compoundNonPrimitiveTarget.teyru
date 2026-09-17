@@ -1,0 +1,31 @@
+/* A compound assignment whose target has no unboxed value. `Number n = 1;
+ * n += 1` would need the target's value before it can add to it, and a
+ * reference type that is not one of the eight wrappers has no unboxing
+ * conversion (JLS 5.1.8), so there is nothing to add: javac 21 rejects all
+ * three of these with "bad operand types for binary operator '+='", and the
+ * second type it prints is the operand's, an int.
+ *
+ * Teyru used to accept them: the checker recorded an error type and said
+ * nothing, and the back end then combined two references. The C back end
+ * emitted `(*p) += 1` on a `C_teyru_Number **`, which is valid C -- pointer
+ * arithmetic that walks the box by one element and corrupts the reference --
+ * so the program compiled and then answered nonsense or died. Refusing is what
+ * the rule of the language and javac both say, and it is the same check that
+ * TY-TYP-0064 already makes for the binary operator. */
+class F {
+  int k = 1
+}
+
+class Main {
+  public static void main(String[] args) {
+    Number n = 1
+    n += 1
+    Object o = 1
+    o -= 1
+    F f = new F()
+    f += 1
+    System.out.println(n)
+    System.out.println(o)
+    System.out.println(f)
+  }
+}
