@@ -82,29 +82,15 @@ class T227 {
     }
   }
 
-  // ask retries a read that timed out with nothing in hand: a collection cannot
-  // stop a thread that is inside recv(), and this program's client is one, so a
-  // pause during a handler waits for the client's own read to end. Nothing has
-  // been read when that happens, so the retry starts at the answer.
+  // ask sends one request on a connection of its own and answers the status
+  // line. The retried read belongs to RawClient.ask -- its comment carries the
+  // reason, which is this runtime's collector and a thread blocked in recv().
   static String ask(int port, String path) {
-    Socket s = new Socket("127.0.0.1", port)
-    s.setSoTimeout(500)
+    RawClient c = new RawClient(port)
     try {
-      s.getOutputStream().write("GET " + path + " HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
-      s.getOutputStream().flush()
-      SocketInputStream in = s.getInputStream()
-      for (int attempt = 0 : attempt < 40 : attempt++) {
-        try {
-          String line = in.readLine()
-          return line == null ? "<no answer>" : line
-        } catch (SocketTimeoutException e) {
-        }
-      }
-      return "<no answer>"
-    } catch (IOException e) {
-      return e.getClass().getName()
+      return c.ask("GET " + path + " HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
     } finally {
-      s.close()
+      c.close()
     }
   }
 }

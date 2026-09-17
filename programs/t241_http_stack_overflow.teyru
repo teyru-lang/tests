@@ -11,18 +11,14 @@ import teyru.*
  * answers 500. So the error never reaches the connection loop and the serving
  * thread survives; that is what this pins.
  *
- * The read is retried rather than waited on in one piece, and the reason is a
- * known limitation of this runtime rather than a property of the test: the
- * collector is cooperative, so a thread blocked inside a native recv() is not at
- * a safepoint, and the client's own read is such a thread. A collection that
- * starts while the deep request is being answered therefore waits for the
- * client, which is waiting for the answer: the 500 arrives when the client's
- * read finally times out. Reading in 500 ms pieces turns that into an answer
- * that arrives a second late instead of one that never arrives -- the same
- * request, the same 500, observed only once whatever the client was doing stops
- * mattering. (A client that waits once for five seconds sees nothing and looks
- * like a dead server; that is how this test's first version misread the tree.)
- *
+ * The retried read is RawClient.ask rather than this file's own loop: the
+ * collector here is cooperative, so a thread blocked inside a native recv() is
+ * not at a safepoint, and a client waiting for an answer is such a thread -- a
+ * collection that starts while the deep request is being answered waits for the
+ * client, which is waiting for the answer. The helper carries the whole of that
+ * reason, including what should happen to the retry when W3.11 closes the gap;
+ * this file only says which request it is making.
+ * *
  * The second half is what a program cares about: the next request, on a fresh
  * connection, is answered, and the serving thread is alive at the end. See also
  * t214 (the error itself, on the main thread and on a Thread), t215/t216 (the
@@ -55,41 +51,6 @@ class DeepApi {
   }
 }
 
-class Client {
-  private Socket s
-  private SocketInputStream in
-  private SocketOutputStream out
-
-  public Client(int port) {
-    s = new Socket("127.0.0.1", port)
-    s.setSoTimeout(500)
-    in = s.getInputStream()
-    out = s.getOutputStream()
-  }
-
-  // The status line of one request's answer, or the reason there was none.
-  public String statusLine(String path) {
-    out.write("GET " + path + " HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
-    out.flush()
-    for (int i = 0 : i < 30 : i++) {
-      try {
-        String line = in.readLine()
-        if (line == null) {
-          return "<closed with no answer>"
-        }
-        return line
-      } catch (SocketTimeoutException e) {
-        continue
-      }
-    }
-    return "<no answer within fifteen seconds>"
-  }
-
-  public void close() {
-    s.close()
-  }
-}
-
 class T241 {
   public static void main(String[] args) throws Exception {
     ApplicationContext ctx = new ApplicationContext()
@@ -111,10 +72,13 @@ class T241 {
     System.out.println("done")
   }
 
+  // probe asks one path on a connection of its own. The request is written out
+  // here because what is being tested is the server's answer to this route, and
+  // RawClient.ask is a client that takes a request rather than builds one.
   static void probe(int port, String label, String path) {
-    Client c = new Client(port)
+    RawClient c = new RawClient(port)
     try {
-      System.out.println(label + " -> " + c.statusLine(path))
+      System.out.println(label + " -> " + c.ask("GET " + path + " HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n"))
     } finally {
       c.close()
     }

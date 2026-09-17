@@ -11,14 +11,10 @@ import teyru.*
    answered 200, because a server that answers the first and not the second is a
    server that died on the first.
 
-   The client retries a read that timed out with nothing in hand. That is not
-   slop: the collector cannot stop a thread that is inside the C library's
-   recv(), and this program's client is such a thread, so a collection during
-   the handler waits for the client's own read to end. The answer has not been
-   written when that happens -- the handler is still running -- so a retry is
-   reading from the start of the answer, and the retry is what keeps the test
-   from depending on how long the pause lasts. The socket timeout is short on
-   purpose: it is the pause's upper bound, not the test's patience. */
+   The client is RawClient.ask, whose read is retried in short pieces because
+   this runtime's collector cannot stop a thread blocked in recv() and a
+   client waiting for an answer is such a thread; its comment is where that
+   belongs, and this file does not restate it. */
 
 @RestController
 class ErrorApi {
@@ -68,30 +64,15 @@ class T226 {
     System.out.println("done")
   }
 
-  // ask sends one request and answers the status line, or what came instead. A
-  // read that times out with nothing read is retried, for the reason in the
-  // file comment; the retries are bounded so that a server which never answers
-  // is a line of output rather than a program that hangs.
+  // ask sends one request on a connection of its own and answers the status
+  // line, or what came instead. What is a request and what a retried read is
+  // are RawClient's: this is only the connection's lifetime.
   static String ask(int port, String path) {
-    Socket s = new Socket("127.0.0.1", port)
-    s.setSoTimeout(500)
+    RawClient c = new RawClient(port)
     try {
-      s.getOutputStream().write("GET " + path + " HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
-      s.getOutputStream().flush()
-      SocketInputStream in = s.getInputStream()
-      for (int attempt = 0 : attempt < 40 : attempt++) {
-        try {
-          String line = in.readLine()
-          return line == null ? "<no answer>" : line
-        } catch (SocketTimeoutException e) {
-          // nothing has been read yet: the server is still in the handler
-        }
-      }
-      return "<no answer>"
-    } catch (IOException e) {
-      return e.getClass().getName()
+      return c.ask("GET " + path + " HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
     } finally {
-      s.close()
+      c.close()
     }
   }
 }
