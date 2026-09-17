@@ -1,0 +1,205 @@
+import teyru.*
+
+/* The Teyru half of t250_string_utf16_builders, whose expectation is what the
+   JDK printed for the .java.ref beside it. A StringBuilder is a sequence of
+   UTF-16 code units: setCharAt names a unit, which may be half of an
+   astral character, substring can cut one in half, and setLength can leave one
+   of the halves behind. Every line here is the same line as in the Java. */
+class Builders {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v)
+  }
+  static String hex(int unit) {
+    return Integer.toString(unit & 0xFFFF, 16)
+  }
+  static String units(String text) {
+    StringBuilder b = new StringBuilder()
+    for (var i = 0 : i < text.length() : i++) {
+      if (i > 0) {
+        b.append(' ')
+      }
+      b.append(hex(text.charAt(i)))
+    }
+    return b.toString()
+  }
+  static void pair(String text) {
+    p(text, units(text) + " | bytes=" + text.getBytes().length)
+  }
+  public static void main(String[] args) {
+    StringBuilder sb = new StringBuilder("a\uD83D\uDE00b")
+    p("sb_len", sb.length())
+    p("sb_units", units(sb.toString()))
+    p("sb_charat1", hex(sb.charAt(1)))
+    p("sb_charat2", hex(sb.charAt(2)))
+    p("sb_sub_0_2", units(sb.substring(0, 2)))
+    p("sb_sub_1_2", units(sb.substring(1, 2)))
+    p("sb_sub_1_3", units(sb.substring(1, 3)))
+
+    sb = new StringBuilder()
+    sb.append('\uD83D')
+    sb.append('\uDE00')
+    p("append_pair", units(sb.toString()))
+    sb = new StringBuilder("x")
+    sb.append(new char[] {'y', '\uD83D', '\uDE00', 'z'})
+    p("append_chars", units(sb.toString()))
+
+    sb = new StringBuilder("a\uD83D\uDE00b")
+    sb.insert(2, new char[] {'-', '\uD83D', '\uDE00'})
+    p("insert_inside", units(sb.toString()))
+    sb = new StringBuilder("a\uD83D\uDE00b")
+    sb.insert(4, '\uD83D')
+    p("insert_char_high", units(sb.toString()))
+
+    sb = new StringBuilder("a\uD83D\uDE00b")
+    sb.deleteCharAt(1)
+    p("delcharat_high", units(sb.toString()))
+    sb = new StringBuilder("a\uD83D\uDE00b")
+    sb.deleteCharAt(2)
+    p("delcharat_low", units(sb.toString()))
+    sb = new StringBuilder("a\uD83D\uDE00b")
+    sb.delete(1, 3)
+    p("delete_pair", units(sb.toString()))
+    sb = new StringBuilder("a\uD83D\uDE00b")
+    sb.delete(2, 4)
+    p("delete_straddle", units(sb.toString()))
+
+    sb = new StringBuilder("a\uD83D\uDE00b")
+    sb.replace(1, 3, "\uD83E\uDD14")
+    p("replace_pair", units(sb.toString()))
+    sb = new StringBuilder("a\uD83D\uDE00b")
+    sb.replace(2, 4, "xy")
+    p("replace_straddle", units(sb.toString()))
+
+    sb = new StringBuilder("a\uD83D\uDE00b")
+    sb.setCharAt(1, '\uDE00')
+    p("setcharat_high", units(sb.toString()))
+    sb = new StringBuilder("a\uD83D\uDE00b")
+    sb.setCharAt(2, '\uD83D')
+    p("setcharat_low", units(sb.toString()))
+
+    sb = new StringBuilder("a\uD83D\uDE00b")
+    sb.setLength(2)
+    p("setlen_2", units(sb.toString()))
+    sb = new StringBuilder("a\uD83D\uDE00b")
+    sb.setLength(4)
+    sb.append('|')
+    p("setlen_4", units(sb.toString()))
+    sb = new StringBuilder("ab")
+    sb.setLength(4)
+    p("setlen_grow", units(sb.toString()))
+
+    sb = new StringBuilder("a\uD83D\uDE00b\u4e2d")
+    sb.reverse()
+    p("reverse", units(sb.toString()))
+    sb = new StringBuilder("\uD83D\uDE00\uD83E\uDD14")
+    sb.reverse()
+    p("reverse_pairs", units(sb.toString()))
+    sb = new StringBuilder("\uD83D\uDE00a")
+    sb.reverse()
+    p("reverse_lone", units(sb.toString()))
+
+    sb = new StringBuilder("abcdef")
+    sb.delete(2, 100)
+    p("delete_clamp", units(sb.toString()))
+    sb = new StringBuilder("abcdef")
+    sb.replace(2, 100, "Z")
+    p("replace_clamp", units(sb.toString()))
+    sb = new StringBuilder("a\uD83D\uDE00b")
+    sb.replace(1, 100, "Z")
+    p("replace_clamp_pair", units(sb.toString()))
+
+    try {
+      new StringBuilder("abc").delete(4, 1)
+      p("delete_bad", "no exception")
+    } catch (StringIndexOutOfBoundsException e) {
+      p("delete_bad", "caught StringIndexOutOfBoundsException")
+    }
+    try {
+      new StringBuilder("abc").delete(-1, 1)
+      p("delete_neg", "no exception")
+    } catch (StringIndexOutOfBoundsException e) {
+      p("delete_neg", "caught StringIndexOutOfBoundsException")
+    }
+    try {
+      new StringBuilder("abc").substring(0, 9)
+      p("substring_bad", "no exception")
+    } catch (StringIndexOutOfBoundsException e) {
+      p("substring_bad", "caught StringIndexOutOfBoundsException")
+    }
+    try {
+      new StringBuilder("abc").setLength(-1)
+      p("setlength_neg", "no exception")
+    } catch (StringIndexOutOfBoundsException e) {
+      p("setlength_neg", "caught StringIndexOutOfBoundsException")
+    }
+    try {
+      new StringBuilder("abc").deleteCharAt(3)
+      p("delcharat_bad", "no exception")
+    } catch (StringIndexOutOfBoundsException e) {
+      p("delcharat_bad", "caught StringIndexOutOfBoundsException")
+    }
+    try {
+      new StringBuilder("abc").setCharAt(3, 'x')
+      p("setcharat_bad", "no exception")
+    } catch (StringIndexOutOfBoundsException e) {
+      p("setcharat_bad", "caught StringIndexOutOfBoundsException")
+    }
+    try {
+      new StringBuilder("abc").insert(4, "x")
+      p("insert_bad", "no exception")
+    } catch (StringIndexOutOfBoundsException e) {
+      p("insert_bad", "caught StringIndexOutOfBoundsException")
+    }
+    try {
+      new StringBuilder("abc").replace(1, 2, null)
+      p("replace_null", "no exception")
+    } catch (NullPointerException e) {
+      p("replace_null", "NullPointerException")
+    }
+    try {
+      new StringBuilder("abc").append((char[]) null)
+      p("append_null_chars", "no exception")
+    } catch (NullPointerException e) {
+      p("append_null_chars", "NullPointerException")
+    }
+    try {
+      new StringBuilder("abc").insert(1, (char[]) null)
+      p("insert_null_chars", "no exception")
+    } catch (NullPointerException e) {
+      p("insert_null_chars", "NullPointerException")
+    }
+    try {
+      p("append_null_str", units(new StringBuilder("abc").append((String) null).toString()))
+    } catch (NullPointerException e) {
+      p("append_null_str", "NullPointerException")
+    }
+    try {
+      p("insert_null_str", units(new StringBuilder("abc").insert(1, (String) null).toString()))
+    } catch (NullPointerException e) {
+      p("insert_null_str", "NullPointerException")
+    }
+
+    StringBuffer fb = new StringBuffer("a\uD83D\uDE00b")
+    fb.setCharAt(2, '\uD83D')
+    p("buffer_setcharat", units(fb.toString()))
+    fb = new StringBuffer("a\uD83D\uDE00b")
+    fb.delete(2, 4)
+    p("buffer_delete", units(fb.toString()))
+    fb = new StringBuffer("a\uD83D\uDE00b")
+    fb.replace(1, 3, "\u4e2d")
+    p("buffer_replace", units(fb.toString()))
+    fb = new StringBuffer("a\uD83D\uDE00b")
+    fb.setLength(3)
+    p("buffer_setlen", units(fb.toString()))
+    fb = new StringBuffer("a\uD83D\uDE00b")
+    fb.reverse()
+    p("buffer_reverse", units(fb.toString()))
+    fb = new StringBuffer("a\uD83D\uDE00b")
+    fb.insert(1, new char[] {'\uD83D', '\uDE00'})
+    p("buffer_insert", units(fb.toString()))
+
+    pair("a\uD83D\uDE00b")
+    pair("a\u4e2db")
+    pair("\uD83D\uDE00")
+  }
+}

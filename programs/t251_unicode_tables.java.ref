@@ -1,0 +1,66 @@
+// The Java this case was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t251_unicode_tables.java.ref /tmp/Uni.java
+//   javac -d /tmp/out /tmp/Uni.java
+//   java -ea -Dstdout.encoding=UTF-8 -Duser.language=en -Duser.country=US -cp /tmp/out Uni
+//
+// The whole of Unicode 15.0, code point by code point: what each of them is
+// classified as, which of the predicates answer true for it, and what its case
+// mappings and values are -- folded into counts and one hash, which is what
+// makes it a case a repository can hold. It is the table check: the runtime's
+// tables are generated from UnicodeData.txt, PropList.txt and SpecialCasing.txt,
+// and this says the JDK agrees with every one of the 1,114,112 answers.
+
+class Uni {
+  static void p(String k, long v) {
+    System.out.println(k + " = " + v);
+  }
+  public static void main(String[] args) {
+    long[] byType = new long[31];
+    long letters = 0, digits = 0, letterOrDigit = 0, alphabetic = 0;
+    long upper = 0, lower = 0, title = 0, ws = 0, spaceChar = 0, defined = 0;
+    long h = 0;
+    for (int cp = 0; cp <= 0x10FFFF; cp++) {
+      int t = Character.getType(cp);
+      byType[t]++;
+      if (Character.isLetter(cp)) letters++;
+      if (Character.isDigit(cp)) digits++;
+      if (Character.isLetterOrDigit(cp)) letterOrDigit++;
+      if (Character.isAlphabetic(cp)) alphabetic++;
+      if (Character.isUpperCase(cp)) upper++;
+      if (Character.isLowerCase(cp)) lower++;
+      if (Character.isTitleCase(cp)) title++;
+      if (Character.isWhitespace(cp)) ws++;
+      if (Character.isSpaceChar(cp)) spaceChar++;
+      if (Character.isDefined(cp)) defined++;
+      h = h * 31 + t;
+      h = h * 31 + Character.toUpperCase(cp);
+      h = h * 31 + Character.toLowerCase(cp);
+      h = h * 31 + Character.toTitleCase(cp);
+      h = h * 31 + Character.digit(cp, 36);
+      h = h * 31 + Character.getNumericValue(cp);
+      h = h * 31 + Character.charCount(cp);
+      h = h * 31 + (Character.isSupplementaryCodePoint(cp) ? 1 : 0);
+      h = h * 31 + (Character.isBmpCodePoint(cp) ? 1 : 0);
+      h = h * 31 + (Character.isValidCodePoint(cp) ? 1 : 0);
+    }
+    long total = 0;
+    for (int t = 0; t < 31; t++) {
+      p("type_" + t, byType[t]);
+      total += byType[t];
+    }
+    p("type_total", total);
+    p("letters", letters);
+    p("digits", digits);
+    p("letter_or_digit", letterOrDigit);
+    p("alphabetic", alphabetic);
+    p("upper", upper);
+    p("lower", lower);
+    p("title", title);
+    p("whitespace", ws);
+    p("space_char", spaceChar);
+    p("defined", defined);
+    p("hash", h);
+  }
+}
