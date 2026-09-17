@@ -1,0 +1,122 @@
+import teyru.*
+
+/* A handler that recurses past the end of its stack is one failed request, not
+ * one dead server.
+ *
+ * A route is called reflectively, so the route's frames sit under the runtime's
+ * invoker: the recursion reaches the limit, the check throws, and the invoker's
+ * catch frame -- the nearest one -- takes it. Java's shape for that is an
+ * InvocationTargetException whose cause is the throwable, and because that
+ * wrapper *is* an Exception, lib/18_web's own `catch (Exception)` takes it and
+ * answers 500. So the error never reaches the connection loop and the serving
+ * thread survives; that is what this pins.
+ *
+ * The read is retried rather than waited on in one piece, and the reason is a
+ * known limitation of this runtime rather than a property of the test: the
+ * collector is cooperative, so a thread blocked inside a native recv() is not at
+ * a safepoint, and the client's own read is such a thread. A collection that
+ * starts while the deep request is being answered therefore waits for the
+ * client, which is waiting for the answer: the 500 arrives when the client's
+ * read finally times out. Reading in 500 ms pieces turns that into an answer
+ * that arrives a second late instead of one that never arrives -- the same
+ * request, the same 500, observed only once whatever the client was doing stops
+ * mattering. (A client that waits once for five seconds sees nothing and looks
+ * like a dead server; that is how this test's first version misread the tree.)
+ *
+ * The second half is what a program cares about: the next request, on a fresh
+ * connection, is answered, and the serving thread is alive at the end. See also
+ * t214 (the error itself, on the main thread and on a Thread), t215/t216 (the
+ * report when nothing catches it). The same shape one layer over -- a WebSocket
+ * session's callbacks are called directly rather than reflectively, so an Error
+ * from one does leave the loop -- is pinned separately, in t227. */
+
+@RestController
+class DeepApi {
+  // A recursion no optimiser can turn into a loop: the frame's own array is read
+  // after the recursive call returns, so every level keeps a frame.
+  static int frameRead(int n) {
+    if (n == 0) {
+      return 0
+    }
+    int[] frame = new int[4]
+    frame[0] = n
+    int r = frameRead(n - 1)
+    return r + frame[0] - n + 1
+  }
+
+  @GetMapping("/deep")
+  String deep() {
+    return "depth " + frameRead(10000000)
+  }
+
+  @GetMapping("/ok")
+  String ok() {
+    return "fine"
+  }
+}
+
+class Client {
+  private Socket s
+  private SocketInputStream in
+  private SocketOutputStream out
+
+  public Client(int port) {
+    s = new Socket("127.0.0.1", port)
+    s.setSoTimeout(500)
+    in = s.getInputStream()
+    out = s.getOutputStream()
+  }
+
+  // The status line of one request's answer, or the reason there was none.
+  public String statusLine(String path) {
+    out.write("GET " + path + " HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    out.flush()
+    for (int i = 0 : i < 30 : i++) {
+      try {
+        String line = in.readLine()
+        if (line == null) {
+          return "<closed with no answer>"
+        }
+        return line
+      } catch (SocketTimeoutException e) {
+        continue
+      }
+    }
+    return "<no answer within fifteen seconds>"
+  }
+
+  public void close() {
+    s.close()
+  }
+}
+
+class T217 {
+  public static void main(String[] args) throws Exception {
+    ApplicationContext ctx = new ApplicationContext()
+    ctx.refresh()
+    HttpServer server = new HttpServer(0, Application.routerFrom(ctx), ctx)
+    server.bind()
+    int port = server.getPort()
+    ServerTask task = new ServerTask(server)
+    Thread serving = new Thread(task, "server")
+    serving.start()
+
+    probe(port, "deep", "/deep")
+    probe(port, "after-deep", "/ok")
+    System.out.println("serving-thread-alive=" + serving.isAlive())
+
+    task.stop()
+    serving.join()
+    server.close()
+    System.out.println("done")
+  }
+
+  static void probe(int port, String label, String path) {
+    Client c = new Client(port)
+    try {
+      System.out.println(label + " -> " + c.statusLine(path))
+    } finally {
+      c.close()
+    }
+  }
+}
