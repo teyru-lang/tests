@@ -1,0 +1,54 @@
+// The Java this probe was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t251_exception_names.java.ref /tmp/Names.java
+//   javac -d /tmp/out /tmp/Names.java
+//   java -Dstdout.encoding=UTF-8 -Duser.language=en -Duser.country=US -cp /tmp/out Names
+//
+// Every line is what the JDK printed for the same program. D8 of the fix plan
+// is why they match now: a class of the standard library reports the JDK class
+// it stands in for, so the exceptions the runtime raises are java.lang.* and
+// not teyru.*. The rows that still differ are in t235_probe_exceptions, which
+// asks for the messages this file leaves out on purpose -- a cast's
+// module/loader parenthetical and the helpful NullPointerException message.
+import java.util.*;
+class Names {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v);
+  }
+  static void catchIt(String k, Runnable r) {
+    try {
+      r.run();
+    } catch (Throwable t) {
+      p(k + "_class", t.getClass().getName());
+      p(k + "_str", t.toString());
+      p(k + "_msg", t.getMessage());
+    }
+  }
+  public static void main(String[] args) {
+    p("string", String.class.getName());
+    p("integer", Integer.class.getName());
+    p("list", ArrayList.class.getName());
+    p("map", HashMap.class.getName());
+    p("entry", Map.Entry.class.getName());
+    p("class_of_class", Class.class.getName());
+    p("exception", RuntimeException.class.getName());
+    catchIt("aioobe", () -> { int[] a = new int[3]; a[5] = 1; });
+    catchIt("sioobe", () -> { String s = "abc"; s.charAt(9); });
+    catchIt("nfe", () -> Integer.parseInt("abc"));
+    catchIt("nfe_space", () -> Integer.parseInt(" 5"));
+    catchIt("arith", () -> { int z = 1 / 0; });
+    catchIt("illegal", () -> { throw new IllegalStateException("state"); });
+    catchIt("uoe", () -> { throw new UnsupportedOperationException(); });
+    p("caught_by_parent", parent());
+  }
+  static String parent() {
+    try {
+      int[] a = new int[1];
+      a[2] = 1;
+    } catch (IndexOutOfBoundsException e) {
+      return e.getClass().getName();
+    }
+    return "not caught";
+  }
+}

@@ -1,0 +1,59 @@
+// The names a thrown object reports. Decision D8 of the fix plan: a class of
+// the standard library reports the JDK class it stands in for, so the exception
+// the runtime raises when an array index is out of bounds is
+// java.lang.ArrayIndexOutOfBoundsException here as it is in Java, and
+// Throwable.toString -- which is getName plus the message (lib/06_errors.teyru)
+// -- reads as Java's does. The uncaught report is the same call, so
+// `Exception in thread "main" java.lang.IllegalStateException: boom` is what
+// t79_uncaught prints.
+//
+// Every line below is what the JDK printed for the same program
+// (t251_exception_names.java.ref); the messages that still differ are in
+// t235_probe_exceptions and are the two this file does not ask for: a cast's
+// module and loader parenthetical, and the helpful NullPointerException message
+// (which javac has to record the dead local's slot for).
+//
+// The name a class reports is not the name it is looked up by: Class.forName
+// still answers to teyru.String as well as to java.lang.String, because a class
+// is found by the binary name it really has.
+import teyru.*
+class Names {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v)
+  }
+  static void catchIt(String k, Runnable r) {
+    try {
+      r.run()
+    } catch (Throwable t) {
+      p(k + "_class", t.getClass().getName())
+      p(k + "_str", t.toString())
+      p(k + "_msg", t.getMessage())
+    }
+  }
+  public static void main(String[] args) {
+    p("string", String.class.getName())
+    p("integer", Integer.class.getName())
+    p("list", ArrayList.class.getName())
+    p("map", HashMap.class.getName())
+    p("entry", Map.Entry.class.getName())
+    p("class_of_class", Class.class.getName())
+    p("exception", RuntimeException.class.getName())
+    catchIt("aioobe", () -> { int[] a = new int[3]; a[5] = 1; })
+    catchIt("sioobe", () -> { String s = "abc"; s.charAt(9); })
+    catchIt("nfe", () -> Integer.parseInt("abc"))
+    catchIt("nfe_space", () -> Integer.parseInt(" 5"))
+    catchIt("arith", () -> { int z = 1 / 0; })
+    catchIt("illegal", () -> { throw new IllegalStateException("state") })
+    catchIt("uoe", () -> { throw new UnsupportedOperationException() })
+    p("caught_by_parent", parent())
+  }
+  static String parent() {
+    try {
+      int[] a = new int[1]
+      a[2] = 1
+    } catch (IndexOutOfBoundsException e) {
+      return e.getClass().getName()
+    }
+    return "not caught"
+  }
+}

@@ -39,12 +39,16 @@
 t31_init_order out none Teyru runs static initialisers before main, Java at first active use (JLS 12.4.1); the runtime's clinit publication order has a fix in flight, and the eager order is the owner's call. Same for t35
 t35_static_members out none Teyru runs static initialisers before main, Java at first active use (JLS 12.4.1); the runtime's clinit publication order has a fix in flight, and the eager order is the owner's call. Same for t31
 
-# The exception's message, which W6 aligns one by one against the JDK.
-t65_arraycopy out W6 the array-store message is Teyru's own text; Java says "arraycopy: type mismatch: can not copy long[] into byte[]"
+# The array class, not a message: every array value here is an instance of one
+# class, so getName answers "teyru.Array" for String[] and for int[] where Java
+# answers "[Ljava.lang.String;" and "[I", and String[].class == int[].class is
+# true. The class names themselves are the JDK's now (W6/D8: t86's own line for
+# Class.class reads java.lang.Class), so what is left in this case is the array
+# class, a shape of the runtime rather than a name (AGENTS.md §10).
+t86_class_literal out W6 the one array class: getName answers teyru.Array for every array, where Java names each element type
 
 # Class.getName() and Throwable's output, which decision D8 says must report the
 # JDK's name.
-t86_class_literal out W6 Class.getName() reports teyru.* here; D8 is that it reports java.lang.*
 
 # ---------------------------------------------------------------- javac says no
 

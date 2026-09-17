@@ -3,6 +3,6 @@ plaintext answered=1 with=[]
 tls status=200 body=[hello over TLS]
 direct isSecure=true
 mismatched -> TlsException: key-b.pem: key values mismatch
-missing -> teyru.NoSuchFileException: absent.pem
-no-key -> teyru.IOException: cannot read : no error
+missing -> java.nio.file.NoSuchFileException: absent.pem
+no-key -> java.io.IOException: cannot read : no error
 done

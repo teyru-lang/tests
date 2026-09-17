@@ -1,9 +1,9 @@
 gzip-offered -> HTTP/1.1 200 OK encoding=[gzip] vary=[Accept-Encoding] length=234 decodes=true shorter=true
 gzip-not-offered -> HTTP/1.1 200 OK encoding=[] length=3382 is-text=true
 request-body-claimed-gzip -> HTTP/1.1 200 OK body=[len=7]
-request-body-real-gzip -> HTTP/1.1 200 OK body=[len=374]
-client-claimed-not-gzip -> teyru.ZipException: Not in GZIP format
+request-body-real-gzip -> HTTP/1.1 200 OK body=[len=224]
+client-claimed-not-gzip -> java.util.zip.ZipException: Not in GZIP format
 claimed-requests=1
-client-truncated-member -> teyru.EOFException: Unexpected end of ZLIB input stream
+client-truncated-member -> java.io.EOFException: Unexpected end of ZLIB input stream
 truncated-requests=1
 done

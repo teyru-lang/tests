@@ -1,4 +1,6 @@
-store array element type mismatch
+store arraycopy: type mismatch: can not copy long[] into byte[]
 2 4 0
+store arraycopy: type mismatch: can not copy char[] into long[]
+store arraycopy: type mismatch: can not copy byte[] into long[]
 bounds
 npe
