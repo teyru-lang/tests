@@ -1,0 +1,9 @@
+bare hasNext true
+bare hasNextLine true
+line length 3 chars 266 53
+cr length 4 chars 112 269 266 113
+cr hasNextLine false
+wide hasNext true
+wide token length 2 chars 266 269
+wide next x
+nl [a][b] false

@@ -1,0 +1,87 @@
+import teyru.*
+
+/* A body with no framing: no Content-Length, no chunks, so it ends when the
+ * connection does. That is HTTP/1.0's answer and an HTTP/1.1 answer that closes,
+ * and the bytes of it are the bytes the peer wrote.
+ *
+ * The client this file's RawClient is part of reads a framed body as bytes
+ * already -- readFully for a length, readChunkBytes for chunks -- and the third
+ * shape was the one that went through a String: every byte became a character
+ * and was encoded back on the way out, so a six-byte answer of two CJK
+ * characters came back as twelve bytes of mojibake. A test comparing an upload
+ * against `bodyBytes` is the one that sees it.
+ *
+ * The expectation is the JDK's: t258_wiretest_body_bytes.java.ref serves the
+ * same six bytes on a socket and reads them with java.net.http.HttpClient, and
+ * the line below is its output on OpenJDK 21.0.11+10.
+ */
+
+/* A server that answers once, without framing, and closes: the only way to have
+   a body whose end is the end of the connection. */
+class Unframed implements Runnable {
+  private ServerSocket listener
+  private IOException failure = null
+
+  public Unframed() throws IOException {
+    this.listener = new ServerSocket(0)
+  }
+
+  public int getPort() {
+    return listener.getLocalPort()
+  }
+
+  public IOException getFailure() {
+    return failure
+  }
+
+  public void run() {
+    try {
+      Socket s = listener.accept()
+      SocketInputStream in = s.getInputStream()
+      // the request head, which this server does not read as anything
+      while (true) {
+        String line = in.readLine()
+        if (line == null || line.isEmpty()) {
+          break
+        }
+      }
+      SocketOutputStream out = s.getOutputStream()
+      out.write("HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\n")
+      out.write("中文".getBytes())
+      out.flush()
+      s.close()
+      listener.close()
+    } catch (IOException e) {
+      failure = e
+    }
+  }
+}
+
+class Main {
+  static String codes(String s) {
+    StringBuilder b = new StringBuilder()
+    for (int i = 0 : i < s.length() : i++) {
+      b.append((int) s.charAt(i)).append(" ")
+    }
+    return b.toString().trim()
+  }
+
+  public static void main(String[] args) throws Exception {
+    Unframed server = new Unframed()
+    Thread serving = new Thread(server, "unframed")
+    serving.start()
+
+    RawClient client = new RawClient(server.getPort())
+    client.send("GET / HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
+    RawResponse res = client.read()
+    client.close()
+    serving.join()
+
+    if (server.getFailure() != null) {
+      System.out.println("server failed: " + server.getFailure().getMessage())
+      return
+    }
+    System.out.println("status " + res.status + " body bytes " + res.bodyBytes.length + " chars " +
+        res.body.length() + " [" + codes(res.body) + "]")
+  }
+}

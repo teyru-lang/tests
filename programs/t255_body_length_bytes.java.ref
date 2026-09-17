@@ -1,0 +1,31 @@
+import java.net.URI;
+import java.net.http.HttpRequest;
+import java.nio.charset.StandardCharsets;
+
+/* The Java half of t255_body_length_bytes.teyru: what the JDK declares as the
+ * length of a text body it is about to send.
+ *
+ * Java has no counterpart to this library's own render or its MockServer, so
+ * what this file answers is the one question the Teyru half asserts a number
+ * for: BodyPublishers.ofString(text).contentLength() is the UTF-8 length of
+ * text, and its output on OpenJDK 21.0.11+10 is the "chars ... bytes ..." line
+ * in the .expected file. */
+public class Main {
+  public static void main(String[] args) {
+    String[] bodies = {
+      "{\"item\":\"coffee\",\"count\":3}",
+      "{\"item\":\"\u4E2D\u6587\u5496\u5561\",\"count\":3}",
+      "\u4E2D\u6587\u5496\u5561",
+      "coffee",
+    };
+    for (String b : bodies) {
+      HttpRequest r = HttpRequest.newBuilder(URI.create("http://example.com/items"))
+          .header("Content-Type", "application/json")
+          .POST(HttpRequest.BodyPublishers.ofString(b))
+          .build();
+      System.out.println("body chars " + b.length() + " bytes " +
+          b.getBytes(StandardCharsets.UTF_8).length + " declared " +
+          r.bodyPublisher().get().contentLength());
+    }
+  }
+}

@@ -1,0 +1,28 @@
+import java.text.ChoiceFormat;
+
+/* The "<=" spelling of a choice limit: U+2264, which Java treats as another
+ * spelling of "#" -- not as a strict "<". */
+public class Main {
+  static void show(String pattern) {
+    try {
+      ChoiceFormat f = new ChoiceFormat(pattern);
+      double[] limits = f.getLimits();
+      Object[] formats = f.getFormats();
+      StringBuilder b = new StringBuilder();
+      for (int i = 0; i < limits.length; i++) {
+        b.append(" ").append(limits[i]).append("=").append(formats[i]);
+      }
+      System.out.println("[" + pattern + "] ->" + b + " 1.0[" + f.format(1.0) + "] 2.0[" +
+          f.format(2.0) + "] 0.5[" + f.format(0.5) + "] toPattern[" + f.toPattern() + "]");
+    } catch (Exception e) {
+      System.out.println("[" + pattern + "] -> " + e.getClass().getName() + ": " + e.getMessage());
+    }
+  }
+
+  public static void main(String[] args) {
+    show("0#none|1#one|2<two");
+    show("0#none|1\u2264one|2\u2264two");
+    show("0#none|1<one|2<two");
+    show("1\u2264one|2\u2264two");
+  }
+}

@@ -1,0 +1,52 @@
+import teyru.*
+
+/* Scanner over a string whose characters have a byte underneath that is a line
+ * feed or a carriage return.
+ *
+ * Scanner is a character reader: the position it holds is an index into the
+ * string, the delimiter test is on the character there, and nextLine() breaks
+ * on the characters Java's line terminators are. This file pins the case that
+ * tells a character test from a byte test -- U+010A is LATIN CAPITAL LETTER C
+ * WITH DOT ABOVE, whose low byte is 0x0A, and U+010D is c with caron, whose low
+ * byte is 0x0D -- because a reader that masks the character down to a byte
+ * reads both of them as line terminators.
+ *
+ * Every expectation below is the output of t253_scanner_codeunits.java.ref on
+ * OpenJDK 21.0.11+10; the .expected file is that output, byte for byte.
+ */
+
+class Main {
+  public static void main(String[] args) {
+    /* A character that is not whitespace, alone: there is a token, and there is
+       a line, in Java. */
+    Scanner bare = new Scanner("\u010A")
+    System.out.println("bare hasNext " + bare.hasNext())
+    System.out.println("bare hasNextLine " + bare.hasNextLine())
+
+    /* nextLine() answers the rest of the line from wherever the position is,
+       and neither of these two characters ends a line. */
+    Scanner line = new Scanner("\u010A 5")
+    String held = line.nextLine()
+    System.out.println("line length " + held.length() + " chars " + (int) held.charAt(0) +
+        " " + (int) held.charAt(2))
+
+    /* A carriage return that is not one: the line runs to the end. */
+    Scanner cr = new Scanner("p\u010D\u010Aq")
+    String whole = cr.nextLine()
+    System.out.println("cr length " + whole.length() + " chars " + (int) whole.charAt(0) + " " +
+        (int) whole.charAt(1) + " " + (int) whole.charAt(2) + " " + (int) whole.charAt(3))
+    System.out.println("cr hasNextLine " + cr.hasNextLine())
+
+    /* A token is a run of non-whitespace, and neither character is whitespace. */
+    Scanner wide = new Scanner("\u010A\u010D x")
+    System.out.println("wide hasNext " + wide.hasNext())
+    String token = wide.next()
+    System.out.println("wide token length " + token.length() + " chars " + (int) token.charAt(0) +
+        " " + (int) token.charAt(1))
+    System.out.println("wide next " + wide.next())
+
+    /* The control: a real line feed still ends a line. */
+    Scanner nl = new Scanner("a\nb")
+    System.out.println("nl [" + nl.nextLine() + "][" + nl.nextLine() + "] " + nl.hasNextLine())
+  }
+}
