@@ -1,0 +1,12 @@
+static init: 5 init
+100 core 0.5 M 25
+15 init
+0 1 4 
+5 hi bob
+0 1 6
+17
+7 fixed 14
+true
+4
+one:x two:xy
+CORE4

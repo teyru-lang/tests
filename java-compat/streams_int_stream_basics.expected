@@ -1,0 +1,9 @@
+range 15
+rangeClosed 21
+rangeCount 5
+max 8
+minOf 4
+average 2.5
+toArraySum 10
+filteredSum 30
+mappedSum 30

@@ -1,0 +1,10 @@
+captureLocal [11, 12, 13, 14]
+captureStatic [v-1!, v-2!, v-3!, v-4!]
+blockLambda 20
+combine 5
+combine 5
+callCount 2
+gen 300
+gen 400
+makeList [a10, b10]
+finalCallCount 4

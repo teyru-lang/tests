@@ -1,0 +1,26 @@
+6
+15
+15
+6
+30
+a-b-c
+p-q
+a-b-c
+x,y,z
+first=1 rest=0 []
+first=1 rest=2 [p,q]
+pear
+9
+2.5
+5.0
+2.0
+Pair(one => 1)
+one/1
+Pair(1 => one)
+true
+false
+3415643
+Point3(3,4)
+true
+false
+97

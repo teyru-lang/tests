@@ -1,0 +1,8 @@
+mapToObj [n0, n1, n2, n3]
+boxed [1, 2, 3, 4, 5]
+count 10
+sum 55
+min 1
+max 10
+average 5.5
+evens [2, 4, 6, 8, 10]

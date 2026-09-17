@@ -1,0 +1,9 @@
+sumDoubled 12.0
+sumDoubledD 8.0
+joinLabels ax;bee;
+sumAll 10.0
+sumAllD 0.75
+bag [0, 1, 4, 9]
+intsOnly [0, 1, 4]
+repeat [ha, ha, ha]
+repeatInt [7, 7]

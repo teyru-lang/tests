@@ -1,0 +1,16 @@
+args=0
+built unit
+no-arg done
+unit 1x1=1
+built box
+12
+built custom
+Box(custom 2x5=10)
+built custom*3
+custom*3 6x15=90
+3
+10
+true
+BOX 3X4=12
+unnamed explicit
+1,1,unit
