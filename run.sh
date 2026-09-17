@@ -28,6 +28,9 @@
 #                 expected.txt for the output, and net_c_test.c, which tests the
 #                 socket layer as C because that is the only way to have a peer
 #                 that is genuinely slow, silent or gone
+#   java-compat/  NAME.java and NAME.expected: the same program written in Java,
+#                 compiled by this compiler as it stands, with the expectation
+#                 taken from running it on the JDK
 #
 # Two files beside them shape what a failure means, and the compiler's own
 # driver reads both the same way:
@@ -54,7 +57,7 @@ fi
 
 CC=${CC:-cc}
 parts=$*
-[ -n "$parts" ] || parts="programs packages diagnostics native"
+[ -n "$parts" ] || parts="programs packages diagnostics native java-compat"
 
 # build passes everything through to the compiler, adding the target when one was
 # named. TEYRU_TARGET is the one place this script says which platform it is
@@ -199,7 +202,7 @@ skip_if_platform() {
 }
 
 # ---------------------------------------------------------------- programs
-if [ "$parts" = "programs packages diagnostics native" ] || [ "${parts#*programs}" != "$parts" ]; then
+if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${parts#*programs}" != "$parts" ]; then
   for src in programs/*.teyru; do
     [ -f "$src" ] || continue
     name=$(basename "$src" .teyru)
@@ -241,7 +244,7 @@ if [ "$parts" = "programs packages diagnostics native" ] || [ "${parts#*programs
 fi
 
 # ---------------------------------------------------------------- packages
-if [ "$parts" = "programs packages diagnostics native" ] || [ "${parts#*packages}" != "$parts" ]; then
+if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${parts#*packages}" != "$parts" ]; then
   for dir in packages/*/; do
     [ -d "$dir" ] || continue
     name=$(basename "$dir")
@@ -276,7 +279,7 @@ if [ "$parts" = "programs packages diagnostics native" ] || [ "${parts#*packages
 fi
 
 # ---------------------------------------------------------------- diagnostics
-if [ "$parts" = "programs packages diagnostics native" ] || [ "${parts#*diagnostics}" != "$parts" ]; then
+if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${parts#*diagnostics}" != "$parts" ]; then
   for src in diagnostics/*.teyru; do
     [ -f "$src" ] || continue
     name=$(basename "$src" .teyru)
@@ -298,7 +301,7 @@ if [ "$parts" = "programs packages diagnostics native" ] || [ "${parts#*diagnost
 fi
 
 # ---------------------------------------------------------------- native
-if [ "$parts" = "programs packages diagnostics native" ] || [ "${parts#*native}" != "$parts" ]; then
+if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${parts#*native}" != "$parts" ]; then
   if [ -f native/program.teyru ]; then
     if skip_if_platform "native/program"; then :; else
     mkdir -p "$tmp/native"
@@ -342,6 +345,42 @@ if [ "$parts" = "programs packages diagnostics native" ] || [ "${parts#*native}"
     fi
     fi
   fi
+fi
+
+# ------------------------------------------------------------- java-compat
+#
+# Unmodified Java programs: NAME.java, and NAME.expected holding what the JDK
+# 21 printed when it ran the same file (`javac -d out NAME.java && java -cp out
+# NAME`; the expectation is never hand-written). The compiler reads .java as a
+# source extension and the statement terminator is optional (decision D6), so a
+# case here fails when this compiler refuses Java that javac accepts, or when
+# the two answers differ. That is the subset `docs`' "Java source compiles
+# unchanged" names, and the size of the subset is the number of files here.
+if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${parts#*java-compat}" != "$parts" ]; then
+  for src in java-compat/*.java; do
+    [ -f "$src" ] || continue
+    name=$(basename "$src" .java)
+    if skip_if_platform "java-compat/$name"; then continue; fi
+    want="java-compat/$name.expected"
+    if [ ! -f "$want" ]; then
+      verdict "$name" "missing $want, the output the JDK printed"
+      continue
+    fi
+    if ! build -O1 -o "$tmp/jc-$name" "$src" >"$tmp/jc-$name.cc" 2>&1; then
+      verdict "$name" "compile failed" "$(sed -n '1,4p' "$tmp/jc-$name.cc")"
+      continue
+    fi
+    "$tmp/jc-$name" >"$tmp/jc-$name.out" 2>"$tmp/jc-$name.err"
+    code=$?
+    problems=""
+    [ "$code" = "0" ] || problems="exit $code, and the JDK's run of it ended 0"
+    cmp -s "$want" "$tmp/jc-$name.out" || problems="$problems stdout differs from $want"
+    if [ -n "$problems" ]; then
+      verdict "$name" "$problems" "$(diff "$want" "$tmp/jc-$name.out" 2>/dev/null | sed -n '1,6p')" "$(sed -n '1,4p' "$tmp/jc-$name.err")"
+    else
+      verdict "$name" ""
+    fi
+  done
 fi
 
 printf '\n%d passed, %d failed, %d known, %d skipped\n' "$pass" "$fail" "$known" "$skipped"

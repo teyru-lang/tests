@@ -8,7 +8,7 @@
 # running them without it. See run.sh for what each part is.
 TEYRU ?= teyru
 
-.PHONY: all programs packages diagnostics native check
+.PHONY: all programs packages diagnostics native java-compat check
 
 all:
 	TEYRU=$(TEYRU) sh run.sh
@@ -24,6 +24,9 @@ diagnostics:
 
 native:
 	TEYRU=$(TEYRU) sh run.sh native
+
+java-compat:
+	TEYRU=$(TEYRU) sh run.sh java-compat
 
 # check runs the parser over the scripts, so a typo is caught without a compiler.
 check:

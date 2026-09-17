@@ -48,8 +48,9 @@ make test-programs # just the programs, with the compiler's own output shown
 ```
 
 `TestPrograms` reads `programs/`, `TestPackages` reads `packages/`,
-`TestDiagnostics` reads `diagnostics/`, `TestNative` reads `native/`, and the
-module system's tests read `modules/`. Both drivers read the same files: the
+`TestDiagnostics` reads `diagnostics/`, `TestNative` reads `native/`,
+`TestJavaCompat` reads `java-compat/`, and the module system's tests read
+`modules/`. Both drivers read the same files: the
 data is the contract, and the two are not allowed to disagree about what a
 `.expected` means.
 
@@ -96,6 +97,7 @@ has been accepted.
 | `modules/` | `teyru.mod` fixtures, a local module cache under `fixtures/`, and the programs that exercise `teyru get` and `mod tidy` |
 | `diagnostics/` | `name.teyru` and `name.code`: the program must be *rejected*, and the diagnostic named in `.code` must appear. The cases live here rather than as string literals in the compiler's test source, because a suite that keeps one of its parts inside the compiler is the compiler testing itself |
 | `native/` | the C implementation a `native` method gets linked against, plus `net_c_test.c`: the socket layer tested as C, because the failures that matter need a peer that is genuinely slow, silent or gone |
+| `java-compat/` | `name.java` and `name.expected`: an unmodified Java program, and what the JDK 21 printed when it ran it. The compiler reads `.java` as a source extension and the statement terminator is optional, so the subset these cases cover is the subset "Java source compiles unchanged" names |
 
 ### The files beside a program
 

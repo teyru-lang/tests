@@ -51,10 +51,8 @@ t236_probe_unicode W5 strip/trim/isBlank use ASCII only and parseInt rejects the
 # --- API the checker does not know yet: codePointCount, codePointAt,
 #     String(char[]), String(int[],int,int), String.join, String.valueOf(char[]),
 #     Character.isSpaceChar/toTitleCase/isSurrogate/charCount, Integer(int)
-t237_probe_missing_api W7 the checker rejects String.codePointCount, String.codePointAt, new String(char[]), String.join and the rest (plan 1.2)
+t237_probe_missing_api W5 the checker rejects String.codePointCount, String.codePointAt, new String(char[]), String.join and the rest (plan 1.2); the declarations are in lib/02_string.teyru, which the string work owns
 
-# --- a method that ends in a switch whose every branch returns
-t238_probe_switch_return W7 a switch whose cases all return is reported as a missing return (plan 1.2, JLS 14.22)
 
 # --- `new int[-1]`: javac compiles it and throws at run time, the checker
 #     rejects it at compile time
