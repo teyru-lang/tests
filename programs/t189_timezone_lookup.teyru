@@ -3,7 +3,9 @@ package teyru
 /* The policy side of the zone layer: which ids a database has, what a bad id
    does, where the files are read from, which zone is the default, and the two
    answers that come from the file rather than from a JVM (the abbreviation a
-   file designates, and the negative DST of Europe/Dublin).
+   file designates, and Ireland's offsets, which are the file's in both of the
+   layouts tzdata has been built in -- its DST *flag* is the layout's own, and is
+   asserted by t190 against files it writes rather than against the host).
 
    Almost nothing here is Java's answer, and that is the point of the file. The
    id list is the *system's* list, so it is read from the search path rather than
@@ -40,6 +42,14 @@ class T189 {
     ZoneRules r = z.getRules()
     String dst = r.isDaylightSavings(instant) ? "dst" : "std"
     p(label + " " + r.getOffset(instant) + " " + dst + " " + r.getAbbreviation(instant))
+  }
+
+  /* One zone's offset and designation for one instant, without the flag: the two
+     answers that are the same whichever layout the host's tzdata was built in. */
+  static void zoneOffsetAndName(String label, String id, long second) {
+    ZoneRules r = ZoneId.of(id).getRules()
+    Instant instant = Instant.ofEpochSecond(second)
+    p(label + " " + r.getOffset(instant) + " " + r.getAbbreviation(instant))
   }
 
   public static void main(String[] args) {
@@ -179,22 +189,33 @@ class T189 {
     zone("kiritimati 2050", "Pacific/Kiritimati", 2540289600L)
     zone("etc gmt-8", "Etc/GMT-8", 2540289600L)
 
-    // ---------- negative DST: the file's answer, and the JVM's ----------
-    /* tzdata models Ireland's winter as daylight saving with minus one hour: the
-       winter type of Europe/Dublin is marked isdst and its footer is
-       IST-1GMT0,M10.5.0,M3.5.0/1, so the DST half of the year is the winter. The
-       JVM's copy of the database flattens that (it answers dst false in January
-       and calls the winter the standard offset), which is the one place t188
-       cannot be asked about this zone. glibc agrees with the file here, and
-       `zdump -v Europe/Dublin` prints the same "isdst=1 gmtoff=0" for January
-       that this test asserts. */
-    zone("dublin 2026 jan", "Europe/Dublin", 1768478400L)
-    zone("dublin 2026 jul", "Europe/Dublin", 1784116800L)
-    zone("dublin 2050 jan", "Europe/Dublin", 2525860800L)
+    // ---------- Ireland, and the one answer the host's layout decides ----------
+    /* Europe/Dublin is the one zone here whose DST *flag* cannot be asserted
+       against the host, because tzdata has been built in two layouts and they
+       disagree about it. In the vanguard layout the standard type is IST
+       (+01:00, isdst=0) and the winter type is GMT (+00:00, isdst=1) -- the
+       negative saving that lib/46_timezone.teyru's header describes, and what
+       `zdump -v Europe/Dublin` prints on this host; in the rearguard layout, which
+       Debian and Ubuntu build tzdata from, GMT is the standard type and IST is the
+       isdst one. The offsets and the designations are the same either way, and
+       those are asserted here; the flags themselves are pinned by
+       tests/programs/t190_timezone_tzif.teyru, which writes both layouts as files
+       it owns, so its answer does not depend on the host at all.
+
+       The two lines after the zones are the properties that hold in either
+       layout: exactly one side of the year carries the flag, and the standard
+       offset is the offset of the side that does not. */
+    zoneOffsetAndName("dublin 2026 jan", "Europe/Dublin", 1768478400L)
+    zoneOffsetAndName("dublin 2026 jul", "Europe/Dublin", 1784116800L)
+    zoneOffsetAndName("dublin 2050 jan", "Europe/Dublin", 2525860800L)
     ZoneRules dublin = ZoneId.of("Europe/Dublin").getRules()
     Instant winter = Instant.ofEpochSecond(1768478400L)
     Instant summer = Instant.ofEpochSecond(1784116800L)
-    p("dublin winter dst " + dublin.isDaylightSavings(winter) + " offset " + dublin.getOffset(winter) + " standard " + dublin.getStandardOffset(winter))
-    p("dublin summer dst " + dublin.isDaylightSavings(summer) + " offset " + dublin.getOffset(summer) + " standard " + dublin.getStandardOffset(summer))
+    boolean winterDst = dublin.isDaylightSavings(winter)
+    boolean summerDst = dublin.isDaylightSavings(summer)
+    ZoneOffset notDst = winterDst ? dublin.getOffset(summer) : dublin.getOffset(winter)
+    p("dublin one side of the year is DST: " + (winterDst != summerDst))
+    p("dublin the standard offset is the side that is not DST: " +
+      dublin.getStandardOffset(winter).equals(notDst))
   }
 }
