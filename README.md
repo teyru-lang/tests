@@ -11,12 +11,30 @@ It runs itself, against any Teyru compiler, with nothing but a shell:
 TEYRU=/path/to/teyru sh run.sh          # everything
 TEYRU=/path/to/teyru sh run.sh programs # one part
 TEYRU=/path/to/teyru make               # the same, through the Makefile
+TEYRU=/path/to/teyru TEYRU_TARGET=linux/arm64 sh run.sh   # for another platform
 ```
 
 `run.sh` builds each case, runs it, and compares with the file beside it. It
 needs no Go, no compiler source tree and no test harness, which is the point:
 the cases are data, and a data repository that can only be read by one program
 in one other repository is not a project of its own.
+
+`TEYRU_TARGET` is the platform the whole run is for, spelled `<os>/<arch>` the
+way `teyru build --target` spells it; empty (the default) is the machine the run
+is on. It is passed to every build, and it is also the platform the `.skip` files
+are read against -- a case is skipped when the program cannot run *there*, since
+that is where the run is taking it. The compiler repository's `go test` driver
+reads exactly the same variable the same way (`TEYRU_TARGET=linux/arm64 go test
+./...`), so a cross run means one thing to both drivers and not two. Nothing else
+about the run changes: the cases, the expectations and the policy files are the
+ones below.
+
+Running for another platform only says something where the programs can actually
+run on it: `linux/arm64` needs a registered `binfmt_misc` handler or `qemu-user`
+(`QEMU_LD_PREFIX` pointing at the target's sysroot), and `windows/amd64` needs
+wine. `CC` is a separate variable, and it is `run.sh`'s own C compiler for
+`native/net_c_test.c` -- a cross run needs that one set to the target's compiler
+as well.
 
 The compiler repository mounts this one as a submodule at `tests/` and drives
 the same files through `go test`, which is the nicer entry point when you are

@@ -4,6 +4,8 @@
 #   TEYRU=/path/to/teyru sh run.sh              # everything
 #   TEYRU=teyru sh run.sh programs diagnostics  # named parts
 #   TEYRU=teyru RUNS_KEEP=0 sh run.sh           # drop the built programs
+#   TEYRU=teyru TEYRU_TARGET=linux/arm64 sh run.sh   # build and run for another
+#                                               # platform this machine can run
 #
 # Nothing here needs Go, the compiler's source tree, or its test harness: this
 # repository is the suite, and this script is what runs it. The compiler
@@ -39,6 +41,7 @@
 set -u
 
 TEYRU=${TEYRU:-teyru}
+TARGET=${TEYRU_TARGET:-}
 RUNS_KEEP=${RUNS_KEEP:-0}
 here=$(cd "$(dirname "$0")" && pwd)
 cd "$here"
@@ -52,6 +55,20 @@ fi
 CC=${CC:-cc}
 parts=$*
 [ -n "$parts" ] || parts="programs packages diagnostics native"
+
+# build passes everything through to the compiler, adding the target when one was
+# named. TEYRU_TARGET is the one place this script says which platform it is
+# building for, and it is said here rather than at each call site so that a build
+# added later cannot forget it. The compiler repository's driver reads the same
+# variable the same way (see README.md), because the two drivers are not allowed
+# to disagree about what a run means.
+build() {
+  if [ -n "$TARGET" ]; then
+    "$TEYRU" build --target "$TARGET" "$@"
+  else
+    "$TEYRU" build "$@"
+  fi
+}
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/teyru-suite.XXXXXX")
 trap 'if [ "$RUNS_KEEP" = "0" ]; then rm -rf "$tmp"; else echo "run.sh: kept $tmp"; fi' EXIT
@@ -128,18 +145,29 @@ verdict() {
 # reads the same file the same way: `windows`, `darwin/arm64`, or `!linux` for
 # the one platform it *can* run on. uname spells both halves differently from
 # Go, so both are normalised here.
-goos=$(uname -s 2>/dev/null | tr 'A-Z' 'a-z')
-case "$goos" in
-  mingw*|msys*|cygwin*|windows*) goos=windows ;;
-  darwin) goos=darwin ;;
-  linux) goos=linux ;;
-esac
-goarch=$(uname -m 2>/dev/null)
-case "$goarch" in
-  x86_64|amd64) goarch=amd64 ;;
-  aarch64|arm64) goarch=arm64 ;;
-  i386|i686) goarch=386 ;;
-esac
+#
+# When TEYRU_TARGET names a platform, that platform is the one a case is skipped
+# for: the programs are built for it, so what they can do is what that platform
+# can do. A cross run is only meaningful where the programs can actually run --
+# qemu for linux/arm64, wine for windows/amd64 -- and a case that platform
+# cannot run is then skipped for the platform's reason rather than the host's.
+if [ -n "$TARGET" ]; then
+  goos=${TARGET%%/*}
+  goarch=${TARGET#*/}
+else
+  goos=$(uname -s 2>/dev/null | tr 'A-Z' 'a-z')
+  case "$goos" in
+    mingw*|msys*|cygwin*|windows*) goos=windows ;;
+    darwin) goos=darwin ;;
+    linux) goos=linux ;;
+  esac
+  goarch=$(uname -m 2>/dev/null)
+  case "$goarch" in
+    x86_64|amd64) goarch=amd64 ;;
+    aarch64|arm64) goarch=arm64 ;;
+    i386|i686) goarch=386 ;;
+  esac
+fi
 
 # skip_reason NAME prints the reason when NAME cannot run on this platform, and
 # prints nothing when it can.
@@ -181,7 +209,7 @@ if [ "$parts" = "programs packages diagnostics native" ] || [ "${parts#*programs
       verdict "$name" "missing $want"
       continue
     fi
-    if ! "$TEYRU" build -O1 -o "$tmp/$name" "$src" >"$tmp/$name.cc" 2>&1; then
+    if ! build -O1 -o "$tmp/$name" "$src" >"$tmp/$name.cc" 2>&1; then
       verdict "$name" "compile failed" "$(sed -n '1,4p' "$tmp/$name.cc")"
       continue
     fi
@@ -220,7 +248,7 @@ if [ "$parts" = "programs packages diagnostics native" ] || [ "${parts#*packages
     if skip_if_platform "packages/$name"; then continue; fi
     if [ -f "$dir/error" ]; then
       want=$(cat "$dir/error")
-      if "$TEYRU" build -O0 -o "$tmp/pkg-$name" "$dir" >"$tmp/pkg-$name.out" 2>&1; then
+      if build -O0 -o "$tmp/pkg-$name" "$dir" >"$tmp/pkg-$name.out" 2>&1; then
         verdict "$name" "expected a compile failure, got none"
       elif grep -qF "$want" "$tmp/pkg-$name.out"; then
         verdict "$name" ""
@@ -234,7 +262,7 @@ if [ "$parts" = "programs packages diagnostics native" ] || [ "${parts#*packages
       verdict "$name" "missing $want"
       continue
     fi
-    if ! "$TEYRU" build -O1 -o "$tmp/pkg-$name" "$dir" >"$tmp/pkg-$name.cc" 2>&1; then
+    if ! build -O1 -o "$tmp/pkg-$name" "$dir" >"$tmp/pkg-$name.cc" 2>&1; then
       verdict "$name" "compile failed" "$(sed -n '1,4p' "$tmp/pkg-$name.cc")"
       continue
     fi
@@ -259,7 +287,7 @@ if [ "$parts" = "programs packages diagnostics native" ] || [ "${parts#*diagnost
       continue
     fi
     want=$(cat "$wantf")
-    if "$TEYRU" build -O0 -o "$tmp/diag-$name" "$src" >"$tmp/diag-$name.out" 2>&1; then
+    if build -O0 -o "$tmp/diag-$name" "$src" >"$tmp/diag-$name.out" 2>&1; then
       verdict "$name" "expected a compile failure, got none"
     elif grep -qF "$want" "$tmp/diag-$name.out"; then
       verdict "$name" ""
@@ -274,7 +302,7 @@ if [ "$parts" = "programs packages diagnostics native" ] || [ "${parts#*native}"
   if [ -f native/program.teyru ]; then
     if skip_if_platform "native/program"; then :; else
     mkdir -p "$tmp/native"
-    if "$TEYRU" build -O1 -o "$tmp/native/program" \
+    if build -O1 -o "$tmp/native/program" \
         --native native/impl.c --native-header "$tmp/native/native.h" \
         --cc-flag -I --cc-flag "$tmp/native" native/program.teyru >"$tmp/native/cc" 2>&1; then
       "$tmp/native/program" >"$tmp/native/out" 2>&1
