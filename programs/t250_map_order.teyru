@@ -1,0 +1,107 @@
+// A HashMap walks its buckets in index order, and the entries inside one bucket
+// in the order they were inserted. That is not a promise Java makes -- iteration
+// order is explicitly unspecified -- but it is what the JDK does, and decision
+// D7 in the fix plan is to walk in the same order rather than to document a
+// difference. Every line below is a rule of that layout, and the expectation
+// beside this file is what the JDK printed for the same program
+// (t250_map_order.java.ref):
+//
+//   - five_strings, five_reversed: the five keys of appendix C.1. bucket 0 holds
+//     banana and date, bucket 1 apple and cherry, bucket 12 elderberry, and a
+//     bucket walks in insertion order, so the second map is not the first
+//     reversed.
+//   - one_bucket: 0, 16, 32 and 48 all land in bucket 0 of a 16-slot table.
+//   - one_bucket_grown: the 13th key grows the table to 32 slots, which splits
+//     bucket 0 in two; 16 and 48 are the entries that move, in insertion order.
+//   - three_direct against three_copied: the copy constructor pre-sizes the
+//     table from the source's size (tableSizeFor(ceil(3 / 0.75)) = 4), so the
+//     same three keys walk differently in a copied map than in the original.
+//   - load_0.6_19: the threshold doubles on every growth, so a 0.6 load factor
+//     over 16 slots is 9, then 18: the 19th key grows the table and 33 and 40
+//     move to the end. Recomputing the threshold as capacity * loadFactor would
+//     give 19 and leave the table at 32.
+//   - putall_pre_sized: putAll on a map that has no table yet pre-sizes from the
+//     source's size too (ceil(20 / 0.6) = 34, tableSizeFor(34) = 64), so 37 keys
+//     never grow again and the 300s follow the 200s.
+//   - hashset: a set is a map's key set, so it walks the map's buckets.
+//   - linked: a LinkedHashMap is insertion order, before and after this change.
+//
+// One thing this file cannot pin is Java's treeification, which a bucket of
+// eight or more entries triggers once the table has 64 slots: the tree's root
+// moves to the front of the bucket and the root after rebalancing is not
+// something Teyru reproduces -- for keys that compare neither by hash nor by
+// Comparable, Java breaks the tie with System.identityHashCode, which is not
+// reproducible in principle. See the note on HashMap in lib/08_collections.teyru.
+import teyru.*
+class MapOrder {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v)
+  }
+  public static void main(String[] args) {
+    Map<String, Integer> m = new HashMap<String, Integer>()
+    m.put("banana", 1)
+    m.put("apple", 2)
+    m.put("cherry", 3)
+    m.put("date", 4)
+    m.put("elderberry", 5)
+    p("five_strings", m)
+    p("five_keys", new ArrayList<String>(m.keySet()))
+    p("five_values", new ArrayList<Integer>(m.values()))
+    p("five_entry", m.entrySet().iterator().next())
+    Map<String, Integer> r = new HashMap<String, Integer>()
+    r.put("elderberry", 5)
+    r.put("date", 4)
+    r.put("cherry", 3)
+    r.put("apple", 2)
+    r.put("banana", 1)
+    p("five_reversed", r)
+    Map<Integer, Integer> one = new HashMap<Integer, Integer>()
+    one.put(0, 0)
+    one.put(16, 16)
+    one.put(32, 32)
+    one.put(48, 48)
+    p("one_bucket", one)
+    for (int i = 100 : i < 109 : i++) {
+      one.put(i, i)
+    }
+    p("one_bucket_grown", one)
+    Map<Integer, Integer> three = new HashMap<Integer, Integer>()
+    three.put(1, 1)
+    three.put(8, 8)
+    three.put(16, 16)
+    p("three_direct", three)
+    p("three_copied", new HashMap<Integer, Integer>(three))
+    Map<Integer, Integer> lf = new HashMap<Integer, Integer>(16, 0.6f)
+    for (int i = 0 : i <= 16 : i++) {
+      lf.put(i, i)
+    }
+    lf.put(33, 33)
+    lf.put(40, 40)
+    p("load_0.6_19", lf)
+    Map<Integer, Integer> g = new HashMap<Integer, Integer>(16, 0.6f)
+    Map<Integer, Integer> src = new LinkedHashMap<Integer, Integer>()
+    for (int i = 200 : i < 220 : i++) {
+      src.put(i, i)
+    }
+    g.putAll(src)
+    for (int i = 300 : i < 317 : i++) {
+      g.put(i, i)
+    }
+    p("putall_pre_sized", g)
+    Set<String> hs = new HashSet<String>()
+    hs.add("one")
+    hs.add("two")
+    hs.add("three")
+    p("hashset", hs)
+    Set<Integer> hi = new HashSet<Integer>()
+    for (int i = 0 : i < 20 : i++) {
+      hi.add(i)
+    }
+    p("hashset20", hi)
+    Map<String, Integer> lh = new LinkedHashMap<String, Integer>()
+    lh.put("z", 1)
+    lh.put("a", 2)
+    lh.put("m", 3)
+    p("linked", lh)
+  }
+}
