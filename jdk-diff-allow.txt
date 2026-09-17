@@ -80,3 +80,18 @@ t84_sealed_switch java none a pattern switch statement over a sealed type need n
 # javac's own limit, not a semantic difference: the program exists to check that
 # the C back end flattens a two-thousand-term chain, and javac recurses on it.
 t60_expr_chain java none javac overflows its own stack attributing the chain this program exists to check the C back end flattens
+
+# ------------------------------------------------------------------- java
+
+# The printer does not write a checked exception into the signature of a method
+# whose body calls a JDK method that declares one: `t.join()` needs
+# `throws InterruptedException`, and Teyru has no compile-time checked
+# exceptions for the signature to inherit it from (AGENTS.md §10 names that as a
+# known limitation). So javac rejects the printed file and there is nothing to
+# run -- the `java` kind, exactly. The fix belongs in emit-java: walk a method's
+# body for the calls whose JDK signatures declare a checked exception and add
+# the clause. Until then these three are the difference, and deleting an entry
+# when it starts agreeing is what the header asks for.
+t214_stack_overflow java W2 the printer omits `throws InterruptedException` for a body calling Thread.join
+t216_stack_overflow_thread_uncaught java W2 the same, in a body that installs an uncaught-exception handler
+t217_class_initializer_race java W2 the same, in a body that awaits a class initialiser
