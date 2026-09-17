@@ -1,0 +1,78 @@
+# The differences from the JDK that the differential is not allowed to report.
+#
+#   <case> <kind> <work item> <reason>
+#
+# `kind` is which of the two things the differential found, and the driver
+# checks it against what actually happened, so an entry cannot mask a difference
+# of a different kind than the one it was written for:
+#
+#   java   javac rejects the Java this program prints, so there is nothing to run
+#   out    both compiled and ran, and their stdout or exit status differs
+#
+# `work item` is the plan's Wn that will remove the difference, or `none` when
+# there is no such work item: the difference is Teyru's design, or it needs a
+# decision from the owner. `none` is a statement, not an omission -- every entry
+# here has been looked at, and the reason says what was found.
+#
+# This file is only read by TestJDKDiff. A difference that *both* drivers see --
+# a program whose .expected is the JDK's output and which Teyru gets wrong --
+# belongs in known-failures.txt instead, because then the end-to-end suite is
+# red as well and the entry has to be deleted when it is fixed.
+#
+# An entry whose case now agrees with the JDK fails the run, so this file cannot
+# rot into a list of things nobody checks any more.
+
+# ---------------------------------------------------------------- outputs
+
+# Teyru runs a class's static initialisers before main; Java runs them at the
+# class's first active use (JLS 12.4.1). The `none` is "no plan work item owns
+# this", not "nobody is looking at it": two things do. The runtime's own
+# publication order (JLS 12.4.2 -- TY_CLS_INIT was set before the initialiser
+# ran, so a second thread skipped it and read a null static) has a fix in
+# flight, and whether the eager order here should stay is the owner's decision.
+# Both programs' .expected are Teyru's order, which is what the suite pins.
+# DECIDED by the owner (2026-09-17): the eager order stays. Making it lazy is a
+# rewrite of the class-install path for a behaviour no test depends on, and the
+# runtime work in flight only makes the lazy path correct for the class monitor
+# (JLS 12.4.2), which is what a static cache actually needs. This entry is the
+# stated divergence, not an unexplained one.
+t31_init_order out none Teyru runs static initialisers before main, Java at first active use (JLS 12.4.1); the runtime's clinit publication order has a fix in flight, and the eager order is the owner's call. Same for t35
+t35_static_members out none Teyru runs static initialisers before main, Java at first active use (JLS 12.4.1); the runtime's clinit publication order has a fix in flight, and the eager order is the owner's call. Same for t31
+
+# The exception's message, which W6 aligns one by one against the JDK.
+t65_arraycopy out W6 the array-store message is Teyru's own text; Java says "arraycopy: type mismatch: can not copy long[] into byte[]"
+
+# Class.getName() and Throwable's output, which decision D8 says must report the
+# JDK's name.
+t86_class_literal out W6 Class.getName() reports teyru.* here; D8 is that it reports java.lang.*
+
+# ---------------------------------------------------------------- javac says no
+
+# Teyru does not track checked exceptions: a method that calls something Java
+# declares as throwing compiles here and does not there. Nothing in the plan
+# changes that, and the difference is not a defect the differential can fix, so
+# the entries are `none` with the method named.
+t116_text java none DateFormat.parse returns an Instant here and a java.util.Date in java.text
+t159_threads java none checked exceptions: Object.wait declares InterruptedException in Java
+t163_executor java none checked exceptions: the executor's await terminates with InterruptedException in Java
+t164_concurrent_collections java none checked exceptions: the concurrent collection's await terminates with InterruptedException in Java
+t173_digest java none checked exceptions: MessageDigest.getInstance declares NoSuchAlgorithmException in Java
+t177_deflate java none checked exceptions: Inflater.inflate declares DataFormatException in Java
+t178_gzip java none checked exceptions: GZIPOutputStream's constructor declares IOException in Java
+t185_zip_archive java none checked exceptions: ZipOutputStream.putNextEntry declares IOException in Java
+t99_file_shell_meta java none checked exceptions: Files.createTempDirectory declares IOException in java.nio.file
+
+# The standard library's own shape, where the JDK's class of the same name takes
+# a different parameter or returns a different type.
+t70_list_map_api java none Map.values() returns a List here and a Collection in java.util, which the declared type needs
+t99_file_paths java none File.join is Teyru's; java.io.File has no such method
+t99_file_roundtrip java none Files.isRegularFile takes a String here and a Path in java.nio.file
+t189_timezone_lookup java none ZoneRules.getAbbreviation and ZoneId.getAvailableIDs are Teyru's; java.time spells them differently
+
+# Java 21 is stricter than Teyru about two things Java 25 relaxed or never had.
+t36_interfaces_adv java W7 a qualified super call is accepted from any subclass here; Java requires the interface to be a direct superinterface
+t84_sealed_switch java none a pattern switch statement over a sealed type need not be exhaustive here and must be in Java 21
+
+# javac's own limit, not a semantic difference: the program exists to check that
+# the C back end flattens a two-thousand-term chain, and javac recurses on it.
+t60_expr_chain java none javac overflows its own stack attributing the chain this program exists to check the C back end flattens

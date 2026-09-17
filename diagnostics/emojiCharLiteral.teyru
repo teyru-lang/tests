@@ -1,0 +1,13 @@
+/* A char literal is one UTF-16 code unit, and `'😀'` is two.
+
+   javac 21 accepts it anyway and takes the pair's first code unit (the program
+   below compiles there and prints 55357); Teyru rejects it, which is what the
+   .code file beside this one pins. Whether the two should agree is a decision
+   for the owner: the plan's W7 item 6 assumed javac reports an error here, and
+   on JDK 21 it does not. */
+class EmojiCharLiteral {
+  public static void main(String[] args) {
+    char c = '😀'
+    System.out.println((int) c)
+  }
+}

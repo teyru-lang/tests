@@ -1,0 +1,49 @@
+class Uni {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v)
+  }
+  public static void main(String[] args) {
+    p("strip_3000", "[" + "\u3000中\u3000".strip() + "]")
+    p("strip_2003_len", "\u2003x\u2003".strip().length())
+    p("trim_2003_len", "\u2003x\u2003".trim().length())
+    p("trim_0020_len", "  x  ".trim().length())
+    p("strip_0020_len", "  x  ".strip().length())
+    p("strip_tab_nl", "[\t\n x \n\t]".strip())
+    p("strip_nbsp_len", "\u00a0x\u00a0".strip().length())
+    p("isBlank_3000", "\u3000".isBlank())
+    p("isBlank_space", " ".isBlank())
+    p("isBlank_x", "x".isBlank())
+    p("isEmpty", "".isEmpty() + " " + "\u3000".isEmpty())
+    p("ws_3000", Character.isWhitespace('\u3000'))
+    p("ws_2003", Character.isWhitespace('\u2003'))
+    p("ws_nbsp", Character.isWhitespace('\u00a0'))
+    p("isLetter_zh", Character.isLetter('中'))
+    p("isDigit_fullwidth", Character.isDigit('１'))
+    p("isDigit_ascii", Character.isDigit('1'))
+    p("isAlphabetic_zh", Character.isAlphabetic('中'))
+    p("digit_value", Character.digit('１', 10))
+    p("numeric_value", Character.getNumericValue('１'))
+    p("upper_ss", "ß".toUpperCase())
+    p("upper_sigma", "σ".toUpperCase())
+    p("lower_greek", "ΟΔΟΣ".toLowerCase())
+    p("lower_I", "İ".toLowerCase().length())
+    p("upper_ascii", "abc".toUpperCase())
+    p("upper_zh", "中文".toUpperCase())
+    p("parse_fullwidth", Integer.parseInt("１２３"))
+    p("format_d", String.format("%d", 12))
+    p("format_d_fullwidth_arg", parseOr("１２３"))
+    p("to_upper_char", Character.toUpperCase('ß'))
+    p("to_lower_char", Character.toLowerCase('İ'))
+    byte[] bytes = "中文".getBytes()
+    p("bytes_len", bytes.length)
+    p("bytes_first", bytes[0] + " " + bytes[1])
+    p("case_insensitive", "中文".equalsIgnoreCase("中文") + " " + "Abc".equalsIgnoreCase("aBC"))
+  }
+  static int parseOr(String s) {
+    try {
+      return Integer.parseInt(s)
+    } catch (NumberFormatException e) {
+      return -1
+    }
+  }
+}

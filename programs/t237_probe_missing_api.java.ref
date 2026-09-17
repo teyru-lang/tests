@@ -1,0 +1,37 @@
+// The Java this probe was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t237_probe_missing_api.java.ref /tmp/P3.java
+//   javac -d /tmp/out /tmp/P3.java
+//   java -ea -Dstdout.encoding=UTF-8 -Duser.language=en -Duser.country=US -cp /tmp/out P3
+
+import java.util.*;
+class P3 {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v);
+  }
+  public static void main(String[] args) {
+    p("cp_count", "a😀b".codePointCount(0, "a😀b".length()));
+    p("str_from_chars", new String("中文".toCharArray()));
+    p("map_get_chars", mget());
+    p("join", String.join("-", Arrays.asList("a", "b", "c")));
+    p("value_of_chars", String.valueOf(new char[] {'a', 'b'}));
+    p("from_bytes", new String("中文".getBytes()));
+    p("len_int", new String(new int[] {0x4e2d}, 0, 1).length());
+    p("spacechar_nbsp", Character.isSpaceChar('\u00a0'));
+    p("spacechar_3000", Character.isSpaceChar('\u3000'));
+    p("toTitle", Character.toTitleCase('ǆ'));
+    p("codepoint_a", "a😀b".codePointAt(0) + " " + "a😀b".codePointAt(1));
+    p("char_count", Character.charCount(0x1F600));
+    p("surrogate", Character.isSurrogate('a') + " " + Character.isSurrogate('\u4e2d'));
+    p("box_identity", Integer.valueOf(127) == Integer.valueOf(127));
+    p("box_from_int", new Integer(100) == Integer.valueOf(100));
+    p("bool_new", new Boolean(true) == Boolean.TRUE);
+    p("map_get_new", new HashMap<Integer, String>().get(new Integer(1)));
+  }
+  static int mget() {
+    Map<String, Integer> m = new HashMap<>();
+    m.put("中文", 1);
+    return m.get(new String("中文".toCharArray()));
+  }
+}

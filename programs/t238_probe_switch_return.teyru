@@ -1,0 +1,12 @@
+class P4 {
+  static String sw(String s) {
+    switch (s) {
+      case "你好": return "hit"
+      case "再见": return "bye"
+      default: return "miss"
+    }
+  }
+  public static void main(String[] args) {
+    System.out.println(sw("你好") + " " + sw("再见") + " " + sw("x"))
+  }
+}

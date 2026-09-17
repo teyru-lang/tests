@@ -1,0 +1,17 @@
+cp_count = 3
+str_from_chars = 中文
+map_get_chars = 1
+join = a-b-c
+value_of_chars = ab
+from_bytes = 中文
+len_int = 1
+spacechar_nbsp = true
+spacechar_3000 = true
+toTitle = ǅ
+codepoint_a = 97 128512
+char_count = 2
+surrogate = false false
+box_identity = true
+box_from_int = false
+bool_new = false
+map_get_new = null

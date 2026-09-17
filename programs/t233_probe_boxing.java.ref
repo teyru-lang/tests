@@ -1,0 +1,57 @@
+// The Java this probe was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t233_probe_boxing.java.ref /tmp/Box.java
+//   javac -d /tmp/out /tmp/Box.java
+//   java -ea -Dstdout.encoding=UTF-8 -Duser.language=en -Duser.country=US -cp /tmp/out Box
+
+import java.util.*;
+class Box {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v);
+  }
+  static void ints() {
+    p("i_127", Integer.valueOf(127) == Integer.valueOf(127));
+    p("i_128", Integer.valueOf(128) == Integer.valueOf(128));
+    p("i_-128", Integer.valueOf(-128) == Integer.valueOf(-128));
+    p("i_-129", Integer.valueOf(-129) == Integer.valueOf(-129));
+    Integer a = 100;
+    Integer b = 100;
+    p("i_auto", a == b);
+    p("i_equals", a.equals(b));
+  }
+  static void others() {
+    p("long_127", Long.valueOf(127L) == Long.valueOf(127L));
+    p("long_128", Long.valueOf(128L) == Long.valueOf(128L));
+    p("short_127", Short.valueOf((short) 127) == Short.valueOf((short) 127));
+    p("byte_127", Byte.valueOf((byte) 127) == Byte.valueOf((byte) 127));
+    p("char_127", Character.valueOf((char) 127) == Character.valueOf((char) 127));
+    p("char_128", Character.valueOf((char) 128) == Character.valueOf((char) 128));
+    p("bool_true", Boolean.valueOf(true) == Boolean.valueOf(true));
+    p("dbl_box", Double.valueOf(1.5) == Double.valueOf(1.5));
+    p("dbl_equals", Double.valueOf(1.5).equals(Double.valueOf(1.5)));
+  }
+  static void mixed() {
+    Integer x = 5;
+    int y = x + 1;
+    p("unbox", y);
+    Integer fromText = Integer.valueOf("17");
+    p("valueOf_text", fromText + 1);
+    List<Integer> xs = new ArrayList<Integer>();
+    xs.add(1);
+    xs.add(2);
+    p("list", xs);
+    p("list_eq", xs.get(0) == Integer.valueOf(1));
+    Map<Integer, String> m = new HashMap<Integer, String>();
+    m.put(1, "one");
+    p("map_get", m.get(1));
+    p("box_sum", Integer.valueOf(1) + Integer.valueOf(2));
+    Long big = 9000000000L;
+    p("long_auto", big + 0);
+  }
+  public static void main(String[] args) {
+    ints();
+    others();
+    mixed();
+  }
+}
