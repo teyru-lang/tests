@@ -1,0 +1,41 @@
+// A program whose only route to TLS is reflection is not linked against
+// OpenSSL, and the call that does arrive at a TLS helper is a named failure.
+//
+// This is W9's rule stated as a program. Neither of the two calls below names a
+// TLS method, and no live call site in the generated C reaches ty_tls_*: what
+// reaches it is the member table reflection reads, whose invoker calls the
+// method body -- Tls.clientContext, whose own body calls the native helper.
+// (A native method cannot be reached this way at all: reflection runs the
+// body the prelude writes, which answers that it is implemented in C.) Before the rule was implemented the reflection metadata made the
+// whole TLS layer reachable, so this program was built with
+// internal/runtime/src/tyrt_tls.c and linked against -lssl -- on a machine
+// without the headers the build failed outright -- and the call below ran the
+// real OpenSSL code, answering with the handle of a context built from the
+// system's trust anchors.
+//
+// What it must get instead is the runtime's weak stub
+// (internal/runtime/src/tyrt_net.c): a named UnsupportedOperationException,
+// thrown at the call rather than inside a slot the pruner emptied. The message
+// names the Teyru method, which is the name a reader can search for, and says
+// nothing about the machine: OpenSSL may be installed and the program simply
+// never named it.
+//
+// The expected output is this program's, not the JDK's: `teyru emit-java`
+// refuses the reflection layer by name (java.lang.reflect has a different API),
+// so the differential says nothing about it.
+
+import java.lang.reflect.*
+
+class Main {
+  public static void main(String[] args) {
+    Class tls = Class.forName("teyru.Tls")
+    Method context = tls.getMethod("clientContext", String.class)
+    try {
+      Object handle = context.invoke(null, "")
+      System.out.println("invoked=" + handle)
+    } catch (InvocationTargetException e) {
+      System.out.println("cause=" + e.getCause().getClass().getName())
+      System.out.println("message=" + e.getCause().getMessage())
+    }
+  }
+}

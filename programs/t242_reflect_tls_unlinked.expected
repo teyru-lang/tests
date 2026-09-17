@@ -1,0 +1,2 @@
+cause=teyru.UnsupportedOperationException
+message=Net.tlsClientContext0: this program was not linked against OpenSSL
