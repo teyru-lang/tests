@@ -23,7 +23,22 @@ package teyru
    of the host's files) and this host's environment. Everything printed is either
    derived from the database at run time -- lengths and containment rather than
    the list itself, which would only pass on the machine that produced it -- or
-   an answer that holds for any host with a current tzdata. The one environmental
+   an answer that holds for any host with a current tzdata.
+
+   "Holds for any host" is a claim about each line, and the one place it is hard
+   to keep is Ireland, so it is spelled out here rather than left to the reader.
+   tzdata is built in two layouts that disagree about Europe/Dublin's isdst octet
+   -- the vanguard layout makes the winter type the DST one, the rearguard layout
+   Debian and Ubuntu build from makes the summer type the DST one -- and the two
+   layouts agree about everything else: the offsets, the designations, and the
+   fact that exactly one side of the year carries the flag. So those are the only
+   things asserted here: the offsets and designations of three instants, the
+   flags being opposite on the two sides of the year, and the standard offset
+   being the offset of the side that is not DST. The flags themselves cannot be
+   asserted against the host at all, and they are not: t190 pins them with files
+   it writes in both layouts, which is the only way the claim "the flag is the
+   octet the file carries" can be tested on a machine whose own files are one of
+   the two. The one environmental
    question, whether the suite is run with TZ or TZDIR set, is asked rather than
    assumed: the two "policy" lines below print true either way and are false if
    the library ignores the variable. */
