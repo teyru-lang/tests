@@ -1,0 +1,3 @@
+a handler that runs out of stack -> HTTP/1.1 500 Internal Server Error
+the next request -> HTTP/1.1 200 OK
+done

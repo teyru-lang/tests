@@ -1,0 +1,3 @@
+a session whose handler throws an Error -> HTTP/1.1 101 Switching Protocols
+the next request -> HTTP/1.1 200 OK
+done
