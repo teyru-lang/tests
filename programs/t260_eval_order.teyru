@@ -1,0 +1,104 @@
+import teyru.*
+
+/* The order an expression's operands are evaluated in.
+ *
+ * Java fixes it, and fixes it left to right: the left operand of a binary
+ * operator is fully evaluated before any part of the right one (JLS 15.7.1), a
+ * call's target before its arguments and the arguments in the order they were
+ * written (JLS 15.12.4), an array's reference before its index (JLS 15.10.3),
+ * the parts of an assignment's target before the value stored into it -- with
+ * the null and bounds tests after that value (JLS 15.26.1) -- and a compound
+ * assignment's target value before its right-hand operand (JLS 15.26.2). The
+ * dimension expressions of `new int[a][b]` are evaluated once each, left to
+ * right (JLS 15.10.2).
+ *
+ * C promises none of that (C11 6.5p3), and gcc and clang choose differently:
+ * every case below answered differently under clang and under gcc before the
+ * generator started binding these operands to temporaries in Java's order, and
+ * all of them are wrong answers rather than crashes -- the same at -O0, -O1 and
+ * -O2, so not an optimiser exploiting undefined behaviour.
+ *
+ * Every expectation here is the output of t260_eval_order.java.ref on OpenJDK
+ * 21.0.11+10, which runs the same eight cases.
+ */
+class Hold {
+  int v = 0
+}
+
+public class Main {
+  static int n = 0
+  static int q = 0
+  static Hold sink
+
+  static int f(int k) {
+    n = n + 1
+    return k * 10 + n
+  }
+
+  static String s(String k) {
+    n = n + 1
+    return k + n
+  }
+
+  static int ix(int k) {
+    n = n + 1
+    return k
+  }
+
+  static Hold mk() {
+    q = 7
+    sink = new Hold()
+    return sink
+  }
+
+  static int rd() { return q }
+
+  static void show(String tag, String v) { System.out.println(tag + " " + v) }
+
+  public static void main(String[] args) {
+    // two side effects in one concatenation chain
+    n = 0
+    show("01", (n = n + 1) + " " + (n = n + 1))
+
+    // three calls in one chain
+    n = 0
+    show("02", s("a") + s("b") + s("c"))
+
+    // two arguments of one call
+    n = 0
+    show("03", "" + (f(1) + f(2)))
+
+    // an array store evaluates the value before the bounds test, and the array
+    // reference and the index before the value
+    int[] a = new int[2]
+    n = 0
+    try {
+      a[9] = f(3)
+    } catch (ArrayIndexOutOfBoundsException e) {
+      show("04", "AIOOBE " + n)
+    }
+
+    // a compound assignment reads its target before the right-hand operand, and
+    // the right-hand operand may write that target
+    int y = 3
+    y += (y = 5)
+    show("05", "" + y)
+
+    // a dimension expression is evaluated once, not once per element of the
+    // dimension above it
+    n = 0
+    int[][] m = new int[ix(2)][ix(3)]
+    show("06", m.length + "x" + m[0].length + " n=" + n)
+
+    // a field store evaluates its receiver before its value
+    q = 0
+    mk().v = rd()
+    show("07", "" + sink.v)
+
+    // a read of a variable that a later operand writes
+    int i = 0
+    int[] c = new int[3]
+    c[0] = 4
+    show("08", "" + (c[i++] + f(0)) + " i=" + i)
+  }
+}
