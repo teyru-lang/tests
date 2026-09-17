@@ -1,0 +1,36 @@
+/* The Java this test's expectation comes from: javac 21 compiles it and its
+   output is the .expected. Identical to the .teyru except for the semicolons,
+   which Teyru does not need. */
+public class BoxIdentity {
+  static Object through(Object o) {
+    return o;
+  }
+  static Integer throughInteger(Integer i) {
+    return i;
+  }
+  public static void main(String[] args) {
+    Integer a = 127;
+    Integer b = throughInteger(a);
+    System.out.println("int-127-across-call=" + (a == b));
+    Object c = through(a);
+    System.out.println("int-127-through-Object=" + (a == c));
+    Integer d = 1000;
+    Integer e = 1000;
+    System.out.println("int-1000-two-boxes=" + (d == e));
+    Integer f = throughInteger(d);
+    System.out.println("int-1000-across-call=" + (d == f));
+    Boolean t = true;
+    Object u = through(t);
+    System.out.println("boolean-TRUE-identity=" + (t == u));
+    Object v = through(true);
+    System.out.println("boolean-TRUE-from-literal=" + (t == v));
+    Character x = 'x';
+    Object y = through(x);
+    System.out.println("character-120-identity=" + (x == y));
+    Object[] arr = new Object[1];
+    arr[0] = a;
+    System.out.println("int-127-from-array=" + (a == arr[0]));
+    arr[0] = d;
+    System.out.println("int-1000-from-array=" + (d == arr[0]));
+  }
+}

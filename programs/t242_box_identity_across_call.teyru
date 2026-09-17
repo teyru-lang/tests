@@ -1,0 +1,67 @@
+/* Box identity, observed across a call.
+ *
+ * The plan's W6.1 asks that escape analysis never put a box whose identity `==`
+ * can observe on the stack, nor copy one. What makes that true today is
+ * structural rather than a promise the analysis keeps: autoboxing is emitted as
+ * a call to the wrapper's own valueOf (which is where the cache lives), and the
+ * stack-promotion analysis only ever promotes an explicit `new T(...)` in a
+ * function whose class is not one of the special ones -- and every wrapper is
+ * marked special. This program is what would catch it if either changed: the
+ * reference goes out to another method and is compared with the original
+ * *afterwards*, which a copy or a frame-local box cannot survive.
+ *
+ * The expectation is javac 21's own output (see the .java.ref): both cached and
+ * uncached wrappers keep their identity across the call, which is what Java
+ * promises and what a stack-allocated box would break for the cached ones. */
+
+class Main {
+  // Hands back what it was given. A box that lived in the caller's frame, was
+  // copied on the way in, or was rebuilt on the way out answers with a
+  // different object here, and every comparison below prints false.
+  static Object through(Object o) {
+    return o
+  }
+
+  // The same, with the wrapper type kept in the signature rather than widened,
+  // which is the shape a program writes by hand.
+  static Integer throughInteger(Integer i) {
+    return i
+  }
+
+  public static void main(String[] args) {
+    // Cached box, the case where a copy is observable: Java answers with the
+    // same object because 127 is in the cache.
+    Integer a = 127
+    Integer b = throughInteger(a)
+    System.out.println("int-127-across-call=" + (a == b))
+    Object c = through(a)
+    System.out.println("int-127-through-Object=" + (a == c))
+
+    // Uncached box: Java says false for two of them, and true for the same one
+    // handed to a call and back.
+    Integer d = 1000
+    Integer e = 1000
+    System.out.println("int-1000-two-boxes=" + (d == e))
+    Integer f = throughInteger(d)
+    System.out.println("int-1000-across-call=" + (d == f))
+
+    // Boolean has two instances and no allocation; Character caches 0..127.
+    Boolean t = true
+    Object u = through(t)
+    System.out.println("boolean-TRUE-identity=" + (t == u))
+    Object v = through(true)
+    System.out.println("boolean-TRUE-from-literal=" + (t == v))
+
+    Character x = 'x'
+    Object y = through(x)
+    System.out.println("character-120-identity=" + (x == y))
+
+    // And through a container, which is how a box usually outlives its frame:
+    // the value read back has to be the object that went in.
+    Object[] arr = new Object[1]
+    arr[0] = a
+    System.out.println("int-127-from-array=" + (a == arr[0]))
+    arr[0] = d
+    System.out.println("int-1000-from-array=" + (d == arr[0]))
+  }
+}

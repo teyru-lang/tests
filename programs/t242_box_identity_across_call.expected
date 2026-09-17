@@ -1,0 +1,9 @@
+int-127-across-call=true
+int-127-through-Object=true
+int-1000-two-boxes=false
+int-1000-across-call=true
+boolean-TRUE-identity=true
+boolean-TRUE-from-literal=true
+character-120-identity=true
+int-127-from-array=true
+int-1000-from-array=true
