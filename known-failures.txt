@@ -61,3 +61,13 @@ t238_probe_switch_return W7 a switch whose cases all return is reported as a mis
 t239_probe_negative_array W7 a negative array size is a compile error here and a run-time exception in Java (plan 1.2)
 t196_string_bytes W5 the WTF-8 header and its decoders are not in main yet (the test landed first)
 t180_http_gzip W5 the byte-level Gzip API is not in main yet (the test landed first)
+
+# --- the compound assignment whose target is boxed (W8, the compound-assignment
+#     and boxing families): neither back end unboxes the target, so the operator
+#     is applied to the wrapper reference. The suite's driver builds with the C
+#     back end, where t246 segfaults and t247/t248 do not compile at all; the
+#     cross-back-end view of the same three cases is
+#     scripts/backend-matrix-allow.txt in the compiler repository.
+t246_probe_boxed_compound W8 a boxed compound-assignment target is not unboxed: `(*p) += 1` walks the wrapper reference by one element and segfaults
+t247_probe_boxed_bitwise W8 a boxed `&=`, `|=`, `^=` is emitted against the wrapper reference, and the generated C does not compile
+t248_probe_boxed_shift W8 a boxed `<<=`, `>>=`, `>>>=` is emitted against the wrapper reference, and the generated C does not compile

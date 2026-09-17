@@ -1,0 +1,83 @@
+/* The shift compound assignments on a boxed target -- the one place where the
+ * LLVM back end answers with a wrong number rather than refusing. `Long a = 1L;
+ * a <<= 33` is `a = Long.valueOf(((long) a.longValue()) << 33)`: the operation
+ * happens at the target's own width, so its count keeps six bits and the result
+ * is 8589934592.
+ *
+ * The LLVM back end takes the width from the target's *static* type, which for a
+ * boxed `Long` is the wrapper class, and `shiftType` of anything that is not a
+ * primitive `long` is `int`: the count is masked with 31 and the shift runs in
+ * 32 bits, so `1L <<= 32` answers 1, `1L <<= 33` answers 2, `1L <<= 63` answers
+ * -2147483648 and `-1L >>>= 1` answers 2147483647. The boxed `Integer` cases are
+ * right, because int is what the bug assumes. The C back end does not compile
+ * any of it (`(*p) <<= 33` on a `C_teyru_Long *`); the non-compound spelling,
+ * which goes through the ordinary binary path, is correct in both, and is here
+ * as the control.
+ *
+ * The arithmetic spellings are t246 and the bitwise ones t247.
+ *
+ * The expectation is the same program compiled by javac 21:
+ *   javac -d /tmp t248_probe_boxed_shift.java && java -cp /tmp Main
+ *   (see the .java.ref) */
+import teyru.*
+
+class Main {
+  static Long S = 1L
+
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v)
+  }
+
+  public static void main(String[] args) {
+    // the boxed Integer: the width the bug assumes, so these are right
+    Integer i = 1
+    i <<= 33
+    p("Integer <<= 33", i)
+    Integer j = 1
+    j >>= 33
+    p("Integer >>= 33", j)
+    Integer k = -1
+    k >>>= 1
+    p("Integer -1 >>>= 1", k)
+
+    // the boxed Long: every one of these needs more than 32 bits
+    Long a = 1L
+    a <<= 32
+    p("Long <<= 32", a)
+    Long b = 1L
+    b <<= 33
+    p("Long <<= 33", b)
+    Long c = 1L
+    c <<= 63
+    p("Long <<= 63", c)
+    Long d = 4294967296L
+    d >>= 32
+    p("Long >>= 32", d)
+    Long e = -1L
+    e >>>= 1
+    p("Long -1 >>>= 1", e)
+    Long f = 4294967296L
+    f >>>= 32
+    p("Long >>>= 32", f)
+    int count = 33
+    Long g = 1L
+    g <<= count
+    p("Long <<= count", g)
+
+    // a Long parameter and a static Long field, the other lvalue shapes
+    p("Long parameter <<= 33", shift(1L))
+    S <<= 33
+    p("static Long <<= 33", S)
+
+    // the non-compound spelling, which is correct in both back ends
+    Long ctl = 1L
+    p("control 1L << 33", ctl << 33)
+    p("control -1L >>> 1", -1L >>> 1)
+  }
+
+  static Long shift(Long v) {
+    v <<= 33
+    return v
+  }
+
+}

@@ -1,0 +1,60 @@
+/* The Java twin of t248_probe_boxed_shift.teyru, printed by
+   `teyru emit-java` from the same source and compiled with javac 21 to produce
+   the .expected file:
+
+     javac -d /tmp t248_probe_boxed_shift.java && java -cp /tmp Main
+
+   `Long a = 1L; a <<= 33` shifts at the target's own width, so the count keeps
+   six bits and the answer is 8589934592. The LLVM back end takes that width from
+   the target's static type, which for a boxed `Long` is the wrapper class, and
+   `shiftType` of anything but a primitive long is int: it masks the count with 31
+   and shifts in 32 bits. The C back end does not compile the statement. */
+class Main {
+  static Long S = 1L;
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v);
+  }
+  public static void main(String[] args) {
+    Integer i = 1;
+    i <<= 33;
+    p("Integer <<= 33", i);
+    Integer j = 1;
+    j >>= 33;
+    p("Integer >>= 33", j);
+    Integer k = -1;
+    k >>>= 1;
+    p("Integer -1 >>>= 1", k);
+    Long a = 1L;
+    a <<= 32;
+    p("Long <<= 32", a);
+    Long b = 1L;
+    b <<= 33;
+    p("Long <<= 33", b);
+    Long c = 1L;
+    c <<= 63;
+    p("Long <<= 63", c);
+    Long d = 4294967296L;
+    d >>= 32;
+    p("Long >>= 32", d);
+    Long e = -1L;
+    e >>>= 1;
+    p("Long -1 >>>= 1", e);
+    Long f = 4294967296L;
+    f >>>= 32;
+    p("Long >>>= 32", f);
+    int count = 33;
+    Long g = 1L;
+    g <<= count;
+    p("Long <<= count", g);
+    p("Long parameter <<= 33", shift(1L));
+    S <<= 33;
+    p("static Long <<= 33", S);
+    Long ctl = 1L;
+    p("control 1L << 33", ctl << 33);
+    p("control -1L >>> 1", -1L >>> 1);
+  }
+  static Long shift(Long v) {
+    v <<= 33;
+    return v;
+  }
+}

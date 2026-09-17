@@ -1,0 +1,23 @@
+Integer += 1 = 6
+Integer -= 1 = 6
+Integer *= 2 = 10
+Integer /= 2 = 3
+Integer %= 2 = 1
+Long += 1 = 2
+Long += 1 past 32 bits = 4294967297
+Long -= 2 = 5
+Long *= 4 = 12
+Long /= 2 = 3
+Long %= 2 = 1
+Long -= 1 past 32 bits = 4294967295
+Double += 1 = 2.5
+Double *= 2 = 3.0
+Float /= 2 = 0.75
+Float %= 1.0f = 0.5
+Integer null += 1 = NullPointerException
+Long null *= 2 = NullPointerException
+control 1L << 33 = 8589934592
+control 4294967296L + 1 = 4294967297
+control 5 + 1 = 6
+static Long += 1 = 2
+Long[] element += 1 = 2

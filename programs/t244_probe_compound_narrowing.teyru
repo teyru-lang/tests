@@ -1,0 +1,186 @@
+/* A compound assignment is `E1 op= E2` meaning `E1 = (T) ((E1) op (E2))`, where
+ * T is the type of E1 and the operation is performed in the type binary numeric
+ * promotion gives the two operands (JLS 15.26.2). Two things follow that a back
+ * end can get wrong separately: the operation may be performed in a wider type
+ * than the target -- `int i = 5; i *= 1.5` is (int)(5 * 1.5) = 7, not 5 * 1 = 5
+ * -- and the conversion back to the target is an implicit narrowing that
+ * saturates for a floating source and truncates for an integral one:
+ * `byte b = 100; b += 100` is (byte) 200 = -56.
+ *
+ * The families here are the ones the plan names for the shared lowering: the
+ * arithmetic compounds with a floating-point right operand against an integral
+ * target, the same against the narrow targets, the integral right operands that
+ * must not move, the bitwise compounds on byte, short, char and boolean, the
+ * string form, and a boxed target (unbox, operate, box).
+ *
+ * The expectation is the same program compiled by javac 21:
+ *   javac -d /tmp t244_probe_compound_narrowing.java && java -cp /tmp Main
+ *   (see the .java.ref) */
+import teyru.*
+
+class Main {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v)
+  }
+
+  public static void main(String[] args) {
+    // an integral target and an integral right operand: no promotion, the
+    // result is narrowed back with a wrap
+    byte b = 100
+    b += 100
+    p("byte += 100", b)
+    b = 100
+    b *= 3
+    p("byte *= 3", b)
+    b = -128
+    b /= -1
+    p("byte /= -1", b)
+    b = -128
+    b %= -1
+    p("byte %= -1", b)
+    short s = 32767
+    s += 1
+    p("short += 1", s)
+    s = 1
+    s *= 40000
+    p("short *= 40000", s)
+    char c = (char) 65535
+    c += 1
+    p("char += 1", (int) c)
+    c = 1
+    c *= 70000
+    p("char *= 70000", (int) c)
+
+    // a floating-point right operand promotes the whole operation
+    int i = 5
+    i *= 1.5
+    p("int *= 1.5", i)
+    i = 7
+    i -= 0.5
+    p("int -= 0.5", i)
+    i = 1
+    i += 0.9
+    p("int += 0.9", i)
+    i = 2147483647
+    i *= 2.0
+    p("int *= 2.0 past the range", i)
+    i = -2147483648
+    i -= 0.5
+    p("int -= 0.5 under the range", i)
+    i = 5
+    i %= 0.0
+    p("int %= 0.0", i)
+    i = 5
+    i /= 0.0
+    p("int /= 0.0", i)
+    i = -5
+    i /= 0.0
+    p("int /= 0.0 negative", i)
+    long l = 7L
+    l /= 2.5
+    p("long /= 2.5", l)
+    l = 7L
+    l %= 2.5
+    p("long %= 2.5", l)
+    l = 1L
+    l += 0.5
+    p("long += 0.5", l)
+    l = -9223372036854775807L
+    l -= 0.5
+    p("long -= 0.5 under the range", l)
+    short sh2 = 3
+    sh2 *= 1.5
+    p("short *= 1.5", sh2)
+    char ch2 = 65
+    ch2 += 0.5
+    p("char += 0.5", (int) ch2)
+    byte by2 = 3
+    by2 /= 2.0
+    p("byte /= 2.0", by2)
+
+    // an integral right operand against a wider target: the division stays
+    // integral, in the promoted type
+    int j = 7
+    j /= 2L
+    p("int /= 2L", j)
+    j = 7
+    j /= 2
+    p("int /= 2", j)
+    short k = 6
+    k /= 2L
+    p("short /= 2L", k)
+    byte n = 7
+    n /= 2L
+    p("byte /= 2L", n)
+    long m = 7L
+    m /= 2
+    p("long /= 2", m)
+
+    // the bitwise compounds, on the narrow types and on boolean
+    byte bm = -1
+    bm &= 15
+    p("byte &= 15", bm)
+    bm = 1
+    bm |= 128
+    p("byte |= 128", bm)
+    bm = -1
+    bm ^= 15
+    p("byte ^= 15", bm)
+    char cb = 0
+    cb |= 65535
+    p("char |= 65535", (int) cb)
+    cb = (char) 65535
+    cb &= 255
+    p("char &= 255", (int) cb)
+    short sb = -1
+    sb &= 255
+    p("short &= 255", sb)
+    sb = -1
+    sb ^= 255
+    p("short ^= 255", sb)
+    boolean bt = true
+    bt &= false
+    p("boolean &= false", bt)
+    bt |= true
+    p("boolean |= true", bt)
+    bt ^= true
+    p("boolean ^= true", bt)
+
+    // the string form
+    String str = "a"
+    str += 1
+    p("String += 1", str)
+    str += 'b'
+    p("String += 'b'", str)
+    str += null
+    p("String += null", str)
+    str += 1 + 2
+    p("String += 1 + 2", str)
+
+    // a boxed target is t246 (it is a different defect: neither back end
+    // unboxes it, and one of them does not even compile the result)
+
+    // division by zero keeps its exception, in the compound spelling too
+    try {
+      int z = 5
+      z /= 0
+      p("int /= 0", z)
+    } catch (ArithmeticException e) {
+      p("int /= 0", "ArithmeticException")
+    }
+    try {
+      int z = 5
+      z %= 0
+      p("int %= 0", z)
+    } catch (ArithmeticException e) {
+      p("int %= 0", "ArithmeticException")
+    }
+    try {
+      long z = 5L
+      z /= 0
+      p("long /= 0", z)
+    } catch (ArithmeticException e) {
+      p("long /= 0", "ArithmeticException")
+    }
+  }
+}
