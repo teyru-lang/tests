@@ -24,12 +24,14 @@
 
 # --- appendix C.1: length, charAt, substring, reverse, case mapping, hashCode,
 #     HashMap order, boxing identity, exception messages, and the parts that are
-#     already right (%.2f rounding, widening, MIN/-1, and so on)
-t230_probe_core W5 string length, charAt, substring and reverse are byte-based (plan 1.1); the boxing and HashMap lines are W6
+#     already right (%.2f rounding, widening, MIN/-1, and so on). The string half
+#     is green now -- length, charAt, substring, reverse, hashCode and the case
+#     mapping are UTF-16 code units and Unicode 15.0 -- and the one line left is
+#     the map's iteration order, which is W6's.
+t230_probe_core W6 HashMap iteration order is not the JDK's; the string lines this case also pins (length, charAt, substring, reverse, hashCode, case mapping) are answered by W5's read and write work
 
-# --- appendix C.2: "中文".hashCode, String.format width, Character.isLetter and
-#     isWhitespace, strip, the full-width digits Integer.parseInt must accept
-t231_probe_strings W5 hashCode, format width, isLetter/isWhitespace, strip and full-width digits (plan 1.1)
+# --- appendix C.2 is green: t231_probe_strings (hashCode, format width,
+#     isLetter/isWhitespace, strip, the full-width digits) is not listed here.
 
 # --- the formatting family: already right, and kept right
 # t232_probe_format is green: it is not listed here, and it exists so that a
@@ -44,14 +46,16 @@ t234_probe_collections W6 HashMap/HashSet iteration order is not the JDK's (plan
 # --- exception class names and messages
 t235_probe_exceptions W6 Throwable's class name is teyru.* rather than java.lang.* (the bound message itself matches the JDK now)
 
-# --- the whitespace and case family: strip, trim, isBlank, isWhitespace, the
-#     full-width digits, and the Greek and dotted-I case mappings
-t236_probe_unicode W5 strip/trim/isBlank use ASCII only and parseInt rejects the full-width digits (plan 1.1)
+# --- the whitespace and case family is green: t236_probe_unicode (strip, trim,
+#     isBlank, isWhitespace, the full-width digits, the Greek final sigma and the
+#     dotted-I mapping) is not listed here.
 
-# --- API the checker does not know yet: codePointCount, codePointAt,
-#     String(char[]), String(int[],int,int), String.join, String.valueOf(char[]),
-#     Character.isSpaceChar/toTitleCase/isSurrogate/charCount, Integer(int)
-t237_probe_missing_api W5 the checker rejects String.codePointCount, String.codePointAt, new String(char[]), String.join and the rest (plan 1.2); the declarations are in lib/02_string.teyru, which the string work owns
+# --- API the checker does not know yet: the string half is declared (codePoint
+#     Count, codePointAt, String(char[]), String(int[],int,int), String.join over
+#     an array and over an Iterable, String.valueOf(char[]), isSpaceChar,
+#     toTitleCase, isSurrogate, charCount), and what is left is the two boxed
+#     constructors, which are the boxing work item's declarations.
+t237_probe_missing_api W6 new Integer(int) and new Boolean(boolean) are not declared; the string API this probe also asks for landed with W5's write work
 
 
 # --- `new int[-1]`: javac compiles it and throws at run time, the checker

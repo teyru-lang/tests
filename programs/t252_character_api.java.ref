@@ -1,0 +1,172 @@
+// The Java this case was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t252_character_api.java.ref /tmp/Api.java
+//   javac -d /tmp/out /tmp/Api.java
+//   java -ea -Dstdout.encoding=UTF-8 -Duser.language=en -Duser.country=US -cp /tmp/out Api
+//
+// The Character API and the string methods that depend on it, one shape at a
+// time: the categories, the two digit families, the case mappings both as a
+// character and as a string (where "ß" is "SS" and a sigma is final at the end
+// of a word), strip and trim on Unicode whitespace, the parsers that accept the
+// full-width digits, and the case-insensitive comparisons.
+
+import java.util.*;
+
+class Api {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v);
+  }
+  static String cat(int cp) {
+    return Integer.toHexString(cp) + ":" + Character.getType(cp);
+  }
+  static String upper(String s) { return s.toUpperCase(); }
+  static String lower(String s) { return s.toLowerCase(); }
+  static String hex(String s) {
+    StringBuilder b = new StringBuilder();
+    for (int i = 0; i < s.length(); i++) {
+      if (i > 0) b.append(' ');
+      b.append(Integer.toHexString(s.charAt(i) & 0xFFFF));
+    }
+    return b.toString();
+  }
+  static String parseOr(String s) {
+    try {
+      return Integer.toString(Integer.parseInt(s));
+    } catch (NumberFormatException e) {
+      return "NumberFormatException";
+    }
+  }
+  static String parseOrRadix(String s, int radix) {
+    try {
+      return Integer.toString(Integer.parseInt(s, radix));
+    } catch (NumberFormatException e) {
+      return "NumberFormatException";
+    }
+  }
+  static String longOr(String s) {
+    try {
+      return Long.toString(Long.parseLong(s));
+    } catch (NumberFormatException e) {
+      return "NumberFormatException";
+    }
+  }
+  static String doubleOr(String s) {
+    try {
+      return Double.toString(Double.parseDouble(s));
+    } catch (NumberFormatException e) {
+      return "NumberFormatException";
+    }
+  }
+  public static void main(String[] args) {
+    int[] sample = {'A', 'a', '0', 0x4E2D, 0x0301, 0xFF11, 0x2160, 0x00A0, 0x3000,
+                    0x200B, 0x1F600, 0xD800, 0xE000, 0x10FFFF, 0x378, 0x2028,
+                    0x5F, 0x24, 0x2B, 0x9, 0xB2, 0xBD};
+    StringBuilder types = new StringBuilder();
+    for (int i = 0; i < sample.length; i++) {
+      if (i > 0) types.append(' ');
+      types.append(cat(sample[i]));
+    }
+    p("types", types.toString());
+
+    p("isLetter_zh", Character.isLetter(0x4E2D));
+    p("isLetter_astral", Character.isLetter(0x10400));
+    p("isLetter_undef", Character.isLetter(0x378));
+    p("isDigit_astral", Character.isDigit(0x104A0));
+    p("isWhitespace_2028", Character.isWhitespace(0x2028));
+    p("isSpaceChar_2028", Character.isSpaceChar(0x2028));
+    p("isSpaceChar_nbsp", Character.isSpaceChar(0x00A0));
+    p("isWhitespace_nbsp", Character.isWhitespace(0x00A0));
+    p("isWhitespace_200b", Character.isWhitespace(0x200B));
+    p("isDefined_378", Character.isDefined(0x378));
+    p("isDefined_4e2d", Character.isDefined(0x4E2D));
+    p("isDefined_neg", Character.isDefined(-1));
+    p("isDefined_toobig", Character.isDefined(0x110000));
+
+    p("digit_fw", Character.digit(0xFF11, 10));
+    p("digit_fw_letter", Character.digit(0xFF21, 16));
+    p("digit_super", Character.digit(0xB2, 10));
+    p("digit_roman", Character.digit(0x216B, 10));
+    p("digit_astral", Character.digit(0x104A0, 10));
+    p("digit_bad_radix", Character.digit('1', 1));
+    p("numeric_fw", Character.getNumericValue(0xFF11));
+    p("numeric_roman", Character.getNumericValue(0x216B));
+    p("numeric_half", Character.getNumericValue(0xBD));
+    p("numeric_letter", Character.getNumericValue('f') + " " + Character.getNumericValue('F'));
+    p("numeric_none", Character.getNumericValue(0x4E2D));
+    p("numeric_big", Character.getNumericValue(0x16B60));
+    p("for_digit", (int) Character.forDigit(0, 10) + " " + (int) Character.forDigit(9, 10)
+                   + " " + (int) Character.forDigit(10, 16) + " " + (int) Character.forDigit(35, 36));
+    p("for_digit_bad", (int) Character.forDigit(10, 10) + " " + (int) Character.forDigit(-1, 10)
+                      + " " + (int) Character.forDigit(30, 1));
+
+    p("to_upper_char", (int) Character.toUpperCase('ß') + " " + (int) Character.toUpperCase(0x00B5)
+                      + " " + (int) Character.toUpperCase(0x10428));
+    p("to_lower_char", (int) Character.toLowerCase(0x0130) + " " + (int) Character.toLowerCase(0x39F));
+    p("to_title_char", (int) Character.toTitleCase(0x01C6) + " " + (int) Character.toTitleCase(0x01C4));
+    p("upper_str_ss", upper("ß") + " " + hex(upper("ß")));
+    p("lower_str_I", hex(lower("\u0130")));
+    p("upper_str_lig", upper("\uFB03") + " " + upper("\uFB01"));
+    p("upper_str_micro", upper("\u00B5"));
+    p("upper_astral", hex(upper(Character.toString(0x10428))));
+    p("lower_astral", hex(lower(Character.toString(0x10400))));
+
+    // the final sigma: at the end of a cased word, not elsewhere
+    String[] words = {"\u039F\u0394\u039F\u03A3", "\u039F\u0394\u039F\u03A3\u0391",
+                      "\u039F\u0394\u039F\u03A3.", "\u039F\u0394\u039F\u03A3 \u0391\u03A3",
+                      "\u03A3", "\u03A3\u03A3", "\u0391\u03A3\u0031",
+                      "\u0391\u03A3\u0031\u0391", "\u0391\u03A3\u0301\u0391"};
+    for (int i = 0; i < words.length; i++) {
+      p("sigma_" + i, hex(lower(words[i])));
+    }
+
+    p("strip", hex("\u3000\u4E2D\u3000".strip()) + " " + "\u3000".isBlank());
+    p("strip_lead", hex("\u3000\u4E2D\u3000".stripLeading()));
+    p("strip_trail", hex("\u3000\u4E2D\u3000".stripTrailing()));
+    p("strip_nbsp", hex("\u00A0x\u00A0".strip()) + " " + "\u00A0".isBlank());
+    p("strip_2028", hex("\u2028x\u2029".strip()));
+    p("strip_all", "[" + "\u3000\t\n".strip() + "]");
+    p("strip_empty", "[" + "".strip() + "]");
+    p("trim_3000", trim3000());
+    p("blank_samples", " ".isBlank() + " " + "\t\n".isBlank() + " " + "\u00A0".isBlank()
+                       + " " + "".isBlank() + " " + "x".isBlank());
+
+    p("parse_fw", parseOr("\uFF11\uFF12\uFF13"));
+    p("parse_fw_minus", parseOr("-\uFF11\uFF12"));
+    p("parse_fw_plus", parseOr("+\uFF11\uFF12"));
+    p("parse_mixed", parseOr("1\uFF12" + "3"));
+    p("parse_arabic", parseOr("\u0661\u0662\u0663"));
+    p("parse_devanagari", parseOr("\u0967\u0968\u0969"));
+    p("parse_radix16", parseOrRadix("\uFF11\uFF21", 16));
+    p("parse_astral", parseOr("\uD801\uDCA0\uD801\uDCA1"));
+    p("parse_super", parseOr("\u00B2"));
+    p("parse_roman", parseOr("\u216B"));
+    p("parse_space", parseOr(" \uFF11"));
+    p("parse_empty", parseOr(""));
+    p("parse_sign", parseOr("-"));
+    p("long_fw", longOr("\uFF11\uFF12\uFF13"));
+    p("long_max", longOr("9223372036854775807"));
+    p("long_over", longOr("9223372036854775808"));
+    p("byte_fw", Byte.toString(Byte.parseByte("\uFF11\uFF12\uFF17")));
+    p("short_fw", Short.toString(Short.parseShort("\uFF11\uFF12\uFF13")));
+    p("double_fw", doubleOr("\uFF11\uFF12\uFF13"));
+    p("double_plain", doubleOr("123"));
+    p("double_spaces", doubleOr(" 123"));
+    p("to_string", Integer.toString(123) + " " + Integer.toString(31, 36)
+                   + " " + Long.toString(9223372036854775807L)
+                   + " " + Integer.toString(-2147483648, 16));
+
+    p("eq_ic_ascii", "Abc".equalsIgnoreCase("aBC"));
+    p("eq_ic_dotless", "\u0131".equalsIgnoreCase("i"));
+    p("eq_ic_sharp_s", "ß".equalsIgnoreCase("ẞ") + " " + "ß".equalsIgnoreCase("SS"));
+    p("eq_ic_astral", Character.toString(0x10428).equalsIgnoreCase(Character.toString(0x10400)));
+    p("cmp_ic", "b".compareToIgnoreCase("A") < 0 ? "before" : "after");
+    p("region_ic", "İstanbul".regionMatches(true, 0, "iSTANBUL", 0, 1)
+                   + " " + "K".regionMatches(true, 0, "k", 0, 1));
+    p("region_ic_dotless", "\u0131".regionMatches(true, 0, "i", 0, 1));
+  }
+  static String trim3000() {
+    String s = "\u3000x\u3000";
+    return "[" + s.trim() + "]";
+  }
+}
