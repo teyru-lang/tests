@@ -1,0 +1,6 @@
+Base(b=1)
+Child(super=Base(b=1), c=2)
+Leaf(super=Child(super=Base(b=1), c=2), name=n)
+Empty(super=Base(b=1))
+Bare(super=Base(b=1), 2)
+Alone(x=1)
