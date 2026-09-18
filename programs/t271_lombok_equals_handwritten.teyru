@@ -1,0 +1,43 @@
+// Lombok generates equals and hashCode together or not at all.
+//
+// HandleEqualsAndHashCode looks for both, and when one of them was written by
+// hand it generates neither -- "the implementations of these 2 methods are all
+// inter-related and should be written by the same entity". So @Data next to a
+// hand-written hashCode leaves equals as Object's identity test, and the class
+// that carries both @Data and @EqualsAndHashCode is not a duplicate-definition
+// error, because the second annotation finds the first one's equals.
+//
+// t271_lombok_equals_handwritten.java.ref is the expansion written out, and the
+// expected output is what the JDK 21 printed when it ran.
+import lombok.*
+
+@Data
+@EqualsAndHashCode
+class Both {
+  int x
+}
+
+@Data
+class HandWritten {
+  int v
+
+  public int hashCode() {
+    return 12345
+  }
+}
+
+class Main {
+  public static void main(String[] args) {
+    Both a = new Both()
+    a.setX(1)
+    Both b = new Both()
+    b.setX(1)
+    System.out.println(a.equals(b) + " " + (a.hashCode() == b.hashCode()))
+
+    HandWritten p = new HandWritten()
+    p.setV(1)
+    HandWritten q = new HandWritten()
+    q.setV(1)
+    System.out.println(p.equals(q) + " " + p.hashCode())
+  }
+}

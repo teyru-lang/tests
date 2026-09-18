@@ -1,0 +1,61 @@
+// t271_lombok_equals_handwritten.teyru with Lombok's own expansion written out.
+// @Data's equals/hashCode are not generated for HandWritten because it wrote a
+// hashCode itself, so equals stays Object's; Both gets @Data's pair once,
+// because @EqualsAndHashCode finds what @Data already generated.
+class Both {
+	int x;
+
+	public int getX() { return this.x; }
+	public void setX(int x) { this.x = x; }
+
+	public Both() { }
+
+	public boolean equals(Object o) {
+		if (o == this) return true;
+		if (!(o instanceof Both)) return false;
+		Both other = (Both) o;
+		if (!other.canEqual(this)) return false;
+		if (this.x != other.x) return false;
+		return true;
+	}
+
+	protected boolean canEqual(Object other) {
+		return other instanceof Both;
+	}
+
+	public int hashCode() {
+		final int PRIME = 59;
+		int result = 1;
+		result = result * PRIME + this.x;
+		return result;
+	}
+}
+
+class HandWritten {
+	int v;
+
+	public int getV() { return this.v; }
+	public void setV(int v) { this.v = v; }
+
+	public HandWritten() { }
+
+	public int hashCode() {
+		return 12345;
+	}
+}
+
+class Main {
+	public static void main(String[] args) {
+		Both a = new Both();
+		a.setX(1);
+		Both b = new Both();
+		b.setX(1);
+		System.out.println(a.equals(b) + " " + (a.hashCode() == b.hashCode()));
+
+		HandWritten p = new HandWritten();
+		p.setV(1);
+		HandWritten q = new HandWritten();
+		q.setV(1);
+		System.out.println(p.equals(q) + " " + p.hashCode());
+	}
+}
