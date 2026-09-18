@@ -1,0 +1,21 @@
+// @PackagePrivate is not a class-level annotation, and Lombok does not read it
+// on one: its javadoc says it is used by @FieldDefaults and @Value "to avoid
+// having it make a field one of public, protected, or private", and both of
+// those reach it through HandleFieldDefaults, which visits fields.
+//
+// This layer used to read it on the class and strip the access modifier from
+// every field and method of the class, which is a different annotation
+// entirely. `secret` is written private and must stay private, so reaching it
+// from another class is rejected.
+import lombok.experimental.PackagePrivate
+
+@PackagePrivate
+class Drops {
+  private int secret = 5
+}
+
+class Main {
+  public static void main(String[] args) {
+    System.out.println(new Drops().secret)
+  }
+}

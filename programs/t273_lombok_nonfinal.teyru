@@ -1,0 +1,93 @@
+// @NonFinal and @PackagePrivate are how one field opts out of what
+// @FieldDefaults and @Value would do to it.
+//
+// Lombok reads them in one place only, HandleFieldDefaults.setFieldDefaultsForField,
+// and @Value reaches that same code by calling generateFieldDefaultsForType on
+// itself: @NonFinal stops the `final` from being added, @PackagePrivate stops
+// the access level from being set. Neither is a general-purpose modifier
+// switch, so on a class of its own neither does anything -- the one class-level
+// use is @NonFinal on a @Value class, where HandleValue asks for it before it
+// makes the class final.
+//
+// `shared` is the other half of that same function: a static field is skipped
+// for both, so it keeps the modifiers it was written with.
+import lombok.*
+import lombok.experimental.*
+
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+class Base {
+  @NonFinal int mutable = 1
+  @PackagePrivate int reachable = 2
+  static int shared = 3
+  int frozen = 4
+
+  public int frozen() {
+    return this.frozen
+  }
+}
+
+// @NonFinal on the class is what keeps @Value from making it final, so this one
+// can be extended; without it the subclass below would be TY-TYP-0007.
+@NonFinal
+@Value
+class OpenValue {
+  String name
+}
+
+class OpenValueSub extends OpenValue {
+  public OpenValueSub(String name) {
+    super(name)
+  }
+}
+
+// "final" is what tells @Data not to write a setter (HandleSetter skips a field
+// with Flags.FINAL), so @NonFinal on `count` is the reason setCount exists at
+// all while `fixed` has none.
+@Data
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+class Counted {
+  @NonFinal int count = 1
+  int fixed = 2
+}
+
+// The same rule reaches the generated constructor: @Value's @AllArgsConstructor
+// takes every field except a final one that has an initializer, so `note` is in
+// the constructor only because @NonFinal kept it out of `final`.
+@Value
+class Memo {
+  @NonFinal String note = "n"
+  @PackagePrivate String tag
+  String plain
+}
+
+// @Value's field defaults are skipped when the class carries @FieldDefaults:
+// HandleValue passes checkForTypeLevelFieldDefaults, so the annotation that is
+// there says what the fields look like.
+@Value
+@FieldDefaults(level = AccessLevel.PUBLIC, makeFinal = false)
+class Public {
+  int x
+}
+
+class Main {
+  public static void main(String[] args) {
+    Base b = new Base()
+    System.out.println(b.reachable)
+    Base.shared = Base.shared + 1
+    System.out.println(Base.shared)
+    System.out.println(b.frozen())
+
+    OpenValueSub sub = new OpenValueSub("ada")
+    System.out.println(sub.getName())
+
+    Counted c = new Counted()
+    c.setCount(3)
+    System.out.println(c.getCount() + "/" + c.getFixed())
+
+    Memo m = new Memo("n1", "t1", "p1")
+    System.out.println(m.getNote() + "/" + m.getPlain())
+    System.out.println(m.tag)
+
+    System.out.println(new Public(5).x)
+  }
+}
