@@ -1,0 +1,16 @@
+param_receiver = Cannot invoke "Object.toString()" because "<parameter1>" is null
+field_then_invoke = Cannot read field "s" because "<local0>" is null
+invoke_local = Cannot invoke "Object.toString()" because "<local1>" is null
+invoke_string_local = Cannot invoke "String.length()" because "<local1>" is null
+invoke_with_arg = Cannot invoke "java.lang.StringBuilder.append(String)" because "<local1>" is null
+unbox = Cannot invoke "java.lang.Integer.intValue()" because "<local1>" is null
+read_field = Cannot read field "inst" because "<local1>" is null
+assign_field = Cannot assign field "inst" because "<local1>" is null
+read_length = Cannot read the array length because "<local1>" is null
+load_int = Cannot load from int array because "<local1>" is null
+store_int = Cannot store to int array because "<local1>" is null
+store_object = Cannot store to object array because "<local1>" is null
+invoke_elem = Cannot invoke "Object.toString()" because "<local1>[0]" is null
+invoke_return = Cannot invoke "String.length()" because the return value of "Npe.retnull()" is null
+invoke_return_local = Cannot invoke "String.length()" because "<local1>" is null
+still running

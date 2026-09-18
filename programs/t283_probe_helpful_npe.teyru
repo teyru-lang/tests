@@ -1,0 +1,76 @@
+// The message a NullPointerException carries (JEP 358, JDK 15 and later). The
+// JDK's message names the action that could not be performed and the thing
+// that was null: `Cannot invoke "Object.toString()" because "<local1>" is
+// null`, `Cannot read field "inst" because "<local1>" is null`, `Cannot load
+// from int array because "<local1>" is null`. This printed a bare "null" for
+// every one of them, which is what a NullPointerException with no message
+// prints and is not what Java says.
+//
+// The naming rules the JDK's own text follows, and the .expected beside this
+// file is what it printed for the program in the .java.ref:
+//
+//   - a failure names what was attempted: an invocation, a field read or
+//     assignment, an array access (`Cannot load from int array`, `Cannot store
+//     to object array`), the array's length, throwing, or a monitor;
+//   - the cause is the chain that produced the null: a local (`<local1>`), a
+//     parameter (`<parameter1>`), `this` or `this.field`, a field of a local
+//     (`<local1>.s`), an element of an array (`<local1>[0]`), the null
+//     literal, or the return value of a call (`the return value of
+//     "Npe.retnull()"`);
+//   - the local and parameter numbers are the ones javac's own bytecode uses,
+//     which is the slot: parameters first (this is slot 0 of an instance
+//     method), then the locals of the method body, at the slot the block they
+//     are declared in gives them;
+//   - a class is named as Class.getName names it (decision D8), except that
+//     java.lang.Object and java.lang.String are printed as Object and String,
+//     which is the one thing the JDK's own text does to a class name.
+class Node {
+  int inst
+  String s
+}
+
+class Npe {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v)
+  }
+
+  static String retnull() {
+    return null
+  }
+
+  static void withParam(Object p) {
+    try {
+      p.toString()
+    } catch (NullPointerException e) {
+      p("param_receiver", e.getMessage())
+    }
+  }
+
+  static void inst() {
+    Node n = null
+    try {
+      n.s.length()
+    } catch (NullPointerException e) {
+      p("field_then_invoke", e.getMessage())
+    }
+  }
+
+  public static void main(String[] args) {
+    withParam(null)
+    inst()
+    try { Object o = null; o.toString(); } catch (NullPointerException e) { p("invoke_local", e.getMessage()); }
+    try { String s = null; s.length(); } catch (NullPointerException e) { p("invoke_string_local", e.getMessage()); }
+    try { StringBuilder sb = null; sb.append("x"); } catch (NullPointerException e) { p("invoke_with_arg", e.getMessage()); }
+    try { Integer i = null; int x = i; p("unused", x); } catch (NullPointerException e) { p("unbox", e.getMessage()); }
+    try { Node n = null; int x = n.inst; p("unused", x); } catch (NullPointerException e) { p("read_field", e.getMessage()); }
+    try { Node n = null; n.inst = 1; } catch (NullPointerException e) { p("assign_field", e.getMessage()); }
+    try { int[] a = null; int x = a.length; p("unused", x); } catch (NullPointerException e) { p("read_length", e.getMessage()); }
+    try { int[] a = null; int x = a[0]; p("unused", x); } catch (NullPointerException e) { p("load_int", e.getMessage()); }
+    try { int[] a = null; a[0] = 1; } catch (NullPointerException e) { p("store_int", e.getMessage()); }
+    try { Object[] a = null; a[0] = "x"; } catch (NullPointerException e) { p("store_object", e.getMessage()); }
+    try { Object[] a = new Object[2]; a[0].toString(); } catch (NullPointerException e) { p("invoke_elem", e.getMessage()); }
+    try { retnull().length(); } catch (NullPointerException e) { p("invoke_return", e.getMessage()); }
+    try { String s = retnull(); s.length(); } catch (NullPointerException e) { p("invoke_return_local", e.getMessage()); }
+    System.out.println("still running")
+  }
+}
