@@ -1,0 +1,39 @@
+// @Accessors(fluent = true) turns chaining on with it.
+//
+// Lombok's HandlerUtil.shouldReturnThis0 returns `chain || fluent` unless
+// `chain` was written out, and @Accessors's javadoc says the same: chain is
+// "false, unless fluent=true, then default: true". So a fluent setter returns
+// the instance and `f.n(5).n()` compiles, without `chain = true` beside it.
+//
+// An explicit `chain` still decides on its own, and a static field's setter is
+// void whatever the annotation says, because there is no instance to return.
+import lombok.Getter
+import lombok.Setter
+import lombok.experimental.Accessors
+
+@Accessors(fluent = true)
+class Fluent {
+  @Getter @Setter int n
+  @Getter @Setter String name
+}
+
+@Accessors(fluent = true, chain = true)
+class Explicit {
+  @Getter @Setter int n
+}
+
+@Accessors(chain = true)
+class Shared {
+  @Setter static int count
+}
+
+class Main {
+  public static void main(String[] args) {
+    Fluent f = new Fluent()
+    System.out.println(f.n(5).n())
+    System.out.println(f.name("x").name())
+    System.out.println(new Explicit().n(9).n())
+    Shared.setCount(4)
+    System.out.println(Shared.count)
+  }
+}
