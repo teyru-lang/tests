@@ -1,0 +1,37 @@
+// The constructors the @XxxArgsConstructor annotations generate, in the shape
+// Lombok leaves the class in: a class that declares none of its own gets no
+// implicit no-argument constructor alongside the generated one, so a private
+// one is the only way in and the required-args constructor is the one the
+// fields ask for.
+import lombok.*
+
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+class Singleton {
+  int v = 7
+
+  static Singleton make() {
+    return new Singleton()
+  }
+}
+
+@AllArgsConstructor
+class Pair {
+  int a
+  int b
+}
+
+@RequiredArgsConstructor
+class Named {
+  final String name
+  int other = 3
+}
+
+class Main {
+  public static void main(String[] args) {
+    System.out.println(Singleton.make().v)
+    Pair p = new Pair(1, 2)
+    System.out.println(p.a + p.b)
+    Named n = new Named("n")
+    System.out.println(n.name + " " + n.other)
+  }
+}
