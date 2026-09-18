@@ -1,0 +1,81 @@
+// @EqualsAndHashCode, read back out: the constants, the field order and
+// canEqual.
+//
+// The expansion this is checked against is Lombok's HandleEqualsAndHashCode --
+// PRIME 59, 43 where a reference is null, 79 and 97 for the two values of a
+// boolean, `(int) (v >>> 32 ^ v)` for a long, Float.floatToIntBits for a float,
+// Double.doubleToLongBits for a double, the members sorted by
+// HandlerUtil.defaultEqualsAndHashcodeIncludeRank (primitives first, then boxed
+// primitives, then the rest) and a `canEqual` that the subclass overrides.
+//
+// t270_lombok_equals.java.ref is the same program with Lombok's own expansion
+// written out, and the expected output is what the JDK 21 printed when it ran.
+import lombok.*
+
+@EqualsAndHashCode
+@AllArgsConstructor
+class Plain {
+  int id
+  boolean flag
+  long total
+  double ratio
+  float small
+  String name
+}
+
+// The sort: declared String, then Integer, then int. Lombok reads the int
+// first, the Integer second and the String last, so the hash is not the one a
+// declaration-order walk would produce.
+@EqualsAndHashCode
+@AllArgsConstructor
+class Sorted {
+  String name
+  Integer boxed
+  int num
+}
+
+@EqualsAndHashCode
+class Base {
+  int v
+
+  Base() {
+    this.v = 0
+  }
+
+  Base(int v) {
+    this.v = v
+  }
+}
+
+@EqualsAndHashCode(callSuper = true)
+class Derived extends Base {
+  int w
+
+  Derived(int v, int w) {
+    super(v)
+    this.w = w
+  }
+}
+
+class Main {
+  public static void main(String[] args) {
+    Plain a = new Plain(1, true, 3, 0.5, 1.5f, "n")
+    Plain b = new Plain(1, true, 3, 0.5, 1.5f, "n")
+    Plain c = new Plain(2, true, 3, 0.5, 1.5f, "n")
+    System.out.println(a.hashCode())
+    System.out.println(a.equals(b) + " " + a.equals(c))
+    System.out.println(new Plain(1, false, 3, 0.5, 1.5f, "n").hashCode())
+    System.out.println(new Plain(1, true, 3, 0.5, 1.5f, null).hashCode())
+    System.out.println(new Plain(0, false, 0, 0.0, 0.0f, null).hashCode())
+
+    System.out.println(new Sorted("a", 2, 1).hashCode())
+    System.out.println(new Sorted("a", null, 1).hashCode())
+
+    // canEqual: a Base instance is not equal to a Derived one even when every
+    // field Base knows about matches, because Derived.canEqual rejects it
+    Base base = new Base(1)
+    Derived d = new Derived(1, 2)
+    System.out.println(base.equals(base) + " " + base.equals(d) + " " + d.equals(base))
+    System.out.println(base.hashCode() + " " + d.hashCode())
+  }
+}

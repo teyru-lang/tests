@@ -1,0 +1,20 @@
+// A generated constructor is a constructor of the class.
+//
+// Lombok injects its constructor into the class declaration, and javac, finding
+// one declared, never adds the implicit no-argument constructor. Here the class
+// declares none, so the only constructor the class has is the private one
+// @NoArgsConstructor asked for, and this call from another class must be
+// rejected -- it used to find the implicit public constructor still in place.
+import lombok.NoArgsConstructor
+import lombok.AccessLevel
+
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+class Secret {
+  int x = 1
+}
+
+class Main {
+  public static void main(String[] args) {
+    System.out.println(new Secret().x)
+  }
+}
