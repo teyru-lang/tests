@@ -1,4 +1,4 @@
-Derived(d=2; super=Base(1))
+Derived(super=Base(1), d=2)
 true
 true
 using Res(first)
