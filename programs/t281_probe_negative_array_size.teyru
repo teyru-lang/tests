@@ -1,0 +1,65 @@
+// A negative array size is a run-time exception, not a compile error: javac
+// compiles `new int[-1]` and the array creation throws
+// NegativeArraySizeException, whose message is the length that was refused.
+// The checker used to reject the program at compile time (TY-TYP-0067), so a
+// program Java compiles and runs was rejected here -- and the case below that
+// needs the size to be computed, not written, could not be written at all.
+//
+// The order is the JDK's (JLS 15.10.2, and t281_probe_negative_array_size.java.ref
+// is what it printed): every written dimension expression is evaluated left to
+// right before any of them is tested, then the dimensions are tested from the
+// outermost in, and the first negative one is the exception. That is why
+// `new int[0][-1]` throws -- the outer level is empty, so the JDK never
+// allocates an inner level, and it still refuses the size -- and why
+// `new int[bad("first")][dim("second", 3)]` evaluates both calls before it
+// throws (the JDK printed both eval lines, then -1).
+//
+// The empty brackets are not a written dimension and are never tested:
+// `new int[-1][]` throws for the -1, and `new int[2][]` builds two nulls.
+class NegSize {
+  static int calls = 0
+
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v)
+  }
+
+  static int dim(String name, int v) {
+    calls = calls + 1
+    p("eval_" + name, v + " call " + calls)
+    return v
+  }
+
+  static int bad(String name) {
+    calls = calls + 1
+    p("eval_" + name, "-1 call " + calls)
+    return -1
+  }
+
+  static void size(String k, Runnable r) {
+    try {
+      r.run()
+      p(k, "no exception")
+    } catch (NegativeArraySizeException e) {
+      p(k + "_class", e.getClass().getName())
+      p(k + "_msg", e.getMessage())
+    }
+  }
+
+  public static void main(String[] args) {
+    size("int_literal", () -> { int[] a = new int[-1]; p("int_literal_len", a.length); })
+    size("int_computed", () -> { int[] a = new int[bad("computed")]; p("int_computed_len", a.length); })
+    size("object_literal", () -> { Object[] a = new Object[-2]; p("object_literal_len", a.length); })
+    size("string_literal", () -> { String[] a = new String[-3]; p("string_literal_len", a.length); })
+    size("outer_first", () -> { int[][] a = new int[-1][-2]; p("outer_first_len", a.length); })
+    size("inner_only", () -> { int[][] a = new int[2][-1]; p("inner_only_len", a.length); })
+    size("three_dims_second", () -> { int[][][] a = new int[1][-1][-2]; p("three_dims_second_len", a.length); })
+    size("outer_zero_inner_negative", () -> { int[][] a = new int[0][-1]; p("outer_zero_inner_negative_len", a.length); })
+    size("extra_dim", () -> { int[][] a = new int[-1][]; p("extra_dim_len", a.length); })
+    calls = 0
+    size("evaluation_order", () -> { int[][] a = new int[bad("first")][dim("second", 3)]; p("evaluation_order_len", a.length); })
+    p("calls_after_evaluation_order", calls)
+    size("ok_multi", () -> { int[][] a = new int[2][3]; p("ok_multi_len", a.length + " " + a[1].length); })
+    size("ok_zero", () -> { int[] a = new int[0]; p("ok_zero_len", a.length); })
+    System.out.println("still running")
+  }
+}

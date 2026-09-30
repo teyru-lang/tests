@@ -1,0 +1,20 @@
+int_value = 100
+int_identity_above_cache = false
+int_identity_in_cache = false
+int_cached_constant_identity = false
+int_equals_valueOf = true
+int_class = java.lang.Integer
+int_hash = 42
+int_toString = -7
+int_intValue = -7
+int_sum = 3
+int_negative_zero = 0
+bool_true_identity = false
+bool_false_identity = false
+bool_true_value = true
+bool_toString = false
+bool_class = java.lang.Boolean
+bool_equals = true
+bool_in_map = null
+int_in_map = null
+still running

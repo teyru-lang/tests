@@ -1,0 +1,57 @@
+// The Java this probe was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t283_probe_helpful_npe.java.ref /tmp/Npe.java
+//   javac -d /tmp/out /tmp/Npe.java
+//   java -ea -Dstdout.encoding=UTF-8 -Duser.language=en -Duser.country=US -cp /tmp/out Npe
+
+class Node {
+  int inst;
+  String s;
+}
+
+class Npe {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v);
+  }
+
+  static String retnull() {
+    return null;
+  }
+
+  static void withParam(Object p) {
+    try {
+      p.toString();
+    } catch (NullPointerException e) {
+      p("param_receiver", e.getMessage());
+    }
+  }
+
+  static void inst() {
+    Node n = null;
+    try {
+      n.s.length();
+    } catch (NullPointerException e) {
+      p("field_then_invoke", e.getMessage());
+    }
+  }
+
+  public static void main(String[] args) {
+    withParam(null);
+    inst();
+    try { Object o = null; o.toString(); } catch (NullPointerException e) { p("invoke_local", e.getMessage()); }
+    try { String s = null; s.length(); } catch (NullPointerException e) { p("invoke_string_local", e.getMessage()); }
+    try { StringBuilder sb = null; sb.append("x"); } catch (NullPointerException e) { p("invoke_with_arg", e.getMessage()); }
+    try { Integer i = null; int x = i; p("unused", x); } catch (NullPointerException e) { p("unbox", e.getMessage()); }
+    try { Node n = null; int x = n.inst; p("unused", x); } catch (NullPointerException e) { p("read_field", e.getMessage()); }
+    try { Node n = null; n.inst = 1; } catch (NullPointerException e) { p("assign_field", e.getMessage()); }
+    try { int[] a = null; int x = a.length; p("unused", x); } catch (NullPointerException e) { p("read_length", e.getMessage()); }
+    try { int[] a = null; int x = a[0]; p("unused", x); } catch (NullPointerException e) { p("load_int", e.getMessage()); }
+    try { int[] a = null; a[0] = 1; } catch (NullPointerException e) { p("store_int", e.getMessage()); }
+    try { Object[] a = null; a[0] = "x"; } catch (NullPointerException e) { p("store_object", e.getMessage()); }
+    try { Object[] a = new Object[2]; a[0].toString(); } catch (NullPointerException e) { p("invoke_elem", e.getMessage()); }
+    try { retnull().length(); } catch (NullPointerException e) { p("invoke_return", e.getMessage()); }
+    try { String s = retnull(); s.length(); } catch (NullPointerException e) { p("invoke_return_local", e.getMessage()); }
+    System.out.println("still running");
+  }
+}
