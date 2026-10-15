@@ -1,0 +1,25 @@
+len = 4
+walk_0_3 = 4
+walk_1_2 = 4
+walk_2_1 = 3
+walk_4_0 = 4
+walk_4_m3 = 0
+walk_1_m1 = 0
+neg_index = java.lang.IndexOutOfBoundsException msg=null
+past_index = java.lang.IndexOutOfBoundsException msg=null
+walk_off_end = java.lang.IndexOutOfBoundsException msg=null
+walk_off_start = java.lang.IndexOutOfBoundsException msg=null
+walk_off_end2 = java.lang.IndexOutOfBoundsException msg=null
+walk_off_start2 = java.lang.IndexOutOfBoundsException msg=null
+str_count_oob = java.lang.IndexOutOfBoundsException msg=Range [0, 5) out of bounds for length 4
+str_count_rev = java.lang.IndexOutOfBoundsException msg=Range [2, 1) out of bounds for length 4
+str_count_neg = java.lang.IndexOutOfBoundsException msg=Range [-1, 2) out of bounds for length 4
+buf_count_oob = java.lang.IndexOutOfBoundsException msg=Range [0, 5) out of bounds for length 4
+buf_count_rev = java.lang.IndexOutOfBoundsException msg=Range [3, 1) out of bounds for length 4
+str_charat_oob = java.lang.StringIndexOutOfBoundsException msg=Index 4 out of bounds for length 4
+str_cpa_oob = java.lang.StringIndexOutOfBoundsException msg=Index 4 out of bounds for length 4
+buf_charat_oob = java.lang.StringIndexOutOfBoundsException msg=Index 4 out of bounds for length 4
+buf_cpa_oob = java.lang.StringIndexOutOfBoundsException msg=Index 4 out of bounds for length 4
+buf_cpb_oob = java.lang.StringIndexOutOfBoundsException msg=Index -1 out of bounds for length 4
+walk_to_end = 4
+walk_to_start = 0

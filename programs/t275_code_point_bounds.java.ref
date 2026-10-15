@@ -1,0 +1,68 @@
+// The Java this case was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t275_code_point_bounds.java.ref /tmp/Bounds.java
+//   javac -d /tmp/out /tmp/Bounds.java
+//   java -ea -Dstdout.encoding=UTF-8 -Duser.language=en -Duser.country=US -cp /tmp/out Bounds
+//
+// Two string operations whose bounds failure is the *parent* of the exception
+// the rest of the library throws: String.offsetByCodePoints and
+// String.codePointCount both throw java.lang.IndexOutOfBoundsException, with no
+// message in the first case and with Objects.checkFromToIndex's range report in
+// the second, while a single-index read (charAt, codePointAt) throws
+// StringIndexOutOfBoundsException. The catch below is the parent, which is the
+// idiom these two are written for, and each line prints what actually arrived.
+// Every line below is what the JDK printed.
+
+class Bounds {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v);
+  }
+  static void caught(String k, Runnable r) {
+    try {
+      r.run();
+      p(k, "no throw");
+    } catch (IndexOutOfBoundsException e) {
+      p(k, e.getClass().getName() + " msg=" + e.getMessage());
+    }
+  }
+  public static void main(String[] args) {
+    String s = "a\uD83D\uDE00b";
+    p("len", s.length());
+
+    // the walk itself, which is what the method is for
+    p("walk_0_3", s.offsetByCodePoints(0, 3));
+    p("walk_1_2", s.offsetByCodePoints(1, 2));
+    p("walk_2_1", s.offsetByCodePoints(2, 1));
+    p("walk_4_0", s.offsetByCodePoints(4, 0));
+    p("walk_4_m3", s.offsetByCodePoints(4, -3));
+    p("walk_1_m1", s.offsetByCodePoints(1, -1));
+
+    // off the ends of the string, and off the ends of the walk
+    caught("neg_index", () -> s.offsetByCodePoints(-1, 0));
+    caught("past_index", () -> s.offsetByCodePoints(5, 0));
+    caught("walk_off_end", () -> s.offsetByCodePoints(0, 4));
+    caught("walk_off_start", () -> s.offsetByCodePoints(0, -1));
+    caught("walk_off_end2", () -> s.offsetByCodePoints(3, 2));
+    caught("walk_off_start2", () -> s.offsetByCodePoints(2, -3));
+
+    // the code point count's range, on a String and on a builder
+    caught("str_count_oob", () -> s.codePointCount(0, 5));
+    caught("str_count_rev", () -> s.codePointCount(2, 1));
+    caught("str_count_neg", () -> s.codePointCount(-1, 2));
+    StringBuilder b = new StringBuilder(s);
+    caught("buf_count_oob", () -> b.codePointCount(0, 5));
+    caught("buf_count_rev", () -> b.codePointCount(3, 1));
+
+    // and the single-index reads, which stay the string's own subclass
+    caught("str_charat_oob", () -> s.charAt(4));
+    caught("str_cpa_oob", () -> s.codePointAt(4));
+    caught("buf_charat_oob", () -> b.charAt(4));
+    caught("buf_cpa_oob", () -> b.codePointAt(4));
+    caught("buf_cpb_oob", () -> b.codePointBefore(0));
+
+    // a valid walk that ends exactly at the length is not a failure
+    p("walk_to_end", s.offsetByCodePoints(2, 2));
+    p("walk_to_start", s.offsetByCodePoints(2, -2));
+  }
+}

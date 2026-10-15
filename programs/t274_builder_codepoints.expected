@@ -1,0 +1,37 @@
+len = 4
+cpa_0 = 97
+cpa_1 = 128512
+cpa_2 = 56832
+cpa_3 = 98
+cpb_1 = 97
+cpb_2 = 55357
+cpb_3 = 128512
+cpb_4 = 98
+cpc_0_4 = 3
+cpc_1_3 = 1
+cpc_0_1 = 1
+cpc_3_4 = 1
+cpc_0_0 = 0
+cpc_4_4 = 0
+cpa_oob = java.lang.StringIndexOutOfBoundsException msg=Index 4 out of bounds for length 4
+cpa_neg = java.lang.StringIndexOutOfBoundsException msg=Index -1 out of bounds for length 4
+cpb_0 = java.lang.StringIndexOutOfBoundsException msg=Index -1 out of bounds for length 4
+cpb_oob = java.lang.StringIndexOutOfBoundsException msg=Index 4 out of bounds for length 4
+cpc_oob = java.lang.IndexOutOfBoundsException msg=Range [0, 5) out of bounds for length 4
+cpc_rev = java.lang.IndexOutOfBoundsException msg=Range [2, 1) out of bounds for length 4
+cpc_neg = java.lang.IndexOutOfBoundsException msg=Range [-1, 2) out of bounds for length 4
+empty_len = 0
+empty_count = 0
+empty_at_0 = java.lang.StringIndexOutOfBoundsException msg=Index 0 out of bounds for length 0
+empty_before_0 = java.lang.StringIndexOutOfBoundsException msg=Index -1 out of bounds for length 0
+tail_len = 2
+tail_cpa_0 = 120
+tail_cpa_1 = 55357
+tail_cpb_1 = 120
+tail_cpb_2 = 55357
+tail_count = 2
+buf_cpa_1 = 128512
+buf_cpb_3 = 128512
+buf_cpc = 3
+buf_cpc_oob = java.lang.IndexOutOfBoundsException msg=Range [0, 9) out of bounds for length 4
+buf_cpa_oob = java.lang.StringIndexOutOfBoundsException msg=Index 9 out of bounds for length 4

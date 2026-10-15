@@ -1,0 +1,58 @@
+import teyru.*
+
+/* The Teyru half of t273_builder_capacity, whose expectation is what the JDK
+   printed for the .java.ref beside it. A builder's capacity is observable and
+   it is Java's: 16 by default, exactly what a constructor was given -- zero
+   included -- length + 16 for one made from a string, and a growth rule of
+   "double and add two, or take the size asked for". Every line here is the
+   same line as in the Java. */
+class Capacity {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v)
+  }
+  public static void main(String[] args) {
+    p("default", new StringBuilder().capacity())
+    p("int_0", new StringBuilder(0).capacity())
+    p("int_1", new StringBuilder(1).capacity())
+    p("int_16", new StringBuilder(16).capacity())
+    p("int_100", new StringBuilder(100).capacity())
+    p("str_empty", new StringBuilder("").capacity())
+    p("str_a", new StringBuilder("a").capacity())
+    p("str_emoji", new StringBuilder("a\uD83D\uDE00b").capacity())
+    p("str_20", new StringBuilder("01234567890123456789").capacity())
+
+    StringBuilder b = new StringBuilder(0)
+    b.append("abc")
+    p("grow_from_0", b.capacity())
+    b = new StringBuilder(1)
+    b.append("abc")
+    p("grow_from_1", b.capacity())
+    b = new StringBuilder(16)
+    b.append("0123456789abcdefg")
+    p("grow_from_16", b.capacity())
+    b = new StringBuilder(3)
+    b.append("abcdefgh")
+    p("grow_from_3", b.capacity())
+    b = new StringBuilder()
+    for (var i = 0 : i < 40 : i++) {
+      b.append('x')
+    }
+    p("grow_default_40", b.capacity())
+
+    b = new StringBuilder(16)
+    b.ensureCapacity(100)
+    p("ensure_100", b.capacity())
+    b = new StringBuilder()
+    b.ensureCapacity(10)
+    p("ensure_below", b.capacity())
+    b = new StringBuilder(0)
+    b.ensureCapacity(1)
+    p("ensure_from_0", b.capacity())
+
+    StringBuffer sb = new StringBuffer()
+    p("buffer_default", sb.capacity())
+    sb.append("0123456789abcdefg")
+    p("buffer_grow", sb.capacity())
+    p("buffer_str", new StringBuffer("a\uD83D\uDE00b").capacity())
+  }
+}
