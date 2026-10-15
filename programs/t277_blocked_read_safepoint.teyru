@@ -1,0 +1,90 @@
+import teyru.*
+
+/* A thread blocked in a socket read is a stop point, not a thread the collector
+ * has to wait for.
+ *
+ * The collector is cooperative: it stops the world by waiting for every other
+ * thread to reach a point where it says it has stopped, and it has to, because a
+ * running thread's registers and stack are where its live references are. A
+ * thread inside a blocking call is not running generated code, so it must be one
+ * of the stopped ones -- and until W3.11 it was not: `typlat_socket_recv` was a
+ * bare recv(), so a collection asked for while a thread sat in it waited for the
+ * read's own deadline. With a socket that has no timeout that is forever, and
+ * every other thread that wants to allocate waits with it.
+ *
+ * This case is that shape and nothing else. The reader blocks on a connection
+ * nothing is written to, with a deadline long enough to be seen; the main thread
+ * then allocates hard enough to ask for about twenty-five collections; and the
+ * answer is whether those collections took the reader's deadline to happen. The
+ * second line is the same read answered properly afterwards: the peer closes,
+ * and a read that was really blocked returns the end of the stream.
+ *
+ * The two answers are not a measurement of the machine, they are a factor of a
+ * hundred apart: a run whose collections did not wait spends tens of
+ * milliseconds on the allocations below -- 5ms and 20ms on two runs of the
+ * shape this is -- and one that waited spends the reader's whole deadline,
+ * which is six seconds. Two seconds is the line between them, so neither side
+ * is close to it.
+ *
+ * A thread blocked in a native recv() is the same thread whether the wait is
+ * under TLS or not, and the same is true of the other calls in the runtime that
+ * wait for data: the file and pipe reads and writes, and a line from the
+ * console. This case is the plain socket read, which is the one the work item
+ * named; t99, t191 and t192 walk the file and TLS paths and none of them pins
+ * this property. */
+
+class Reader implements Runnable {
+  private Socket sock
+  public int got = -99
+
+  public Reader(Socket sock) {
+    this.sock = sock
+  }
+
+  public void run() {
+    try {
+      this.got = this.sock.getInputStream().read()
+    } catch (SocketTimeoutException e) {
+      // the read waited out its whole deadline: the collector was waiting too
+      this.got = -2
+    } catch (IOException e) {
+      this.got = -3
+    }
+  }
+}
+
+class Main {
+  public static void main(String[] args) throws Exception {
+    ServerSocket server = new ServerSocket(0)
+    Socket client = new Socket("127.0.0.1", server.getLocalPort())
+    Socket conn = server.accept()
+    // Long enough that a collection waiting for this read is unmistakable, and
+    // short enough that the failing case is over in seconds.
+    client.setSoTimeout(6000)
+
+    Reader r = new Reader(client)
+    Thread reader = new Thread(r, "reader")
+    reader.start()
+    // Nothing is ever written to this connection until the close below, so the
+    // reader is inside the read from here on. The sleep is what makes the
+    // collections below happen while it is there rather than before it got
+    // there: starting a thread and calling read on it is microseconds of work.
+    Thread.sleep(200)
+
+    long before = System.currentTimeMillis()
+    for (int i = 0 : i < 400 : i++) {
+      byte[] block = new byte[262144]
+      block[0] = (byte) i
+    }
+    long elapsed = System.currentTimeMillis() - before
+    System.out.println("the collections did not wait for the blocked read: " + (elapsed < 2000))
+
+    // The reader is still inside the read: this is its answer arriving.
+    conn.close()
+    reader.join()
+    System.out.println("the blocked read saw the end of the stream: " + (r.got == -1))
+
+    client.close()
+    server.close()
+  }
+}
