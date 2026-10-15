@@ -1,0 +1,83 @@
+import teyru.*
+
+/* The Teyru half of t276_regex_codepoints, whose expectation is what the JDK
+   printed for the .java.ref beside it. What the engine matches is a code point
+   and what it reports is a code unit index: `.` takes the emoji of
+   "\uD83D\uDE00a" in one step, a class is a set of characters, a quantifier
+   counts characters, and a supplementary character written literally in the
+   pattern is one node -- while Matcher.start/end still answer 0 and 2 for that
+   emoji. Every line here is the same line as in the Java. */
+class RegexCodepoints {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v)
+  }
+  static String spans(String re, String text) {
+    Matcher m = Pattern.compile(re).matcher(text)
+    StringBuilder b = new StringBuilder()
+    while (m.find()) {
+      if (b.length() > 0) {
+        b.append(' ')
+      }
+      b.append(m.start()).append('-').append(m.end())
+    }
+    return b.toString()
+  }
+  public static void main(String[] args) {
+    /* `.` takes one code point, so the emoji is one character */
+    p("dot_a", "\uD83D\uDE00a".matches(".a"))
+    p("dot_dot", "\uD83D\uDE00a".matches(".."))
+    p("dot_dot_dot", "\uD83D\uDE00a".matches("..."))
+    p("dot_emoji", "\uD83D\uDE00".matches("."))
+    p("dot_lone_high", "\uD83D".matches("."))
+    p("dot_lone_low", "\uDE00".matches("."))
+    p("dot_pair_is_two", "\uD83D\uDE00".matches(".."))
+
+    /* and the positions it reports are code units */
+    p("find_dot", spans(".", "\uD83D\uDE00a"))
+    p("find_two_dots", spans("..", "\uD83D\uDE00a"))
+    p("find_a", spans("a", "\uD83D\uDE00a"))
+
+    Matcher m = Pattern.compile("(.)(.)").matcher("\uD83D\uDE00a")
+    p("group_matches", m.matches())
+    p("group_0", m.group(0))
+    p("group_1", m.group(1))
+    p("group_2", m.group(2))
+    p("group_1_span", m.start(1) + "-" + m.end(1))
+    p("group_2_span", m.start(2) + "-" + m.end(2))
+
+    /* quantifiers count characters, not units */
+    p("plus", "\uD83D\uDE00\uD83D\uDE00".matches(".+"))
+    p("star", "\uD83D\uDE00".matches(".*"))
+    p("brace", "\uD83D\uDE00\uD83D\uDE00".matches(".{2}"))
+    p("brace_three", "\uD83D\uDE00\uD83D\uDE00".matches(".{3}"))
+    p("emoji_opt", "\uD83D\uDE00".matches("\uD83D\uDE00?"))
+    p("emoji_opt_lone", "\uD83D".matches("\uD83D\uDE00?"))
+    p("emoji_plus", "\uD83D\uDE00\uD83D\uDE00".matches("\uD83D\uDE00+"))
+    p("emoji_twice", "\uD83D\uDE00".matches("\uD83D\uDE00\uD83D\uDE00"))
+
+    /* a class is a set of code points: the emoji is not in the surrogate range
+       even though both of its halves are */
+    p("class_emoji", "\uD83D\uDE00".matches("[\uD83D\uDE00]"))
+    p("class_mixed_a", "a".matches("[a\uD83D\uDE00]"))
+    p("class_mixed_emoji", "\uD83D\uDE00".matches("[a\uD83D\uDE00]"))
+    p("class_mixed_b", "b".matches("[a\uD83D\uDE00]"))
+    p("class_range", "\uD83D\uDE00".matches("[\uD800-\uDFFF]"))
+    p("class_range_lone", "\uD83D".matches("[\uD800-\uDFFF]"))
+    p("class_neg", "a".matches("[^\uD83D\uDE00]"))
+    p("class_neg_emoji", "\uD83D\uDE00".matches("[^\uD83D\uDE00]"))
+    p("class_word", "a1".matches("\\w\\d"))
+    p("class_space", " \t".matches("\\s\\s"))
+
+    /* replacement and splitting */
+    p("repl_all", "\uD83D\uDE00a".replaceAll(".", "X"))
+    p("repl_first", "\uD83D\uDE00a".replaceFirst(".", "X"))
+    p("split_emoji", Arrays.toString("a\uD83D\uDE00b".split("\uD83D\uDE00")))
+    p("split_dot", Arrays.toString("\uD83D\uDE00a".split(".")))
+    p("repl_empty", "\uD83D\uDE00a".replaceAll("", "X"))
+
+    /* ASCII is what it always was */
+    p("ascii_dot", "abc".matches(".b."))
+    p("ascii_nl", "a\nb".matches(".*"))
+    p("ascii_repl", "ab".replaceAll(".", "X"))
+  }
+}
