@@ -11,10 +11,11 @@ import teyru.*
    answered 200, because a server that answers the first and not the second is a
    server that died on the first.
 
-   The client is RawClient.ask, whose read is retried in short pieces because
-   this runtime's collector cannot stop a thread blocked in recv() and a
-   client waiting for an answer is such a thread; its comment is where that
-   belongs, and this file does not restate it. */
+   The client is RawClient.ask, whose read is one read with the socket's own
+   deadline: a client waiting for an answer is a thread blocked in recv(), and
+   since W3.11 that is a stop point rather than a thread the collector waits
+   for. RawClient's comment is where that belongs, and this file does not
+   restate it. */
 
 @RestController
 class ErrorApi {

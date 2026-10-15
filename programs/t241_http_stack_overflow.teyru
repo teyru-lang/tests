@@ -11,13 +11,13 @@ import teyru.*
  * answers 500. So the error never reaches the connection loop and the serving
  * thread survives; that is what this pins.
  *
- * The retried read is RawClient.ask rather than this file's own loop: the
- * collector here is cooperative, so a thread blocked inside a native recv() is
- * not at a safepoint, and a client waiting for an answer is such a thread -- a
- * collection that starts while the deep request is being answered waits for the
- * client, which is waiting for the answer. The helper carries the whole of that
- * reason, including what should happen to the retry when W3.11 closes the gap;
- * this file only says which request it is making.
+ * The read is RawClient.ask rather than this file's own loop. The deep request
+ * is also the shape that notices a regression in what a client blocked in
+ * recv() is to the collector: the recursion allocates a frame's array at every
+ * level, so the answering thread collects while the client waits for its answer,
+ * and since W3.11 that wait is a stop point rather than something a collection
+ * waits for. RawClient's comment carries the reason; this file only says which
+ * request it is making.
  * *
  * The second half is what a program cares about: the next request, on a fresh
  * connection, is answered, and the serving thread is alive at the end. See also
