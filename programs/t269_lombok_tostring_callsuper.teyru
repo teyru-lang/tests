@@ -1,0 +1,73 @@
+// @ToString(callSuper = true) prints the superclass first.
+//
+// Lombok builds the text as `name + "(super=" + super.toString()` and only then
+// appends its own fields, so a field of the subclass comes after the superclass
+// part and is joined to it with ", ". The layer used to append its own fields
+// first and the superclass last, separated by "; super=".
+//
+// The cases below are the ones where the two orders differ visibly: a subclass
+// with fields, one without, one two levels down, and one that turned the field
+// names off.
+import lombok.*
+
+@ToString
+class Base {
+  int b
+
+  Base(int b) {
+    this.b = b
+  }
+}
+
+@ToString(callSuper = true)
+class Child extends Base {
+  int c
+
+  Child(int b, int c) {
+    super(b)
+    this.c = c
+  }
+}
+
+@ToString(callSuper = true)
+class Leaf extends Child {
+  String name
+
+  Leaf(int b, int c, String name) {
+    super(b, c)
+    this.name = name
+  }
+}
+
+@ToString(callSuper = true)
+class Empty extends Base {
+  Empty(int b) {
+    super(b)
+  }
+}
+
+@ToString(callSuper = true, includeFieldNames = false)
+class Bare extends Base {
+  int c
+
+  Bare(int b, int c) {
+    super(b)
+    this.c = c
+  }
+}
+
+@ToString
+class Alone {
+  int x = 1
+}
+
+class Main {
+  public static void main(String[] args) {
+    System.out.println(new Base(1))
+    System.out.println(new Child(1, 2))
+    System.out.println(new Leaf(1, 2, "n"))
+    System.out.println(new Empty(1))
+    System.out.println(new Bare(1, 2))
+    System.out.println(new Alone())
+  }
+}

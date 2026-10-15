@@ -1,0 +1,52 @@
+// @Getter(lazy = true) computes the value once, under load.
+//
+// Lombok's lazy getter is double-checked: the field it generates is an
+// AtomicReference, the fast path reads it without the lock, and the second test
+// inside `synchronized` is what keeps two threads from both running the
+// initializer. Here the initializer sleeps, so every thread that gets past the
+// unlocked test runs it; without the lock the counter would be well past one.
+//
+// The reads happen on eight threads and are printed afterwards, so the output
+// does not depend on how the scheduler interleaves them: the sum is always 56,
+// and calls is always 1.
+import lombok.*
+
+class Slow {
+  static int calls = 0
+
+  static int compute() {
+    calls++
+    Thread.sleep(50)
+    return 7
+  }
+
+  @Getter(lazy = true) private int value = compute()
+}
+
+class Main {
+  public static void main(String[] args) {
+    final Slow s = new Slow()
+    final int n = 8
+    final Thread[] threads = new Thread[n]
+    final int[] seen = new int[n]
+    for (int i = 0 : i < n : i++) {
+      final int k = i
+      threads[i] = new Thread(new Runnable() {
+        public void run() {
+          seen[k] = s.getValue()
+        }
+      })
+    }
+    for (int i = 0 : i < n : i++) {
+      threads[i].start()
+    }
+    for (int i = 0 : i < n : i++) {
+      threads[i].join()
+    }
+    int sum = 0
+    for (int i = 0 : i < n : i++) {
+      sum += seen[i]
+    }
+    System.out.println(sum + " calls=" + Slow.calls)
+  }
+}

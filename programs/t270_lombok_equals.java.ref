@@ -1,0 +1,180 @@
+// t270_lombok_equals.teyru with Lombok's own @EqualsAndHashCode expansion written
+// out, exactly as HandleEqualsAndHashCode generates it. The .expected beside the
+// Teyru program is what running this on the JDK 21 printed.
+class Plain {
+	int id;
+	boolean flag;
+	long total;
+	double ratio;
+	float small;
+	String name;
+
+	Plain(int id, boolean flag, long total, double ratio, float small, String name) {
+		this.id = id;
+		this.flag = flag;
+		this.total = total;
+		this.ratio = ratio;
+		this.small = small;
+		this.name = name;
+	}
+
+	public boolean equals(Object o) {
+		if (o == this) return true;
+		if (!(o instanceof Plain)) return false;
+		Plain other = (Plain) o;
+		if (!other.canEqual(this)) return false;
+		if (this.id != other.id) return false;
+		if (this.flag != other.flag) return false;
+		if (this.total != other.total) return false;
+		if (Double.compare(this.ratio, other.ratio) != 0) return false;
+		if (Float.compare(this.small, other.small) != 0) return false;
+		Object this$name = this.name;
+		Object other$name = other.name;
+		if (this$name == null ? other$name != null : !this$name.equals(other$name)) return false;
+		return true;
+	}
+
+	protected boolean canEqual(Object other) {
+		return other instanceof Plain;
+	}
+
+	public int hashCode() {
+		final int PRIME = 59;
+		int result = 1;
+		result = result * PRIME + this.id;
+		result = result * PRIME + (this.flag ? 79 : 97);
+		final long $total = this.total;
+		result = result * PRIME + (int) ($total >>> 32 ^ $total);
+		final long $ratio = Double.doubleToLongBits(this.ratio);
+		result = result * PRIME + (int) ($ratio >>> 32 ^ $ratio);
+		result = result * PRIME + Float.floatToIntBits(this.small);
+		final Object $name = this.name;
+		result = result * PRIME + ($name == null ? 43 : $name.hashCode());
+		return result;
+	}
+}
+
+class Sorted {
+	String name;
+	Integer boxed;
+	int num;
+
+	Sorted(String name, Integer boxed, int num) {
+		this.name = name;
+		this.boxed = boxed;
+		this.num = num;
+	}
+
+	public boolean equals(Object o) {
+		if (o == this) return true;
+		if (!(o instanceof Sorted)) return false;
+		Sorted other = (Sorted) o;
+		if (!other.canEqual(this)) return false;
+		if (this.num != other.num) return false;
+		Object this$boxed = this.boxed;
+		Object other$boxed = other.boxed;
+		if (this$boxed == null ? other$boxed != null : !this$boxed.equals(other$boxed)) return false;
+		Object this$name = this.name;
+		Object other$name = other.name;
+		if (this$name == null ? other$name != null : !this$name.equals(other$name)) return false;
+		return true;
+	}
+
+	protected boolean canEqual(Object other) {
+		return other instanceof Sorted;
+	}
+
+	public int hashCode() {
+		final int PRIME = 59;
+		int result = 1;
+		result = result * PRIME + this.num;
+		final Object $boxed = this.boxed;
+		result = result * PRIME + ($boxed == null ? 43 : $boxed.hashCode());
+		final Object $name = this.name;
+		result = result * PRIME + ($name == null ? 43 : $name.hashCode());
+		return result;
+	}
+}
+
+class Base {
+	int v;
+
+	Base() {
+		this.v = 0;
+	}
+
+	Base(int v) {
+		this.v = v;
+	}
+
+	public boolean equals(Object o) {
+		if (o == this) return true;
+		if (!(o instanceof Base)) return false;
+		Base other = (Base) o;
+		if (!other.canEqual(this)) return false;
+		if (this.v != other.v) return false;
+		return true;
+	}
+
+	protected boolean canEqual(Object other) {
+		return other instanceof Base;
+	}
+
+	public int hashCode() {
+		final int PRIME = 59;
+		int result = 1;
+		result = result * PRIME + this.v;
+		return result;
+	}
+}
+
+class Derived extends Base {
+	int w;
+
+	Derived(int v, int w) {
+		super(v);
+		this.w = w;
+	}
+
+	public boolean equals(Object o) {
+		if (o == this) return true;
+		if (!(o instanceof Derived)) return false;
+		Derived other = (Derived) o;
+		if (!other.canEqual(this)) return false;
+		if (!super.equals(o)) return false;
+		if (this.w != other.w) return false;
+		return true;
+	}
+
+	protected boolean canEqual(Object other) {
+		return other instanceof Derived;
+	}
+
+	public int hashCode() {
+		final int PRIME = 59;
+		int result = super.hashCode();
+		result = result * PRIME + this.w;
+		return result;
+	}
+}
+
+class Main {
+	public static void main(String[] args) {
+		Plain a = new Plain(1, true, 3, 0.5, 1.5f, "n");
+		Plain b = new Plain(1, true, 3, 0.5, 1.5f, "n");
+		Plain c = new Plain(2, true, 3, 0.5, 1.5f, "n");
+		System.out.println(a.hashCode());
+		System.out.println(a.equals(b) + " " + a.equals(c));
+		System.out.println(new Plain(1, false, 3, 0.5, 1.5f, "n").hashCode());
+		System.out.println(new Plain(1, true, 3, 0.5, 1.5f, null).hashCode());
+		System.out.println(new Plain(0, false, 0, 0.0, 0.0f, null).hashCode());
+
+		System.out.println(new Sorted("a", 2, 1).hashCode());
+		System.out.println(new Sorted("a", null, 1).hashCode());
+
+		Base base = new Base(1);
+		Derived d = new Derived(1, 2);
+		System.out.println(base.equals(base) + " " + base.equals(d) + " " + d.equals(base));
+		System.out.println(base.hashCode() + " " + d.hashCode());
+	}
+}

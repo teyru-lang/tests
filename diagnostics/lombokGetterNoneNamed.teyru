@@ -1,0 +1,18 @@
+// AccessLevel written the long way is the same parameter.
+//
+// Lombok declares @Getter's access level as `value`, so @Getter(value =
+// AccessLevel.NONE) is what @Getter(AccessLevel.NONE) means, and it generates
+// no getter at all. Reading only the unnamed form made this annotation look
+// like one with no access level, and a public getX() appeared instead.
+import lombok.Getter
+import lombok.AccessLevel
+
+class Secret {
+  @Getter(value = AccessLevel.NONE) int x = 3
+}
+
+class Main {
+  public static void main(String[] args) {
+    System.out.println(new Secret().getX())
+  }
+}

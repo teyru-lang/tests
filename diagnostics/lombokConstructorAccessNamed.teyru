@@ -1,0 +1,17 @@
+// The constructors declare their access level as `access`, which is the
+// spelling Lombok's own documentation uses: @AllArgsConstructor(access =
+// AccessLevel.PRIVATE). Reading only the unnamed form dropped the level and
+// generated a public constructor, so this call was accepted.
+import lombok.AllArgsConstructor
+import lombok.AccessLevel
+
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+class Secret {
+  int x
+}
+
+class Main {
+  public static void main(String[] args) {
+    System.out.println(new Secret(1).x)
+  }
+}

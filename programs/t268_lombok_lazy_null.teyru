@@ -1,0 +1,26 @@
+// @Getter(lazy = true) caches a null like any other value.
+//
+// Lombok's holder is an AtomicReference, so "not computed yet" is the reference
+// itself and the computed value may be null. A holder that is the value cannot
+// say that with null -- it would read as "still not computed" -- and the
+// initializer would run again on every read. calls has to be 1, and the two
+// reads have to print the same thing.
+import lombok.*
+
+class Maybe {
+  static int calls = 0
+
+  static String computeNull() {
+    calls++
+    return null
+  }
+
+  @Getter(lazy = true) private String label = computeNull()
+}
+
+class Main {
+  public static void main(String[] args) {
+    Maybe m = new Maybe()
+    System.out.println("[" + m.getLabel() + "] [" + m.getLabel() + "] calls=" + Maybe.calls)
+  }
+}
