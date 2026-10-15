@@ -1,0 +1,47 @@
+/* A class whose initializer throws: what the program reports, and that it is
+ * reported as the JDK reports it.
+ *
+ * Java wraps an initializer's failure in ExceptionInInitializerError (JLS
+ * 12.4.2) unless the throwable is an Error, which is rethrown as it is. This
+ * program's initializer throws a RuntimeException, so the first line of the
+ * report is `java.lang.ExceptionInInitializerError` -- and that is what the
+ * JDK prints for the same program, measured:
+ *
+ *   Exception in thread "main" java.lang.ExceptionInInitializerError
+ *   Caused by: java.lang.RuntimeException: init failed
+ *       at Boom.boom(Boom.java:4)
+ *       at Boom.<clinit>(Boom.java:2)
+ *
+ * This compiler prints the first line and no stack trace, which is the same
+ * difference every uncaught report here has (t79, t80); what this pins is that
+ * the first line is the JDK's, where it used to be the raw
+ * `java.lang.RuntimeException: init failed`.
+ *
+ * The class is a program class, and the compiler runs a program's own classes
+ * before main (AGENTS.md §10 records that as this compiler's order rather than
+ * JLS 12.4.1's, kept by the owner's decision), so the failure happens at startup
+ * and main never runs. That is also why the second half of JLS 12.4.2 -- an
+ * erroneous class refusing every later use with NoClassDefFoundError -- cannot
+ * be reached from a program today: it needs a class the compiler leaves to its
+ * first use, which is a standard-library class, and no library class has an
+ * initializer that can throw. The runtime implements it anyway (tyrt2.c's
+ * TY_CLS_ERR); this file is the half that is observable.
+ *
+ * The initializer is written to fail on a value the compiler cannot fold, so
+ * that the failure is a run-time one: an initializer the checker rejects would
+ * be a diagnostics case, not this one. */
+class Boom {
+  public static int x = boom()
+
+  static int boom() {
+    String s = "init " + "failed"
+    if (s.length() > 0) {
+      throw new RuntimeException(s)
+    }
+    return 1
+  }
+
+  public static void main(String[] args) {
+    System.out.println("never")
+  }
+}
