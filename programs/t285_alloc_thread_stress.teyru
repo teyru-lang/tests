@@ -1,0 +1,103 @@
+/* Four threads allocating at once, with arrays big enough that every
+ * allocation goes to the heap's free list rather than to a per-thread batch,
+ * and dropped immediately so that slabs come back.
+ *
+ * What this pins: a thread that takes a block off a free list has to be a
+ * thread the collector waits for. `ty_heap_unlock` unlocks the heap mutex
+ * *first* and only then runs `stopped_end`, so there was a window in which an
+ * allocating thread was still counted in `n_stopped` while holding a block
+ * nobody could see it holding: a collection starting in that window did not
+ * wait for it, walked the block's slab, read exactly what the block still said
+ * (a free block), and took it for free space -- re-linking it onto the free
+ * list or releasing the whole slab. The thread then woke up, wrote into that
+ * memory and handed it out, which is the same block twice or a write into
+ * memory that has gone back to the system. Fixed in `c3ab10b` (2026-09-15),
+ * which is where `stopped_end` moved to before the unlock.
+ *
+ * Why this shape and not another: a block is batched per size class, so an
+ * allocation larger than the largest class (63 * TY_ALIGN = 1008 bytes) takes
+ * the locked path every time and is never handed out from a batch. `new
+ * long[1024]` is 8 KB, which is over that, and dropping it right away is what
+ * puts the slab back on the free list for the next thread to take a block out
+ * of. Measured on this machine (linux/amd64, 16 cores) with the compiler at
+ * `c3ab10b^`: 26 crashes in 30 runs of this program; with the compiler at
+ * `c3ab10b` and later: 0 in 130 runs at this size and 0 in 50 runs at
+ * `new long[8192]`, which is the same shape with 64 KB blocks and a crash rate
+ * of 30 in 30 before the fix.
+ *
+ * The output is deterministic -- every worker sums the same arithmetic, so the
+ * total is `threads * n * n` -- and nothing here is timed: a run either prints
+ * the line or dies. The program takes its three numbers from the command line
+ * so that a reader can widen it by hand; the suite runs the defaults.
+ *
+ * This is one of the shapes a test suite cannot find by thinking about the
+ * allocator's invariants: it is the interleaving that matters, and only running
+ * four threads at once produces it. */
+class AllocWorker implements Runnable {
+  private int n
+  private int size
+  private long[][] ring
+  private long sum
+
+  public AllocWorker(int n, int size) {
+    this.n = n
+    this.size = size
+    this.ring = new long[64][]
+    this.sum = 0
+  }
+
+  public long sum() {
+    return this.sum
+  }
+
+  public void run() {
+    long acc = 0
+    for (int i = 0 : i < this.n : i++) {
+      long[] a = new long[this.size]
+      a[0] = i
+      a[this.size - 1] = i + 1
+      /* A small live ring, so that a few blocks of each worker's are reachable
+         while the rest are garbage: an empty live set would make every slab
+         releasable and the shape would stop being the one that was measured. */
+      if ((i & 63) == 0) {
+        this.ring[(i >> 6) & 63] = a
+      }
+      acc = acc + a[0] + a[this.size - 1]
+    }
+    this.sum = acc
+  }
+}
+
+class T285 {
+  public static void main(String[] args) {
+    int threads = 4
+    int n = 200000
+    int size = 1024
+    if (args.length > 0) {
+      threads = Integer.parseInt(args[0])
+    }
+    if (args.length > 1) {
+      n = Integer.parseInt(args[1])
+    }
+    if (args.length > 2) {
+      size = Integer.parseInt(args[2])
+    }
+    List<Thread> ts = new ArrayList<Thread>()
+    List<AllocWorker> ws = new ArrayList<AllocWorker>()
+    for (int t = 0 : t < threads : t++) {
+      AllocWorker w = new AllocWorker(n, size)
+      ws.add(w)
+      Thread th = new Thread(w, "alloc-" + t)
+      ts.add(th)
+      th.start()
+    }
+    for (Thread th : ts) {
+      th.join()
+    }
+    long total = 0
+    for (AllocWorker w : ws) {
+      total = total + w.sum()
+    }
+    System.out.println("threads=" + threads + " n=" + n + " size=" + size + " sum=" + total)
+  }
+}
