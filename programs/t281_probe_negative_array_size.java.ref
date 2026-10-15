@@ -1,0 +1,54 @@
+// The Java this probe was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t281_probe_negative_array_size.java.ref /tmp/NegSize.java
+//   javac -d /tmp/out /tmp/NegSize.java
+//   java -ea -Dstdout.encoding=UTF-8 -Duser.language=en -Duser.country=US -cp /tmp/out NegSize
+
+class NegSize {
+  static int calls = 0;
+
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v);
+  }
+
+  static int dim(String name, int v) {
+    calls = calls + 1;
+    p("eval_" + name, v + " call " + calls);
+    return v;
+  }
+
+  static int bad(String name) {
+    calls = calls + 1;
+    p("eval_" + name, "-1 call " + calls);
+    return -1;
+  }
+
+  static void size(String k, Runnable r) {
+    try {
+      r.run();
+      p(k, "no exception");
+    } catch (NegativeArraySizeException e) {
+      p(k + "_class", e.getClass().getName());
+      p(k + "_msg", e.getMessage());
+    }
+  }
+
+  public static void main(String[] args) {
+    size("int_literal", () -> { int[] a = new int[-1]; p("int_literal_len", a.length); });
+    size("int_computed", () -> { int[] a = new int[bad("computed")]; p("int_computed_len", a.length); });
+    size("object_literal", () -> { Object[] a = new Object[-2]; p("object_literal_len", a.length); });
+    size("string_literal", () -> { String[] a = new String[-3]; p("string_literal_len", a.length); });
+    size("outer_first", () -> { int[][] a = new int[-1][-2]; p("outer_first_len", a.length); });
+    size("inner_only", () -> { int[][] a = new int[2][-1]; p("inner_only_len", a.length); });
+    size("three_dims_second", () -> { int[][][] a = new int[1][-1][-2]; p("three_dims_second_len", a.length); });
+    size("outer_zero_inner_negative", () -> { int[][] a = new int[0][-1]; p("outer_zero_inner_negative_len", a.length); });
+    size("extra_dim", () -> { int[][] a = new int[-1][]; p("extra_dim_len", a.length); });
+    calls = 0;
+    size("evaluation_order", () -> { int[][] a = new int[bad("first")][dim("second", 3)]; p("evaluation_order_len", a.length); });
+    p("calls_after_evaluation_order", calls);
+    size("ok_multi", () -> { int[][] a = new int[2][3]; p("ok_multi_len", a.length + " " + a[1].length); });
+    size("ok_zero", () -> { int[] a = new int[0]; p("ok_zero_len", a.length); });
+    System.out.println("still running");
+  }
+}

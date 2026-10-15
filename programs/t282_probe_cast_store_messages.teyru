@@ -1,0 +1,68 @@
+// The two messages a failed cast and a failed covariant store carry.
+//
+// A ClassCastException names both classes and says where they live. The JDK's
+// shape is `class A cannot be cast to class B (<module of A>; <module of B>)`,
+// with the two folded into one clause when the modules are the same: `(A and B
+// are in module java.base of loader 'bootstrap')`. A class a program declares
+// is in the unnamed module of loader 'app', which is what makes the mixed case
+// read the way it does. The names are the ones Class.getName reports, so a
+// standard-library class is reported under its java.* name (decision D8) --
+// t251_exception_names is that rule on its own.
+//
+// An ArrayStoreException's message is the class of the value that did not fit
+// -- `java.lang.Object` for an Object stored into a String[] -- not a sentence
+// about the array. The check is the one an array with a recorded element class
+// applies to a covariant store (t87_array_store is the exception itself).
+//
+// The class the .expected was taken from is in the .java.ref beside this file,
+// and every line below is what the JDK printed for it.
+import teyru.*
+
+class Base2 { }
+class Sub2 extends Base2 { }
+interface Iface { }
+class Impl implements Iface { }
+
+class CastStore {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v)
+  }
+
+  static void cast(String k, Runnable r) {
+    try {
+      r.run()
+      p(k, "no exception")
+    } catch (ClassCastException e) {
+      p(k + "_class", e.getClass().getName())
+      p(k + "_msg", e.getMessage())
+    }
+  }
+
+  static void store(String k, Object[] a, Object v) {
+    try {
+      a[0] = v
+      p(k, "stored")
+    } catch (ArrayStoreException e) {
+      p(k + "_class", e.getClass().getName())
+      p(k + "_msg", e.getMessage())
+    }
+  }
+
+  public static void main(String[] args) {
+    cast("jdk_to_jdk", () -> { Object o = "str"; Integer i = (Integer) o; p("jdk_to_jdk_v", i); })
+    cast("jdk_to_user", () -> { Object o = "str"; Sub2 s = (Sub2) o; p("jdk_to_user_v", s); })
+    cast("user_to_jdk", () -> { Object o = new Base2(); String s = (String) o; p("user_to_jdk_v", s); })
+    cast("user_to_user", () -> { Object o = new Base2(); Sub2 s = (Sub2) o; p("user_to_user_v", s); })
+    cast("iface_to_jdk", () -> { Object o = new Impl(); Runnable r = (Runnable) o; p("iface_to_jdk_v", r); })
+    cast("jdk_collections", () -> { Object o = new ArrayList<String>(); HashMap<String, String> m = (HashMap<String, String>) o; p("jdk_collections_v", m); })
+    store("object_into_strings", new String[2], new Object())
+    store("string_into_integers", new Integer[2], "x")
+    store("builder_into_strings", new String[2], new StringBuilder("x"))
+    store("object_into_bases", new Base2[2], new Object())
+    store("string_into_chars", new CharSequence[2], "x")
+    store("sub_into_bases", new Base2[2], new Sub2())
+    store("null_into_strings", new String[2], null)
+    store("string_into_objects", new Object[2], "x")
+    System.out.println("still running")
+  }
+}

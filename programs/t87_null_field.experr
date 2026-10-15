@@ -1,1 +1,1 @@
-Exception in thread "main" java.lang.NullPointerException: null
+Exception in thread "main" java.lang.NullPointerException: Cannot read field "name" because "<local1>" is null

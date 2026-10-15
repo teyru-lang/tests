@@ -1,0 +1,37 @@
+// The Java this probe was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t284_probe_boxed_constructors.java.ref /tmp/BoxedCtor.java
+//   javac -d /tmp/out /tmp/BoxedCtor.java
+//   java -ea -Dstdout.encoding=UTF-8 -Duser.language=en -Duser.country=US -cp /tmp/out BoxedCtor
+
+import java.util.*;
+
+class BoxedCtor {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v);
+  }
+
+  public static void main(String[] args) {
+    p("int_value", new Integer(100));
+    p("int_identity_above_cache", new Integer(100) == Integer.valueOf(100));
+    p("int_identity_in_cache", new Integer(127) == Integer.valueOf(127));
+    p("int_cached_constant_identity", new Integer(-128) == Integer.valueOf(-128));
+    p("int_equals_valueOf", new Integer(100).equals(Integer.valueOf(100)));
+    p("int_class", new Integer(1).getClass().getName());
+    p("int_hash", new Integer(42).hashCode());
+    p("int_toString", new Integer(-7).toString());
+    p("int_intValue", new Integer(-7).intValue());
+    p("int_sum", new Integer(1) + new Integer(2));
+    p("int_negative_zero", new Integer(0));
+    p("bool_true_identity", new Boolean(true) == Boolean.TRUE);
+    p("bool_false_identity", new Boolean(false) == Boolean.FALSE);
+    p("bool_true_value", new Boolean(true).booleanValue());
+    p("bool_toString", new Boolean(false).toString());
+    p("bool_class", new Boolean(true).getClass().getName());
+    p("bool_equals", new Boolean(true).equals(Boolean.TRUE));
+    p("bool_in_map", new HashMap<Boolean, String>().get(new Boolean(true)));
+    p("int_in_map", new HashMap<Integer, String>().get(new Integer(1)));
+    System.out.println("still running");
+  }
+}
