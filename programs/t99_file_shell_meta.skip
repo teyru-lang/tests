@@ -1,0 +1,1 @@
+windows   # NTFS forbids < > : " / \ | ? * in a file name, and this case writes one whose name is made of shell metacharacters; there is no POSIX shell here to interpret it either

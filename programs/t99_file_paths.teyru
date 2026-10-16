@@ -76,10 +76,15 @@ class Main {
     System.out.println("path hash: " + (p.hashCode() == Paths.get("/tmp/teyru/x/y/z.txt").hashCode()))
 
     // A relative path made absolute: the working directory is whatever the
-    // runner used, so only the shape is asserted.
+    // runner used, and the *shape* of an absolute path is the platform's --
+    // "/a/b" here, "Z:\dir\a/b" under Wine -- so the assertion is the one the
+    // method promises rather than a leading "/": the result is absolute by the
+    // same rule File.isAbsolutePath applies, and it ends with what was asked
+    // for. Asserting the leading slash made this case fail on windows/amd64 for
+    // a reason that is not a defect.
     Path rp = Paths.get("a/b")
     String rabs = rp.toAbsolutePath().toString()
-    System.out.println("rel path absolute: " + (rabs.charAt(0) == 47 && rabs.endsWith("a/b")))
+    System.out.println("rel path absolute: " + (File.isAbsolutePath(rabs) && rabs.endsWith("a/b")))
     System.out.println("absolute path unchanged: " + p.toAbsolutePath().toString().equals(p.toString()))
   }
 }

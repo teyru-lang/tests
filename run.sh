@@ -56,6 +56,12 @@ if ! command -v "$TEYRU" >/dev/null 2>&1 && [ ! -x "$TEYRU" ]; then
 fi
 
 CC=${CC:-cc}
+# Wine writes its own diagnostics to stderr -- its version banner, its registry
+# complaints -- and a case's .experr is compared against the program's stderr, so
+# those lines are the runner's noise rather than the program's output. The
+# variable means nothing to a run that is not under Wine.
+WINEDEBUG=${WINEDEBUG:--all}
+export WINEDEBUG
 parts=$*
 [ -n "$parts" ] || parts="programs packages diagnostics native java-compat"
 
@@ -172,6 +178,16 @@ else
   esac
 fi
 
+# The compiler appends the target's suffix to an output path that does not
+# already end in it, so a windows build writes <out>.exe. The runner has to name
+# the same file: running the bare path is exit 127, which is what "the program
+# is not there" looks like from a shell, and it is what a windows/amd64 run
+# reported for every case before this line existed.
+case "$goos" in
+  windows) extsuf=.exe ;;
+  *) extsuf= ;;
+esac
+
 # skip_reason NAME prints the reason when NAME cannot run on this platform, and
 # prints nothing when it can.
 skip_reason() {
@@ -212,7 +228,7 @@ if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${par
       verdict "$name" "missing $want"
       continue
     fi
-    if ! build -O1 -o "$tmp/$name" "$src" >"$tmp/$name.cc" 2>&1; then
+    if ! build -O1 -o "$tmp/$name$extsuf" "$src" >"$tmp/$name.cc" 2>&1; then
       verdict "$name" "compile failed" "$(sed -n '1,4p' "$tmp/$name.cc")"
       continue
     fi
@@ -223,7 +239,7 @@ if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${par
       # contain a space.
       set -- $(cat "programs/$name.args")
     fi
-    "$tmp/$name" "$@" >"$tmp/$name.out" 2>"$tmp/$name.err"
+    "$tmp/$name$extsuf" "$@" >"$tmp/$name.out" 2>"$tmp/$name.err"
     code=$?
     wantexit=0
     if [ -f "programs/$name.exit" ]; then
@@ -251,7 +267,7 @@ if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${par
     if skip_if_platform "packages/$name"; then continue; fi
     if [ -f "$dir/error" ]; then
       want=$(cat "$dir/error")
-      if build -O0 -o "$tmp/pkg-$name" "$dir" >"$tmp/pkg-$name.out" 2>&1; then
+      if build -O0 -o "$tmp/pkg-$name$extsuf" "$dir" >"$tmp/pkg-$name.out" 2>&1; then
         verdict "$name" "expected a compile failure, got none"
       elif grep -qF "$want" "$tmp/pkg-$name.out"; then
         verdict "$name" ""
@@ -265,11 +281,11 @@ if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${par
       verdict "$name" "missing $want"
       continue
     fi
-    if ! build -O1 -o "$tmp/pkg-$name" "$dir" >"$tmp/pkg-$name.cc" 2>&1; then
+    if ! build -O1 -o "$tmp/pkg-$name$extsuf" "$dir" >"$tmp/pkg-$name.cc" 2>&1; then
       verdict "$name" "compile failed" "$(sed -n '1,4p' "$tmp/pkg-$name.cc")"
       continue
     fi
-    "$tmp/pkg-$name" >"$tmp/pkg-$name.out" 2>/dev/null
+    "$tmp/pkg-$name$extsuf" >"$tmp/pkg-$name.out" 2>/dev/null
     if cmp -s "$want" "$tmp/pkg-$name.out"; then
       verdict "$name" ""
     else
@@ -305,10 +321,10 @@ if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${par
   if [ -f native/program.teyru ]; then
     if skip_if_platform "native/program"; then :; else
     mkdir -p "$tmp/native"
-    if build -O1 -o "$tmp/native/program" \
+    if build -O1 -o "$tmp/native/program$extsuf" \
         --native native/impl.c --native-header "$tmp/native/native.h" \
         --cc-flag -I --cc-flag "$tmp/native" native/program.teyru >"$tmp/native/cc" 2>&1; then
-      "$tmp/native/program" >"$tmp/native/out" 2>&1
+      "$tmp/native/program$extsuf" >"$tmp/native/out" 2>&1
       if cmp -s native/expected.txt "$tmp/native/out"; then
         # The header is the contract the C side has to meet: every function it
         # declares must be defined by the C the program was linked against, or
@@ -366,11 +382,11 @@ if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${par
       verdict "$name" "missing $want, the output the JDK printed"
       continue
     fi
-    if ! build -O1 -o "$tmp/jc-$name" "$src" >"$tmp/jc-$name.cc" 2>&1; then
+    if ! build -O1 -o "$tmp/jc-$name$extsuf" "$src" >"$tmp/jc-$name.cc" 2>&1; then
       verdict "$name" "compile failed" "$(sed -n '1,4p' "$tmp/jc-$name.cc")"
       continue
     fi
-    "$tmp/jc-$name" >"$tmp/jc-$name.out" 2>"$tmp/jc-$name.err"
+"$tmp/jc-$name$extsuf" >"$tmp/jc-$name.out" 2>"$tmp/jc-$name.err"
     code=$?
     problems=""
     [ "$code" = "0" ] || problems="exit $code, and the JDK's run of it ended 0"

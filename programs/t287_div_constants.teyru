@@ -1,0 +1,61 @@
+class Main {
+	static final int K = 3;
+
+	public static void main(String[] args) {
+		int min = -2147483648;
+		int[] xs = { min, -7, -1, 0, 1, 7, 2147483647 };
+		for (int x : xs) {
+			System.out.println(x + " / 1 = " + (x / 1));
+			System.out.println(x + " / -1 = " + (x / -1));
+			System.out.println(x + " % 1 = " + (x % 1));
+			System.out.println(x + " % -1 = " + (x % -1));
+			System.out.println(x + " / " + K + " = " + (x / K));
+			System.out.println(x + " % " + K + " = " + (x % K));
+			System.out.println(x + " / -3 = " + (x / -3));
+			System.out.println(x + " % -3 = " + (x % -3));
+		}
+		long lmin = -9223372036854775808L;
+		long[] ls = { lmin, -7L, 0L, 7L, 9223372036854775807L };
+		for (long x : ls) {
+			System.out.println(x + " / 1 = " + (x / 1));
+			System.out.println(x + " / -1 = " + (x / -1));
+			System.out.println(x + " % 1 = " + (x % 1));
+			System.out.println(x + " % -1 = " + (x % -1));
+			System.out.println(x + " / 5 = " + (x / 5));
+			System.out.println(x + " % 5 = " + (x % 5));
+		}
+		int v = 100;
+		v /= 1;
+		System.out.println(v);
+		v /= -1;
+		System.out.println(v);
+		v %= -1;
+		System.out.println(v);
+		v /= 7;
+		System.out.println(v);
+		v %= 3;
+		System.out.println(v);
+		v = min;
+		v /= -1;
+		System.out.println(v);
+		v = min;
+		v %= -1;
+		System.out.println(v);
+		byte b = -128;
+		System.out.println(b / -1);
+		System.out.println(b % -1);
+		short s = -32768;
+		System.out.println(s / -1);
+		char c = 65535;
+		System.out.println(c / 1);
+		System.out.println(c % 1);
+		System.out.println(c / -1);
+		System.out.println(c % -1);
+		long lv = lmin;
+		lv /= -1;
+		System.out.println(lv);
+		lv = lmin;
+		lv %= -1;
+		System.out.println(lv);
+	}
+}
