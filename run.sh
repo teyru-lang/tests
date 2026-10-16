@@ -56,6 +56,12 @@ if ! command -v "$TEYRU" >/dev/null 2>&1 && [ ! -x "$TEYRU" ]; then
 fi
 
 CC=${CC:-cc}
+# Wine writes its own diagnostics to stderr -- its version banner, its registry
+# complaints -- and a case's .experr is compared against the program's stderr, so
+# those lines are the runner's noise rather than the program's output. The
+# variable means nothing to a run that is not under Wine.
+WINEDEBUG=${WINEDEBUG:--all}
+export WINEDEBUG
 parts=$*
 [ -n "$parts" ] || parts="programs packages diagnostics native java-compat"
 
