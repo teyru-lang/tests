@@ -1,0 +1,82 @@
+/* Threads, as the LLVM back end lowers them: a thread is started through the
+   runtime's thread start, its run() is dispatched by an interface selector no
+   call site in this program names, and the monitor a synchronized method and a
+   synchronized block take is the runtime's.
+
+   Everything printed here is sequenced: the worker prints only after the main
+   thread is waiting on the gate the worker opens, and the main thread prints
+   nothing about the counter until the thread has joined. */
+
+class Gate {
+  private boolean open = false
+
+  public synchronized void open() {
+    this.open = true
+    this.notifyAll()
+  }
+
+  public synchronized void await() {
+    while (!this.open) {
+      this.wait(5000)
+    }
+  }
+}
+
+class Counter {
+  private int n = 0
+
+  public synchronized void inc() {
+    this.n = this.n + 1
+  }
+
+  public int get() {
+    return this.n
+  }
+}
+
+class Main {
+  public static void main(String[] args) {
+    Thread main = Thread.currentThread()
+    System.out.println("main=" + main.getName() + " id=" + (main.getId() == 1L))
+
+    Gate gate = new Gate()
+    Counter counter = new Counter()
+    Thread worker = new Thread(new Runnable() {
+      public void run() {
+        for (int i = 0 : i < 1000 : i++) {
+          counter.inc()
+        }
+        gate.open()
+      }
+    }, "worker")
+
+    System.out.println("before=" + worker.isAlive() + " name=" + worker.getName())
+    worker.start()
+    gate.await()
+    worker.join()
+    System.out.println("count=" + counter.get())
+    System.out.println("after=" + worker.isAlive())
+
+    /* a synchronized block on a fresh object, entered and left on the same
+       path: the monitor is released even when the body returns early */
+    Box box = new Box()
+    System.out.println("box=" + box.take(7) + " " + box.take(1))
+
+    Thread.sleep(10)
+    System.out.println("done")
+  }
+}
+
+class Box {
+  private int n = 0
+
+  public int take(int v) {
+    synchronized (this) {
+      this.n = this.n + v
+      if (this.n > 5) {
+        return this.n
+      }
+    }
+    return -this.n
+  }
+}

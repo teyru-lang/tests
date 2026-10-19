@@ -1,0 +1,14 @@
+class=2 Label widget
+second=Marked B
+defaults=1 false 3
+present=true true
+byType=widget
+classValue=java.lang.String
+field=name
+fieldDefault=3
+method=run 4 true
+param=count
+names=3 value
+ctor=0 false
+equals=true
+text=@Label

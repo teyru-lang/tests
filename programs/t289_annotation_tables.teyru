@@ -1,0 +1,71 @@
+import java.lang.reflect.*
+
+/* The annotation tables, read the way java.lang.reflect reads them: the ones on
+   a class, on its fields, on its methods and constructors, and on a method's
+   parameters. A use that does not write an element gets the declared default,
+   which is what Java requires -- the reader asks without knowing whether it was
+   written. */
+
+@interface Label {
+  String value() default ""
+  int weight() default 1
+  boolean loud() default false
+}
+
+enum Kind {
+  A,
+  B
+}
+
+@interface Marked {
+  Kind kind() default Kind.A
+  Class target() default Object.class
+}
+
+@Label("widget")
+@Marked(kind = Kind.B, target = String.class)
+class Widget {
+  @Label("name")
+  public String name = "w"
+
+  @Label(value = "size", weight = 3)
+  public int size = 2
+
+  public Widget() {
+  }
+
+  @Label(value = "run", weight = 4, loud = true)
+  public String run(@Label("count") int n) {
+    return "r" + n
+  }
+}
+
+class Main {
+  public static void main(String[] args) {
+    Class c = Widget.class
+    Annotation[] all = c.getAnnotations()
+    System.out.println("class=" + all.length + " " + all[0].annotationType().getName() + " " + all[0].stringValue("value"))
+    System.out.println("second=" + all[1].annotationType().getName() + " " + all[1].enumValue("kind"))
+    System.out.println("defaults=" + all[0].intValue("weight") + " " + all[0].booleanValue("loud") + " " + all[0].elementNames().length)
+    System.out.println("present=" + c.isAnnotationPresent(Label.class) + " " + c.isAnnotationPresent(Marked.class))
+    System.out.println("byType=" + c.getAnnotation(Label.class).stringValue("value"))
+    System.out.println("classValue=" + all[1].classValue("target").getName())
+
+    Field name = c.getDeclaredField("name")
+    System.out.println("field=" + name.getAnnotation(Label.class).stringValue("value"))
+    Field size = c.getDeclaredField("size")
+    System.out.println("fieldDefault=" + size.getAnnotation(Label.class).intValue("weight"))
+
+    Method run = c.getMethod("run", int.class)
+    Annotation m = run.getAnnotation(Label.class)
+    System.out.println("method=" + m.stringValue("value") + " " + m.intValue("weight") + " " + m.booleanValue("loud"))
+    System.out.println("param=" + run.getParameterAnnotations()[0][0].stringValue("value"))
+    System.out.println("names=" + m.elementNames().length + " " + m.elementNames()[0])
+
+    Constructor ctor = c.getDeclaredConstructor()
+    System.out.println("ctor=" + ctor.getAnnotations().length + " " + run.isAnnotationPresent(Marked.class))
+
+    System.out.println("equals=" + c.getAnnotation(Label.class).equals(all[0]))
+    System.out.println("text=" + all[0].toString())
+  }
+}
