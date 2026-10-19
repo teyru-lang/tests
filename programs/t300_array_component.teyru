@@ -1,0 +1,62 @@
+// Array classes per component type: int[].class, String[].class and the class
+// an array value carries, Class.getComponentType, and the names
+// Class.forName parses.
+//
+// Class.getName spells an array the way a source file would -- int[],
+// java.lang.String[] -- where the JDK's getName spells the descriptor. The
+// binary descriptor is what Class.forName accepts, and the JDK's getTypeName
+// is the same source form, so the JDK run of this program prints the same
+// lines when getName is replaced by getTypeName.
+
+import java.lang.reflect.*
+
+class Person {
+  public String name
+
+  public Person(String name) {
+    this.name = name
+  }
+}
+
+class Main {
+  public static void main(String[] args) throws Exception {
+    Class ia = int[].class
+    System.out.println(ia.getName() + " " + ia.isArray() + " " + ia.getComponentType().getName())
+    System.out.println(ia.getSimpleName() + " " + ia.getModifiers() + " " + ia.getSuperclass().getName())
+
+    Class sa = String[].class
+    System.out.println(sa.getName() + " " + sa.getComponentType().getName() + " " + sa.getSimpleName())
+
+    Class oa = Object[].class
+    System.out.println(oa.getName() + " " + oa.getComponentType().getName())
+
+    Class pa = Person[].class
+    System.out.println(pa.getName() + " " + pa.getComponentType().getName() + " " + pa.getComponentType().getSimpleName())
+
+    // a descriptor is the name forName reads, and the component is resolved by
+    // the same aliases forName uses
+    System.out.println(Class.forName("[I").getName())
+    System.out.println(Class.forName("[Ljava.lang.String;").getName())
+    System.out.println(Class.forName("[[I").getName() + " " + Class.forName("[[I").getComponentType().getName())
+
+    // an array value carries its own component's class
+    Object ints = new int[3]
+    System.out.println(ints.getClass().getName() + " " + (ints.getClass() == int[].class))
+    Object names = new String[2]
+    System.out.println(names.getClass().getName() + " " + (names.getClass() == String[].class) + " " +
+        names.getClass().getComponentType().getName())
+    Object grid = new int[2][3]
+    System.out.println(grid.getClass().getName() + " " + grid.getClass().getComponentType().getName())
+
+    // Array.newInstance builds the same class
+    Object made = Array.newInstance(Person.class, 2)
+    System.out.println(made.getClass().getName() + " " + made.getClass().getComponentType().getName())
+    Object cells = Array.newInstance(int.class, 1)
+    System.out.println(cells.getClass().getName() + " " + cells.getClass().getComponentType().getName())
+
+    // two components are two classes, as they are in Java
+    System.out.println(String[].class == int[].class)
+    System.out.println(String[].class == Object[].class)
+    System.out.println(int[].class.isPrimitive() + " " + int.class.isArray())
+  }
+}

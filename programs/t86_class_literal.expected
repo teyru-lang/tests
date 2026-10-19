@@ -22,6 +22,6 @@ Outer$Inner
 java.lang.Class
 class Point
 class Point
-teyru.Array
-teyru.Array
-true
+java.lang.String[]
+int[]
+false

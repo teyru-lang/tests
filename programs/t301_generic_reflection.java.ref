@@ -1,0 +1,135 @@
+// The same program written for javac, kept so the comparison can be redone:
+//
+//   cp tests/programs/t301_generic_reflection.java.ref /tmp/S.java
+//   /opt/jdk21/jdk-21.0.11+10/bin/javac -d /tmp/out /tmp/S.java
+//   /opt/jdk21/jdk-21.0.11+10/bin/java -cp /tmp/out S
+//
+// Every line but the last three is byte for byte
+// tests/programs/t301_generic_reflection.expected. The three refusals are the
+// runtime's design, not a bug: Java represents a nested parameterized type, a
+// wildcard and a type variable with ParameterizedType, WildcardType and
+// TypeVariable, and this runtime keeps one level of arguments only. It refuses
+// the declaration with UnsupportedOperationException instead of answering the
+// erased type, which would be a different answer; the JDK accepts all three and
+// this reference prints "accepted" where the Teyru program prints "refused".
+
+import java.lang.reflect.*;
+import java.util.*;
+
+class Person {
+  public String name;
+
+  public Person(String name) {
+    this.name = name;
+  }
+}
+
+class People extends ArrayList<Person> {
+  public People() {
+  }
+}
+
+class Box<T> {
+  public T value;
+
+  public Box(T value) {
+    this.value = value;
+  }
+}
+
+class Holder {
+  public List<Person> people;
+  public Map<String, Person> byName;
+  public List raw;
+  public List<List<Person>> nested;
+  public List<? extends Person> wild;
+  public int[] nums;
+  public String plain;
+
+  public Holder() {
+    this.people = new ArrayList<Person>();
+    this.byName = new HashMap<String, Person>();
+    this.raw = new ArrayList();
+    this.nested = new ArrayList<List<Person>>();
+    this.wild = new ArrayList<Person>();
+    this.nums = new int[0];
+    this.plain = "";
+  }
+
+  public Holder(List<Person> people) {
+    this.people = people;
+    this.byName = new HashMap<String, Person>();
+    this.raw = new ArrayList();
+    this.nested = new ArrayList<List<Person>>();
+    this.wild = new ArrayList<Person>();
+    this.nums = new int[0];
+    this.plain = "";
+  }
+
+  public List<Person> peopleOf(String who) {
+    return people;
+  }
+
+  public void fill(Map<String, Person> into, int count) {
+  }
+}
+
+class S {
+  public static void main(String[] args) throws Exception {
+    Field people = Holder.class.getDeclaredField("people");
+    Type t = people.getGenericType();
+    System.out.println(t instanceof ParameterizedType);
+    ParameterizedType p = (ParameterizedType) t;
+    System.out.println(((Class) p.getRawType()).getName());
+    System.out.println(((Class) p.getActualTypeArguments()[0]).getName());
+    System.out.println(p.getTypeName());
+
+    ParameterizedType byName = (ParameterizedType) Holder.class.getDeclaredField("byName").getGenericType();
+    System.out.println(((Class) byName.getRawType()).getName() + " " + byName.getActualTypeArguments().length);
+    System.out.println(((Class) byName.getActualTypeArguments()[0]).getName() + " " +
+        ((Class) byName.getActualTypeArguments()[1]).getName());
+
+    System.out.println(Holder.class.getDeclaredField("raw").getGenericType() instanceof Class);
+    System.out.println(Holder.class.getDeclaredField("nums").getGenericType() instanceof Class);
+    // getName would spell "[I"; the runtime spells an array the source way.
+    System.out.println(((Class) Holder.class.getDeclaredField("nums").getGenericType()).getTypeName());
+    System.out.println(Holder.class.getDeclaredField("plain").getGenericType() instanceof Class);
+
+    Method peopleOf = Holder.class.getMethod("peopleOf", String.class);
+    System.out.println(((ParameterizedType) peopleOf.getGenericReturnType()).getTypeName());
+    Type[] ps = peopleOf.getGenericParameterTypes();
+    System.out.println(ps.length + " " + ps[0].getTypeName());
+
+    Method fill = Holder.class.getMethod("fill", Map.class, int.class);
+    Type[] fp = fill.getGenericParameterTypes();
+    System.out.println(fp.length + " " + fp[0].getTypeName() + " " + fp[1].getTypeName());
+
+    Constructor ctor = Holder.class.getDeclaredConstructor(List.class);
+    Type[] cp = ctor.getGenericParameterTypes();
+    System.out.println(cp.length + " " + cp[0].getTypeName());
+
+    Type sup = People.class.getGenericSuperclass();
+    System.out.println(sup instanceof ParameterizedType);
+    ParameterizedType sp = (ParameterizedType) sup;
+    System.out.println(((Class) sp.getRawType()).getName() + " " + ((Class) sp.getActualTypeArguments()[0]).getName());
+
+    try {
+      Holder.class.getDeclaredField("nested").getGenericType();
+      System.out.println("nested accepted");
+    } catch (UnsupportedOperationException e) {
+      System.out.println("nested refused: " + e.getMessage());
+    }
+    try {
+      Holder.class.getDeclaredField("wild").getGenericType();
+      System.out.println("wild accepted");
+    } catch (UnsupportedOperationException e) {
+      System.out.println("wild refused: " + e.getMessage());
+    }
+    try {
+      Box.class.getDeclaredField("value").getGenericType();
+      System.out.println("variable accepted");
+    } catch (UnsupportedOperationException e) {
+      System.out.println("variable refused: " + e.getMessage());
+    }
+  }
+}

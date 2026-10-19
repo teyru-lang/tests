@@ -1,0 +1,3 @@
+{"owner":"ann","balance":42,"active":true,"home":{"city":"Taipei","zip":"100"}}
+ann 42 true Taipei/100
+bob 0 true

@@ -1,0 +1,78 @@
+// Gson still binds private fields after reflection's access gate was added.
+//
+// The JSON binding reads and writes a class's declared fields through
+// java.lang.reflect (lib/27_json_binding.teyru). Reflection now refuses a
+// non-public member until setAccessible(true), so the binding asks for the
+// fields it is about to use -- which is what Gson does in Java.
+
+import teyru.*
+
+class Account {
+  private String owner
+  private int balance
+  private boolean active
+  private Address home
+
+  public Account() {
+  }
+
+  public Account(String owner, int balance, boolean active, Address home) {
+    this.owner = owner
+    this.balance = balance
+    this.active = active
+    this.home = home
+  }
+
+  public String owner() {
+    return owner
+  }
+
+  public int balance() {
+    return balance
+  }
+
+  public boolean active() {
+    return active
+  }
+
+  public Address home() {
+    return home
+  }
+}
+
+class Address {
+  private String city
+  private String zip
+
+  public Address() {
+  }
+
+  public Address(String city, String zip) {
+    this.city = city
+    this.zip = zip
+  }
+
+  public String city() {
+    return city
+  }
+
+  public String zip() {
+    return zip
+  }
+}
+
+class Main {
+  public static void main(String[] args) {
+    Gson gson = new Gson()
+    Account a = new Account("ann", 42, true, new Address("Taipei", "100"))
+    String json = gson.toJson(a)
+    System.out.println(json)
+
+    Account back = gson.fromJson(json, Account.class)
+    System.out.println(back.owner() + " " + back.balance() + " " + back.active() + " " + back.home().city() + "/" + back.home().zip())
+
+    // a member the document omits keeps the field's default
+    Account partial = gson.fromJson("{\"owner\":\"bob\"}", Account.class)
+    System.out.println(partial.owner() + " " + partial.balance() + " " + (partial.home() == null))
+  }
+}

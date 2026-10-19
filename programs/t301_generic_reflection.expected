@@ -1,0 +1,19 @@
+true
+java.util.List
+Person
+java.util.List<Person>
+java.util.Map 2
+java.lang.String Person
+true
+true
+int[]
+true
+java.util.List<Person>
+1 java.lang.String
+2 java.util.Map<java.lang.String, Person> int
+1 java.util.List<Person>
+true
+java.util.ArrayList Person
+nested refused: a nested parameterized type is deeper than one level
+wild refused: a wildcard has no reflection representation
+variable refused: a type variable has no reflection representation

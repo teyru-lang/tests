@@ -15,15 +15,13 @@
 //   - A prelude class reports the JDK class it stands in for, so the class of a
 //     Class object is "java.lang.Class", as Java has it. A class the program
 //     declares itself is reported under its own name.
-//   - Every array value is an instance of one synthetic class, teyru.Array, so
-//     that is what `A[].class` names for any element type and `String[].class
-//     == int[].class` holds; Java gives each element type its own array class
-//     and spells them "[I" and "[Ljava.lang.String;". Naming those here would
-//     take per-element-type array classes, which the runtime and the array
-//     casts do not have -- and it would make the literal a class no array is an
-//     instance of, where Java keeps the two equal (the line above the block).
-//     The primitive forms are exact, because a primitive has no class of its
-//     own in the program and one can be named after the type.
+//   - An array literal names the array class of its component: String[].class
+//     and int[].class are different classes, and a value built by `new String[]`
+//     carries the first. Class.getName spells them the way a source file would
+//     (java.lang.String[], int[]), where the JDK's getName spells the descriptor
+//     ([Ljava.lang.String;, [I) and its getTypeName spells the source form; this
+//     runtime has one name, and the useful one is the source form. The binary
+//     descriptor is still what Class.forName parses.
 class Point {
   public Point() {
   }

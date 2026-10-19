@@ -1,0 +1,92 @@
+// The same program written for javac, kept so the comparison can be redone:
+//
+//   cp tests/programs/t302_reflect_access.java.ref /tmp/S.java
+//   /opt/jdk21/jdk-21.0.11+10/bin/javac -d /tmp/out /tmp/S.java
+//   /opt/jdk21/jdk-21.0.11+10/bin/java -cp /tmp/out S
+//
+// Its output is tests/programs/t302_reflect_access.expected byte for byte.
+// Java's IllegalAccessException message names the caller ("class S cannot
+// access a member of class Secret with modifiers \"private\""); this runtime has
+// no caller to consult, so the Teyru program prints only which operation was
+// refused. The gate itself -- refuse, then allow after setAccessible(true) --
+// is the same in both.
+
+import java.lang.reflect.*;
+
+class Secret {
+  private int hidden;
+  public int visible;
+  private static int shared = 5;
+
+  private Secret() {
+    hidden = 1;
+  }
+
+  public Secret(int value) {
+    hidden = value;
+    visible = value + 1;
+  }
+
+  private int peek() {
+    return hidden;
+  }
+
+  public int visiblePeek() {
+    return peek();
+  }
+}
+
+class S {
+  public static void main(String[] args) throws Exception {
+    Secret s = new Secret(42);
+
+    Field hidden = Secret.class.getDeclaredField("hidden");
+    try {
+      System.out.println(hidden.getInt(s));
+    } catch (IllegalAccessException e) {
+      System.out.println("get refused");
+    }
+    try {
+      hidden.setInt(s, 7);
+    } catch (IllegalAccessException e) {
+      System.out.println("set refused");
+    }
+    hidden.setAccessible(true);
+    System.out.println("read " + hidden.getInt(s));
+    hidden.setInt(s, 9);
+    System.out.println("wrote " + hidden.getInt(s));
+
+    Method peek = Secret.class.getDeclaredMethod("peek");
+    try {
+      System.out.println(peek.invoke(s));
+    } catch (IllegalAccessException e) {
+      System.out.println("invoke refused");
+    }
+    peek.setAccessible(true);
+    System.out.println("invoked " + peek.invoke(s));
+
+    Constructor ctor = Secret.class.getDeclaredConstructor();
+    try {
+      ctor.newInstance();
+    } catch (IllegalAccessException e) {
+      System.out.println("ctor refused");
+    }
+    ctor.setAccessible(true);
+    Object made = ctor.newInstance();
+    System.out.println("made " + ((Secret) made).visiblePeek());
+
+    Field visible = Secret.class.getDeclaredField("visible");
+    System.out.println("public " + visible.getInt(s) + " " + visible.isAccessible());
+    visible.setAccessible(true);
+    System.out.println("now " + visible.isAccessible());
+
+    Field shared = Secret.class.getDeclaredField("shared");
+    try {
+      System.out.println(shared.getInt(null));
+    } catch (IllegalAccessException e) {
+      System.out.println("static refused");
+    }
+    shared.setAccessible(true);
+    System.out.println("static " + shared.getInt(null));
+  }
+}
