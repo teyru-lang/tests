@@ -1,0 +1,51 @@
+/* A parked virtual thread's stack is a root set.
+ *
+ * The thread allocates an 8 MB long[] and keeps it in a local -- the only
+ * reference anywhere -- and parks in Thread.sleep. The main thread then forces
+ * several collections while it churns through memory of its own, and only then
+ * lets the thread wake. The thread reads the array back and sums it. A
+ * collector that does not register the parked stack frees the array, and the
+ * sum is garbage (or the read is a use after free).
+ *
+ * The thread parks through Thread.sleep, which is the park path a virtual
+ * thread takes; the collector scans the stack from the point it parked to the
+ * top, precisely through the generated frame maps and conservatively around
+ * them. */
+class Main {
+  static long expected(int n) {
+    long s = 0
+    for (int i = 0 : i < n : i++) {
+      s += i
+    }
+    return s
+  }
+
+  public static void main(String[] args) {
+    final int n = 1024 * 1024
+    Thread t = Thread.startVirtualThread(new Runnable() {
+      public void run() {
+        long[] big = new long[n]
+        for (int i = 0 : i < n : i++) {
+          big[i] = i
+        }
+        /* parked with the only reference to big on this thread's stack */
+        Thread.sleep(300)
+        long s = 0
+        for (int i = 0 : i < n : i++) {
+          s += big[i]
+        }
+        System.out.println("sum_ok=" + (s == expected(n)) + " length=" + big.length)
+      }
+    })
+    /* let it allocate and park */
+    Thread.sleep(100)
+    for (int i = 0 : i < 5 : i++) {
+      System.gc()
+      byte[] churn = new byte[1024 * 1024]
+      churn[0] = (byte) i
+      Thread.sleep(20)
+    }
+    t.join()
+    System.out.println("done alive=" + t.isAlive())
+  }
+}

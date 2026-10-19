@@ -1,0 +1,56 @@
+/* isVirtual() tells the two kinds of thread apart, and the rest of the Thread
+   API -- name, id, alive, join -- works for a virtual thread exactly as it does
+   for a platform one. */
+class Gate {
+  boolean open = false
+
+  public synchronized void release() {
+    this.open = true
+    this.notifyAll()
+  }
+
+  public synchronized void await() {
+    while (!this.open) {
+      this.wait(5000)
+    }
+  }
+}
+
+class Main {
+  public static void main(String[] args) {
+    Thread main = Thread.currentThread()
+    System.out.println("main_virtual=" + main.isVirtual())
+    final Gate gate = new Gate()
+
+    Thread v = Thread.ofVirtual().name("virtual-one").start(new Runnable() {
+      public void run() {
+        gate.await()
+        Thread self = Thread.currentThread()
+        System.out.println("inside_virtual=" + self.isVirtual() + " name=" + self.getName())
+      }
+    })
+    System.out.println("object_virtual=" + v.isVirtual() + " name=" + v.getName())
+    System.out.println("alive_before_join=" + v.isAlive())
+    gate.release()
+    v.join()
+    System.out.println("alive_after_join=" + v.isAlive())
+
+    Thread p = new Thread(new Runnable() {
+      public void run() {
+        System.out.println("inside_platform=" + Thread.currentThread().isVirtual())
+      }
+    }, "platform-one")
+    System.out.println("platform_object_virtual=" + p.isVirtual())
+    p.start()
+    p.join()
+
+    Thread s = Thread.startVirtualThread(new Runnable() {
+      public void run() {
+      }
+    })
+    s.join()
+    System.out.println("start_virtual_thread_virtual=" + s.isVirtual())
+    System.out.println("ids_differ=" + (v.getId() != p.getId()))
+    System.out.println("done")
+  }
+}

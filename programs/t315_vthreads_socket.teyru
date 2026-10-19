@@ -1,0 +1,49 @@
+/* A virtual thread blocked on a socket read must not hold its carrier.
+ *
+ * Two connections, one silent: the reader virtual thread connects and reads,
+ * and the server never writes on that connection. The main thread accepts the
+ * connection (which proves the reader is connected), and only then starts a
+ * second virtual thread, which does real work and prints. If a blocked read
+ * kept the carrier, the second thread could not run until the read returned --
+ * and the read does not return until the main thread closes the server side,
+ * which it does only after the worker has finished.
+ *
+ * The program is run by the suite with the default carrier count; running it
+ * with TEYRU_VTHREAD_CARRIERS=1 makes the same-carrier claim exact, because
+ * then there is only one carrier for both threads to share. */
+class Main {
+  public static void main(String[] args) {
+    ServerSocket ss = new ServerSocket(0)
+    final int port = ss.getLocalPort()
+    final Thread reader = Thread.startVirtualThread(new Runnable() {
+      public void run() {
+        try {
+          Socket s = new Socket("localhost", port)
+          byte[] buf = new byte[8]
+          int n = s.getInputStream().read(buf, 0, 8)
+          System.out.println("reader_unblocked=" + (n == -1))
+          s.close()
+        } catch (IOException e) {
+          System.out.println("reader_error")
+        }
+      }
+    })
+    /* accept blocks until the reader has connected, so the reader is connected
+       and about to block in read when this returns */
+    Socket serverSide = ss.accept()
+    System.out.println("accepted")
+    Thread worker = Thread.startVirtualThread(new Runnable() {
+      public void run() {
+        long s = 0
+        for (int i = 0 : i < 200000 : i++) s += i
+        System.out.println("worker_ran=true sum=" + s)
+      }
+    })
+    worker.join()
+    System.out.println("reader_still_blocked=" + reader.isAlive())
+    serverSide.close()
+    reader.join()
+    ss.close()
+    System.out.println("done")
+  }
+}

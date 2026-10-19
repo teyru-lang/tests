@@ -1,0 +1,1 @@
+windows  # virtual threads are refused on Windows (no ucontext); see tyrt_thread.c
