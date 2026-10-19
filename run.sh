@@ -244,7 +244,10 @@ if [ "$parts" = "programs packages diagnostics native java-compat test-framework
       verdict "$name" "compile failed" "$(sed -n '1,4p' "$tmp/$name.cc")"
       continue
     fi
-    set -- ""
+    # No arguments at all, which is not the same as one empty argument: a
+    # program that reads args[0] would parse "" and fail, which is exactly how
+    # t285_alloc_thread_stress reported a NumberFormatException on windows.
+    set --
     if [ -f "programs/$name.args" ]; then
       # The arguments are split on whitespace, the way the harness that reads
       # these files in the compiler repository splits them; an argument cannot
