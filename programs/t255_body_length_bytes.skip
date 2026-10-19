@@ -1,0 +1,1 @@
+windows  # mingw-w64 ships no OpenSSL, so a program whose reachable code calls the TLS layer cannot be linked for this target

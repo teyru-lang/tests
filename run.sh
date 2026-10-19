@@ -48,6 +48,15 @@ set -u
 
 TEYRU=${TEYRU:-teyru}
 TARGET=${TEYRU_TARGET:-}
+# TEYRU_RUNNER is the command that runs a program built for another platform:
+# `wine` for windows/amd64, `qemu-aarch64` for linux/arm64. Empty means run it
+# directly, which is right for the host's own platform.
+#
+# A binfmt handler is not a substitute. With the kernel's `P` flag Wine receives
+# the executable path as argv[0] *and* again as the first argument, so a program
+# that prints args.length reports one too many -- which is how t08_args and
+# t77_compact_main_args failed when this was tried.
+RUNNER=${TEYRU_RUNNER:-}
 RUNS_KEEP=${RUNS_KEEP:-0}
 here=$(cd "$(dirname "$0")" && pwd)
 cd "$here"
@@ -242,7 +251,7 @@ if [ "$parts" = "programs packages diagnostics native java-compat test-framework
       # contain a space.
       set -- $(cat "programs/$name.args")
     fi
-    "$tmp/$name$extsuf" "$@" >"$tmp/$name.out" 2>"$tmp/$name.err"
+    $RUNNER "$tmp/$name$extsuf" "$@" >"$tmp/$name.out" 2>"$tmp/$name.err"
     code=$?
     wantexit=0
     if [ -f "programs/$name.exit" ]; then
@@ -288,7 +297,7 @@ if [ "$parts" = "programs packages diagnostics native java-compat test-framework
       verdict "$name" "compile failed" "$(sed -n '1,4p' "$tmp/pkg-$name.cc")"
       continue
     fi
-    "$tmp/pkg-$name$extsuf" >"$tmp/pkg-$name.out" 2>/dev/null
+    $RUNNER "$tmp/pkg-$name$extsuf" >"$tmp/pkg-$name.out" 2>/dev/null
     if cmp -s "$want" "$tmp/pkg-$name.out"; then
       verdict "$name" ""
     else
@@ -327,7 +336,7 @@ if [ "$parts" = "programs packages diagnostics native java-compat test-framework
     if build -O1 -o "$tmp/native/program$extsuf" \
         --native native/impl.c --native-header "$tmp/native/native.h" \
         --cc-flag -I --cc-flag "$tmp/native" native/program.teyru >"$tmp/native/cc" 2>&1; then
-      "$tmp/native/program$extsuf" >"$tmp/native/out" 2>&1
+      $RUNNER "$tmp/native/program$extsuf" >"$tmp/native/out" 2>&1
       if cmp -s native/expected.txt "$tmp/native/out"; then
         # The header is the contract the C side has to meet: every function it
         # declares must be defined by the C the program was linked against, or

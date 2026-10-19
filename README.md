@@ -29,6 +29,13 @@ reads exactly the same variable the same way (`TEYRU_TARGET=linux/arm64 go test
 about the run changes: the cases, the expectations and the policy files are the
 ones below.
 
+`TEYRU_RUNNER` is the command that runs a program built for another platform:
+`wine` for `windows/amd64`, `qemu-aarch64` for `linux/arm64`; empty (the
+default) runs it directly, which is right on the host's own platform. A binfmt
+handler is not a substitute: with the kernel's `P` flag Wine gets the executable
+path as argv[0] and again as the first argument, so a program that prints its
+argument count reports one too many.
+
 Running for another platform only says something where the programs can actually
 run on it: `linux/arm64` needs a registered `binfmt_misc` handler or `qemu-user`
 (`QEMU_LD_PREFIX` pointing at the target's sysroot), and `windows/amd64` needs
