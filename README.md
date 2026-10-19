@@ -98,6 +98,7 @@ has been accepted.
 | `diagnostics/` | `name.teyru` and `name.code`: the program must be *rejected*, and the diagnostic named in `.code` must appear. The cases live here rather than as string literals in the compiler's test source, because a suite that keeps one of its parts inside the compiler is the compiler testing itself |
 | `native/` | the C implementation a `native` method gets linked against, plus `net_c_test.c`: the socket layer tested as C, because the failures that matter need a peer that is genuinely slow, silent or gone |
 | `java-compat/` | `name.java` and `name.expected`: an unmodified Java program, and what the JDK 21 printed when it ran it. The compiler reads `.java` as a source extension and the statement terminator is optional, so the subset these cases cover is the subset "Java source compiles unchanged" names |
+| `test-framework/` | one directory per case with `expected` (stdout, byte for byte) and `exit`: a project run with `teyru test`. `pass/` holds one passing test; `fail/` holds one passing and one failing test, so the command exits 1 and the case passes |
 
 ### The files beside a program
 

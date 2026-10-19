@@ -31,6 +31,9 @@
 #   java-compat/  NAME.java and NAME.expected: the same program written in Java,
 #                 compiled by this compiler as it stands, with the expectation
 #                 taken from running it on the JDK
+#   test-framework/  one directory per case with `expected` (stdout) and `exit`:
+#                 a project run with `teyru test`, where exit 1 is a passing
+#                 case when it is the failing test's status
 #
 # Two files beside them shape what a failure means, and the compiler's own
 # driver reads both the same way:
@@ -63,7 +66,7 @@ CC=${CC:-cc}
 WINEDEBUG=${WINEDEBUG:--all}
 export WINEDEBUG
 parts=$*
-[ -n "$parts" ] || parts="programs packages diagnostics native java-compat"
+[ -n "$parts" ] || parts="programs packages diagnostics native java-compat test-framework"
 
 # build passes everything through to the compiler, adding the target when one was
 # named. TEYRU_TARGET is the one place this script says which platform it is
@@ -218,7 +221,7 @@ skip_if_platform() {
 }
 
 # ---------------------------------------------------------------- programs
-if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${parts#*programs}" != "$parts" ]; then
+if [ "$parts" = "programs packages diagnostics native java-compat test-framework" ] || [ "${parts#*programs}" != "$parts" ]; then
   for src in programs/*.teyru; do
     [ -f "$src" ] || continue
     name=$(basename "$src" .teyru)
@@ -260,7 +263,7 @@ if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${par
 fi
 
 # ---------------------------------------------------------------- packages
-if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${parts#*packages}" != "$parts" ]; then
+if [ "$parts" = "programs packages diagnostics native java-compat test-framework" ] || [ "${parts#*packages}" != "$parts" ]; then
   for dir in packages/*/; do
     [ -d "$dir" ] || continue
     name=$(basename "$dir")
@@ -295,7 +298,7 @@ if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${par
 fi
 
 # ---------------------------------------------------------------- diagnostics
-if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${parts#*diagnostics}" != "$parts" ]; then
+if [ "$parts" = "programs packages diagnostics native java-compat test-framework" ] || [ "${parts#*diagnostics}" != "$parts" ]; then
   for src in diagnostics/*.teyru; do
     [ -f "$src" ] || continue
     name=$(basename "$src" .teyru)
@@ -317,7 +320,7 @@ if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${par
 fi
 
 # ---------------------------------------------------------------- native
-if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${parts#*native}" != "$parts" ]; then
+if [ "$parts" = "programs packages diagnostics native java-compat test-framework" ] || [ "${parts#*native}" != "$parts" ]; then
   if [ -f native/program.teyru ]; then
     if skip_if_platform "native/program"; then :; else
     mkdir -p "$tmp/native"
@@ -372,7 +375,7 @@ fi
 # case here fails when this compiler refuses Java that javac accepts, or when
 # the two answers differ. That is the subset `docs`' "Java source compiles
 # unchanged" names, and the size of the subset is the number of files here.
-if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${parts#*java-compat}" != "$parts" ]; then
+if [ "$parts" = "programs packages diagnostics native java-compat test-framework" ] || [ "${parts#*java-compat}" != "$parts" ]; then
   for src in java-compat/*.java; do
     [ -f "$src" ] || continue
     name=$(basename "$src" .java)
@@ -393,6 +396,37 @@ if [ "$parts" = "programs packages diagnostics native java-compat" ] || [ "${par
     cmp -s "$want" "$tmp/jc-$name.out" || problems="$problems stdout differs from $want"
     if [ -n "$problems" ]; then
       verdict "$name" "$problems" "$(diff "$want" "$tmp/jc-$name.out" 2>/dev/null | sed -n '1,6p')" "$(sed -n '1,4p' "$tmp/jc-$name.err")"
+    else
+      verdict "$name" ""
+    fi
+  done
+fi
+
+# ------------------------------------------------------------ test-framework
+#
+# The `teyru test` fixture: one directory per case, holding `expected` (the
+# lines the command prints, byte for byte) and `exit` (the status it must end
+# with). A case whose exit is 1 is a project with a failing test, which is a
+# passing case here: the command is supposed to report the failure and exit 1.
+if [ "$parts" = "programs packages diagnostics native java-compat test-framework" ] || [ "${parts#*test-framework}" != "$parts" ]; then
+  for dir in test-framework/*/; do
+    [ -d "$dir" ] || continue
+    name=$(basename "$dir")
+    if skip_if_platform "test-framework/$name"; then continue; fi
+    want="test-framework/$name/expected"
+    wantcodef="test-framework/$name/exit"
+    if [ ! -f "$want" ] || [ ! -f "$wantcodef" ]; then
+      verdict "$name" "missing $want or $wantcodef"
+      continue
+    fi
+    "$TEYRU" test "$dir" >"$tmp/tf-$name.out" 2>"$tmp/tf-$name.err"
+    code=$?
+    wantcode=$(cat "$wantcodef")
+    problems=""
+    [ "$code" = "$wantcode" ] || problems="exit $code, want $wantcode"
+    cmp -s "$want" "$tmp/tf-$name.out" || problems="$problems stdout differs from $want"
+    if [ -n "$problems" ]; then
+      verdict "$name" "$problems" "$(diff "$want" "$tmp/tf-$name.out" 2>/dev/null | sed -n '1,6p')" "$(sed -n '1,4p' "$tmp/tf-$name.err")"
     else
       verdict "$name" ""
     fi

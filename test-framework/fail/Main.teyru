@@ -1,0 +1,6 @@
+// A package of its own main: `teyru test` runs the tests and does not call it.
+class Main {
+  public static void main(String[] args) {
+    System.out.println("the package's main ran")
+  }
+}
