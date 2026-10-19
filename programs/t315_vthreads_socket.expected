@@ -1,0 +1,5 @@
+accepted
+worker_ran=true sum=19999900000
+reader_still_blocked=true
+reader_unblocked=true
+done

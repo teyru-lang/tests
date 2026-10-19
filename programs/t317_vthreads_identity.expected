@@ -1,0 +1,10 @@
+main_virtual=false
+object_virtual=true name=virtual-one
+alive_before_join=true
+inside_virtual=true name=virtual-one
+alive_after_join=false
+platform_object_virtual=false
+inside_platform=false
+start_virtual_thread_virtual=true
+ids_differ=true
+done
