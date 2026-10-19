@@ -1,0 +1,11 @@
+value 1
+value 7
+caught negative: -1
+value 2
+either zero
+value 3
+lambda caught lambda
+inner negative: -1
+file
+ctor no name
+unchecked unchecked

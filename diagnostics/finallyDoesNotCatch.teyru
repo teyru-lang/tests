@@ -1,0 +1,17 @@
+import java.io.IOException
+
+// A finally clause runs on the way out; it does not catch, so it cannot make a
+// checked exception handled.
+class Main {
+  static void risky() throws IOException {
+    throw new IOException("boom")
+  }
+
+  public static void main(String[] args) {
+    try {
+      risky()
+    } finally {
+      System.out.println("done")
+    }
+  }
+}

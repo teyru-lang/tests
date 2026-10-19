@@ -1,0 +1,124 @@
+/* Checked exceptions are checked at compile time (JLS 11.2): a call to a
+   method whose throws clause names a checked exception has to catch it or
+   declare it, and a throw of one follows the same rule. This program is the
+   accepting half of that rule -- every checked exception below is either
+   caught by an enclosing try, declared by the method that lets it escape, or
+   named by the functional interface a lambda implements. The rejecting forms
+   are tests/diagnostics/uncaughtChecked*.teyru and checkedInLambda.teyru
+   (TY-TYP-0122).
+
+   A RuntimeException and an Error are not checked: neither needs handling. */
+
+class AppException extends Exception {
+  public AppException(String message) {
+    super(message)
+  }
+}
+
+class ConfigException extends Exception {
+  public ConfigException(String message) {
+    super(message)
+  }
+}
+
+interface Loader {
+  String load() throws AppException
+}
+
+interface Plain {
+  String load()
+}
+
+class Resource {
+  String name
+
+  public Resource(String name) throws ConfigException {
+    if (name == null) {
+      throw new ConfigException("no name")
+    }
+    this.name = name
+  }
+}
+
+class Main {
+  static String read(int n) throws AppException {
+    if (n < 0) {
+      throw new AppException("negative: " + n)
+    }
+    return "value " + n
+  }
+
+  // declared: the caller has to handle it
+  static String forward() throws AppException {
+    return read(7)
+  }
+
+  // caught by an enclosing try
+  static String handle(int n) {
+    try {
+      return read(n)
+    } catch (AppException e) {
+      return "caught " + e.getMessage()
+    }
+  }
+
+  // multi-catch covers both of the types the body can throw
+  static String both(int n) {
+    try {
+      if (n == 0) {
+        throw new ConfigException("zero")
+      }
+      return read(n)
+    } catch (AppException | ConfigException e) {
+      return "either " + e.getMessage()
+    }
+  }
+
+  // a lambda body may throw what its functional interface declares
+  static String viaLambda(Loader l) {
+    try {
+      return l.load()
+    } catch (AppException e) {
+      return "lambda caught " + e.getMessage()
+    }
+  }
+
+  // a lambda that handles its own checked exception needs no throws clause
+  static String handledLambda() {
+    Plain p = () -> {
+      try {
+        return read(-1)
+      } catch (AppException e) {
+        return "inner " + e.getMessage()
+      }
+    }
+    return p.load()
+  }
+
+  public static void main(String[] args) throws AppException, ConfigException {
+    System.out.println(read(1))
+    System.out.println(forward())
+    System.out.println(handle(-1))
+    System.out.println(both(2))
+    System.out.println(both(0))
+    System.out.println(viaLambda(() -> read(3)))
+    System.out.println(viaLambda(() -> { throw new AppException("lambda") }))
+    System.out.println(handledLambda())
+
+    Resource r = new Resource("file")
+    System.out.println(r.name)
+    try {
+      Resource bad = new Resource(null)
+      System.out.println("unreachable " + bad.name)
+    } catch (ConfigException e) {
+      System.out.println("ctor " + e.getMessage())
+    }
+
+    // an unchecked exception needs no handling
+    try {
+      throw new IllegalStateException("unchecked")
+    } catch (IllegalStateException e) {
+      System.out.println("unchecked " + e.getMessage())
+    }
+  }
+}

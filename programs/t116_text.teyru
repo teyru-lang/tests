@@ -5,7 +5,9 @@
    The reference output is the same program on javac 25 with those three
    properties; see t116_text.java.ref for the Java side. */
 class Main {
-  public static void main(String[] args) {
+  // messages() declares ParseException: MessageFormat.parse(String) does, and a
+  // checked exception has to be declared or caught at every call (TY-TYP-0122)
+  public static void main(String[] args) throws ParseException {
     numberFormats()
     decimalPatterns()
     numberParse()
@@ -279,7 +281,7 @@ class Main {
 
   // ---------------------------------------------------------------- messages
 
-  static void messages() {
+  static void messages() throws ParseException {
     Object[] args = new Object[5]
     args[0] = Double.valueOf(1234567.891)
     args[1] = D(1789394709123L)

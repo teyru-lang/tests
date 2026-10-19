@@ -1,0 +1,12 @@
+import java.io.IOException
+
+// A throw of a checked exception follows the same rule as a call that declares
+// one: something has to catch it or the method has to declare it.
+class Main {
+  static void fail() {
+    throw new IOException("boom")
+  }
+
+  public static void main(String[] args) {
+  }
+}
