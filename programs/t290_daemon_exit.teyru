@@ -1,0 +1,40 @@
+/* A daemon thread loops forever; main returns; the process ends anyway. The
+   non-daemon worker that is still running is what keeps it alive long enough to
+   print, and that is the other half of the rule: the process ends when the last
+   non-daemon thread does, not when main returns.
+
+   The same program in t290_daemon_exit.java.ref, run on OpenJDK 21, is where
+   the .expected file came from. If daemon status were ignored the program would
+   never end, which is what the test's timeout is for. */
+
+class Main {
+  public static void main(String[] args) {
+    Thread daemon = new Thread(new Runnable() {
+      public void run() {
+        while (true) {
+          Thread.sleep(5)
+        }
+      }
+    }, "daemon")
+    daemon.setDaemon(true)
+    System.out.println("daemon=" + daemon.isDaemon())
+    daemon.start()
+    try {
+      daemon.setDaemon(false)
+      System.out.println("setDaemon after start accepted")
+    } catch (IllegalThreadStateException e) {
+      System.out.println("setDaemon after start rejected")
+    }
+
+    Thread worker = new Thread(new Runnable() {
+      public void run() {
+        Thread.sleep(100)
+        System.out.println("non-daemon worker finished")
+      }
+    }, "worker")
+    System.out.println("worker daemon=" + worker.isDaemon())
+    worker.start()
+    Thread.sleep(30)
+    System.out.println("main returning")
+  }
+}

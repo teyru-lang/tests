@@ -1,0 +1,52 @@
+/* The interrupt status: isInterrupted() reads without clearing,
+   Thread.interrupted() reads and clears, and a running thread that polls the
+   flag sees the interrupt another thread raised.
+
+   The Java twin is t289_interrupt_status.java.ref; its output on OpenJDK 21 is
+   the .expected file. The worker polls Thread.interrupted() rather than
+   isInterrupted() so that a sleep it is inside when the interrupt lands does
+   not leave the status set for ever: the catch is the second way the poll can
+   see it. */
+
+class Main {
+  public static void main(String[] args) {
+    Thread main = Thread.currentThread()
+    System.out.println("initial=" + main.isInterrupted())
+    main.interrupt()
+    System.out.println("after interrupt=" + main.isInterrupted())
+    System.out.println("interrupted()=" + Thread.interrupted())
+    System.out.println("after clear=" + main.isInterrupted())
+    System.out.println("interrupted() again=" + Thread.interrupted())
+
+    final Thread worker = new Thread(new Runnable() {
+      public void run() {
+        boolean seen = false
+        while (!seen) {
+          seen = Thread.interrupted()
+          if (!seen) {
+            try {
+              Thread.sleep(1)
+            } catch (InterruptedException e) {
+              seen = true
+            }
+          }
+        }
+        System.out.println("worker observed interrupt")
+      }
+    }, "worker")
+    worker.start()
+    try {
+      Thread.sleep(50)
+    } catch (InterruptedException e) {
+      System.out.println("main sleep interrupted")
+    }
+    worker.interrupt()
+    try {
+      worker.join()
+    } catch (InterruptedException e) {
+      System.out.println("join interrupted")
+    }
+    System.out.println("worker alive=" + worker.isAlive())
+    System.out.println("done")
+  }
+}

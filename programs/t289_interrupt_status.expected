@@ -1,0 +1,8 @@
+initial=false
+after interrupt=true
+interrupted()=true
+after clear=false
+interrupted() again=false
+worker observed interrupt
+worker alive=false
+done

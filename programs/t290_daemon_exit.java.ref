@@ -1,0 +1,47 @@
+/* The same program as t290_daemon_exit.teyru, in Java. Compiled and run on
+   OpenJDK 21; its output is t290_daemon_exit.expected. The daemon's sleep is
+   wrapped because Runnable.run cannot throw a checked exception. */
+public class Main {
+  public static void main(String[] args) {
+    Thread daemon = new Thread(new Runnable() {
+      public void run() {
+        while (true) {
+          try {
+            Thread.sleep(5);
+          } catch (InterruptedException e) {
+            return;
+          }
+        }
+      }
+    }, "daemon");
+    daemon.setDaemon(true);
+    System.out.println("daemon=" + daemon.isDaemon());
+    daemon.start();
+    try {
+      daemon.setDaemon(false);
+      System.out.println("setDaemon after start accepted");
+    } catch (IllegalThreadStateException e) {
+      System.out.println("setDaemon after start rejected");
+    }
+
+    Thread worker = new Thread(new Runnable() {
+      public void run() {
+        try {
+          Thread.sleep(100);
+        } catch (InterruptedException e) {
+          System.out.println("worker interrupted");
+          return;
+        }
+        System.out.println("non-daemon worker finished");
+      }
+    }, "worker");
+    System.out.println("worker daemon=" + worker.isDaemon());
+    worker.start();
+    try {
+      Thread.sleep(30);
+    } catch (InterruptedException e) {
+      System.out.println("main sleep interrupted");
+    }
+    System.out.println("main returning");
+  }
+}
