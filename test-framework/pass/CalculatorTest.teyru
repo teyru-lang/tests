@@ -1,0 +1,7 @@
+// The passing half of the `teyru test` fixture: one test, and it passes.
+class CalculatorTest {
+  @Test
+  public void adds() {
+    Assert.assertEquals(4, 2 + 2)
+  }
+}

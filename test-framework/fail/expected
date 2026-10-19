@@ -1,0 +1,4 @@
+PASS CalculatorTest.adds
+FAIL CalculatorTest.subtracts: expected 3, but was 4
+java.lang.AssertionError: expected 3, but was 4
+1 passed, 1 failed

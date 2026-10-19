@@ -1,0 +1,12 @@
+// The failing half: one test passes and one fails, so the command exits 1.
+class CalculatorTest {
+  @Test
+  public void adds() {
+    Assert.assertEquals(4, 2 + 2)
+  }
+
+  @Test
+  public void subtracts() {
+    Assert.assertEquals(3, 2 + 2)
+  }
+}
