@@ -1,0 +1,16 @@
+import java.io.IOException
+
+// A call whose method declares a checked exception has to be caught by an
+// enclosing try or declared by the enclosing method.
+class Main {
+  static void risky() throws IOException {
+    throw new IOException("boom")
+  }
+
+  static void bad() {
+    risky()
+  }
+
+  public static void main(String[] args) {
+  }
+}

@@ -45,11 +45,13 @@ class Recorder implements Writer {
 /* A Writer whose writes fail, which is the case PrintWriter's contract is
    about: the failure becomes a flag and not an exception. */
 class Broken implements Writer {
-  public void write(String s) {
+  // Writer's own write declares IOException in Java; the failure is what this
+  // class is for, so it declares it too (TY-TYP-0122)
+  public void write(String s) throws IOException {
     throw new IOException("no room")
   }
 
-  public void write(int c) {
+  public void write(int c) throws IOException {
     throw new IOException("no room")
   }
 

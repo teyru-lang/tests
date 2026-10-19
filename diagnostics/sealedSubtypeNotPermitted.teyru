@@ -1,0 +1,22 @@
+// A permits clause makes the permit set explicit: a direct subtype that is not
+// named in it is rejected, even when it is declared in the same file.
+sealed interface Shape permits Circle {
+  double area()
+}
+
+record Circle(double r) implements Shape {
+  public double area() {
+    return r
+  }
+}
+
+final class Square implements Shape {
+  public double area() {
+    return 0.0
+  }
+}
+
+class Main {
+  public static void main(String[] args) {
+  }
+}

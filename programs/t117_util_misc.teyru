@@ -69,7 +69,9 @@ class Main {
 
   // ------------------------------------------------------------- strings
 
-  public static void main(String[] args) {
+  // props() declares Exception, so the caller has to declare it too: a checked
+  // exception is checked at compile time (TY-TYP-0122)
+  public static void main(String[] args) throws Exception {
     strings()
     randoms()
     uuids()

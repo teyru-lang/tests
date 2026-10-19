@@ -1,0 +1,13 @@
+import java.io.IOException
+
+// A lambda body may only let escape the checked exceptions its functional
+// interface declares; a try around the lambda expression does not catch them.
+interface Plain {
+  void run()
+}
+
+class Main {
+  public static void main(String[] args) {
+    Plain p = () -> { throw new IOException("boom") }
+  }
+}

@@ -1,0 +1,63 @@
+/* A sealed hierarchy's permits clause is validated (JLS 8.1.6 for classes,
+   JLS 9.1.4 for interfaces), and the permit set is what decides a switch
+   expression's exhaustiveness. Both hierarchies below are switched without a
+   default: the first names its permits, the second relies on Java's implicit
+   permits clause for direct subtypes declared in the same compilation unit.
+   The rejected forms are tests/diagnostics/sealed*.teyru. */
+
+sealed interface Shape permits Circle, Square {
+  double area()
+}
+
+record Circle(double r) implements Shape {
+  public double area() {
+    return 3.0 * r * r
+  }
+}
+
+record Square(double side) implements Shape {
+  public double area() {
+    return side * side
+  }
+}
+
+// no permits clause: Red and Blue are permitted because they are declared
+// here, in the same compilation unit as the sealed type
+sealed interface Colour {
+  String name()
+}
+
+final class Red implements Colour {
+  public String name() {
+    return "red"
+  }
+}
+
+final class Blue implements Colour {
+  public String name() {
+    return "blue"
+  }
+}
+
+class Main {
+  static double area(Shape s) {
+    return switch (s) {
+      case Circle c -> c.area()
+      case Square q -> q.area()
+    }
+  }
+
+  static String colour(Colour c) {
+    return switch (c) {
+      case Red r -> r.name()
+      case Blue b -> b.name()
+    }
+  }
+
+  public static void main(String[] args) {
+    System.out.println(area(new Circle(2.0)))
+    System.out.println(area(new Square(3.0)))
+    System.out.println(colour(new Red()))
+    System.out.println(colour(new Blue()))
+  }
+}

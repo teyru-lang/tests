@@ -1,0 +1,18 @@
+// A permits clause may only name direct subtypes of the sealed type.
+sealed interface Shape permits Circle, NotAShape {
+  double area()
+}
+
+record Circle(double r) implements Shape {
+  public double area() {
+    return r
+  }
+}
+
+class NotAShape {
+}
+
+class Main {
+  public static void main(String[] args) {
+  }
+}
