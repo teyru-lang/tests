@@ -10,7 +10,7 @@ many=ik/jo len=2
 nums=1,2,3 len=3
 words=a,b len=2
 ids=5,7
-many is teyru.Array of Person
+many is Person[] of Person
 null in int[]: cannot bind null at $.nums[1]: the array's element type is int, which has no null
 null in Person[]: null
 field people: java.util.List -> Person
@@ -20,15 +20,15 @@ field queue: java.util.Deque -> Person
 field plain: java.util.ArrayList -> Person
 field teams: java.util.List -> Team
 field points: java.util.List -> Point
-field many: teyru.Array -> Person
-field nums: teyru.Array -> int
-field words: teyru.Array -> java.lang.String
+field many: Person[] -> Person
+field nums: int[] -> int
+field words: java.lang.String[] -> java.lang.String
 field ids: java.util.List -> java.lang.Integer
 field loose: java.util.List -> java.lang.Object
 field mixed: java.util.Map -> java.lang.Object
 field nested: java.util.List -> java.util.List
 field raw: java.util.List -> java.lang.Object
-field grid: teyru.Array -> teyru.Array
+field grid: Person[][] -> Person[]
 [{"name":"ann","age":31},{"name":"bo","age":24}]
 {"lead":{"name":"di","age":18},"deputy":{"name":"ed","age":50}}
 [{"name":"ik","age":90},{"name":"jo","age":100}]

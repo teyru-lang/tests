@@ -1,0 +1,12 @@
+get refused
+set refused
+read 42
+wrote 9
+invoke refused
+invoked 9
+ctor refused
+made 1
+public 43 false
+now true
+static refused
+static 5

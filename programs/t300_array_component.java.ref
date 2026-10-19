@@ -1,0 +1,62 @@
+// The same program written for javac, kept so the comparison can be redone:
+//
+//   cp tests/programs/t300_array_component.java.ref /tmp/S.java
+//   /opt/jdk21/jdk-21.0.11+10/bin/javac -d /tmp/out /tmp/S.java
+//   /opt/jdk21/jdk-21.0.11+10/bin/java -cp /tmp/out S
+//
+// Its output is tests/programs/t300_array_component.expected byte for byte.
+// One substitution is made on purpose: the Teyru program prints array classes
+// with Class.getName, and this runtime's getName is the source form
+// ("int[]", "java.lang.String[]"), which is the JDK's getTypeName. The JDK's
+// getName spells the descriptor ("[I", "[Ljava.lang.String;"), and that
+// descriptor is exactly what both languages' Class.forName parses -- the
+// forName lines below are unchanged. Component classes still use getName, so
+// the component names are the same in both runs.
+
+import java.lang.reflect.*;
+
+class Person {
+  public String name;
+
+  public Person(String name) {
+    this.name = name;
+  }
+}
+
+class S {
+  public static void main(String[] args) throws Exception {
+    Class ia = int[].class;
+    System.out.println(ia.getTypeName() + " " + ia.isArray() + " " + ia.getComponentType().getName());
+    System.out.println(ia.getSimpleName() + " " + ia.getModifiers() + " " + ia.getSuperclass().getName());
+
+    Class sa = String[].class;
+    System.out.println(sa.getTypeName() + " " + sa.getComponentType().getName() + " " + sa.getSimpleName());
+
+    Class oa = Object[].class;
+    System.out.println(oa.getTypeName() + " " + oa.getComponentType().getName());
+
+    Class pa = Person[].class;
+    System.out.println(pa.getTypeName() + " " + pa.getComponentType().getName() + " " + pa.getComponentType().getSimpleName());
+
+    System.out.println(Class.forName("[I").getTypeName());
+    System.out.println(Class.forName("[Ljava.lang.String;").getTypeName());
+    System.out.println(Class.forName("[[I").getTypeName() + " " + Class.forName("[[I").getComponentType().getTypeName());
+
+    Object ints = new int[3];
+    System.out.println(ints.getClass().getTypeName() + " " + (ints.getClass() == int[].class));
+    Object names = new String[2];
+    System.out.println(names.getClass().getTypeName() + " " + (names.getClass() == String[].class) + " " +
+        names.getClass().getComponentType().getName());
+    Object grid = new int[2][3];
+    System.out.println(grid.getClass().getTypeName() + " " + grid.getClass().getComponentType().getTypeName());
+
+    Object made = Array.newInstance(Person.class, 2);
+    System.out.println(made.getClass().getTypeName() + " " + made.getClass().getComponentType().getName());
+    Object cells = Array.newInstance(int.class, 1);
+    System.out.println(cells.getClass().getTypeName() + " " + cells.getClass().getComponentType().getName());
+
+    System.out.println((Object) String[].class == (Object) int[].class);
+    System.out.println((Object) String[].class == (Object) Object[].class);
+    System.out.println(int[].class.isPrimitive() + " " + int.class.isArray());
+  }
+}

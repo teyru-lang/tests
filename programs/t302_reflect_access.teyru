@@ -1,0 +1,88 @@
+// Reflection's access gate: a private, protected or package-private member is
+// refused with IllegalAccessException until setAccessible(true). Java consults
+// the caller's class; this runtime has no caller to consult, so every
+// non-public member is refused until the program says otherwise, and a public
+// one is never refused.
+
+import java.lang.reflect.*
+
+class Secret {
+  private int hidden
+  public int visible
+  private static int shared = 5
+
+  private Secret() {
+    hidden = 1
+  }
+
+  public Secret(int value) {
+    hidden = value
+    visible = value + 1
+  }
+
+  private int peek() {
+    return hidden
+  }
+
+  public int visiblePeek() {
+    return peek()
+  }
+}
+
+class Main {
+  public static void main(String[] args) throws Exception {
+    Secret s = new Secret(42)
+
+    Field hidden = Secret.class.getDeclaredField("hidden")
+    try {
+      System.out.println(hidden.getInt(s))
+    } catch (IllegalAccessException e) {
+      System.out.println("get refused")
+    }
+    try {
+      hidden.setInt(s, 7)
+    } catch (IllegalAccessException e) {
+      System.out.println("set refused")
+    }
+    hidden.setAccessible(true)
+    System.out.println("read " + hidden.getInt(s))
+    hidden.setInt(s, 9)
+    System.out.println("wrote " + hidden.getInt(s))
+
+    Method peek = Secret.class.getDeclaredMethod("peek")
+    try {
+      System.out.println(peek.invoke(s))
+    } catch (IllegalAccessException e) {
+      System.out.println("invoke refused")
+    }
+    peek.setAccessible(true)
+    System.out.println("invoked " + peek.invoke(s))
+
+    Constructor ctor = Secret.class.getDeclaredConstructor()
+    try {
+      ctor.newInstance()
+    } catch (IllegalAccessException e) {
+      System.out.println("ctor refused")
+    }
+    ctor.setAccessible(true)
+    Object made = ctor.newInstance()
+    System.out.println("made " + ((Secret) made).visiblePeek())
+
+    // a public member is readable without setAccessible, and a handle that was
+    // never asked is not accessible
+    Field visible = Secret.class.getDeclaredField("visible")
+    System.out.println("public " + visible.getInt(s) + " " + visible.isAccessible())
+    visible.setAccessible(true)
+    System.out.println("now " + visible.isAccessible())
+
+    // a private static field is a field like any other
+    Field shared = Secret.class.getDeclaredField("shared")
+    try {
+      System.out.println(shared.getInt(null))
+    } catch (IllegalAccessException e) {
+      System.out.println("static refused")
+    }
+    shared.setAccessible(true)
+    System.out.println("static " + shared.getInt(null))
+  }
+}

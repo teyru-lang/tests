@@ -1,0 +1,134 @@
+// Generic type reflection, one level deep: a field's declared type arguments,
+// a method's result and parameters, and a class's generic superclass.
+//
+// What the language keeps is the erased raw type plus one level of arguments,
+// which is what Field.getElementType already recorded for the JSON binder.
+// getGenericType, getGenericReturnType, getGenericParameterTypes and
+// getGenericSuperclass answer a ParameterizedType from it; a declaration the
+// runtime cannot represent (a wildcard, a type variable, a nested parameterized
+// type) throws UnsupportedOperationException rather than answering the erased
+// type.
+
+import java.lang.reflect.*
+import java.util.*
+
+class Person {
+  public String name
+
+  public Person(String name) {
+    this.name = name
+  }
+}
+
+class People extends ArrayList<Person> {
+  public People() {
+  }
+}
+
+class Box<T> {
+  public T value
+
+  public Box(T value) {
+    this.value = value
+  }
+}
+
+class Holder {
+  public List<Person> people
+  public Map<String, Person> byName
+  public List raw
+  public List<List<Person>> nested
+  public List<? extends Person> wild
+  public int[] nums
+  public String plain
+
+  public Holder() {
+    this.people = new ArrayList<Person>()
+    this.byName = new HashMap<String, Person>()
+    this.raw = new ArrayList()
+    this.nested = new ArrayList<List<Person>>()
+    this.wild = new ArrayList<Person>()
+    this.nums = new int[0]
+    this.plain = ""
+  }
+
+  public Holder(List<Person> people) {
+    this.people = people
+    this.byName = new HashMap<String, Person>()
+    this.raw = new ArrayList()
+    this.nested = new ArrayList<List<Person>>()
+    this.wild = new ArrayList<Person>()
+    this.nums = new int[0]
+    this.plain = ""
+  }
+
+  public List<Person> peopleOf(String who) {
+    return people
+  }
+
+  public void fill(Map<String, Person> into, int count) {
+  }
+}
+
+class Main {
+  public static void main(String[] args) throws Exception {
+    Field people = Holder.class.getDeclaredField("people")
+    Type t = people.getGenericType()
+    System.out.println(t instanceof ParameterizedType)
+    ParameterizedType p = (ParameterizedType) t
+    System.out.println(p.getRawType().getName())
+    System.out.println(((Class) p.getActualTypeArguments()[0]).getName())
+    System.out.println(p.getTypeName())
+
+    ParameterizedType byName = (ParameterizedType) Holder.class.getDeclaredField("byName").getGenericType()
+    System.out.println(byName.getRawType().getName() + " " + byName.getActualTypeArguments().length)
+    System.out.println(((Class) byName.getActualTypeArguments()[0]).getName() + " " +
+        ((Class) byName.getActualTypeArguments()[1]).getName())
+
+    // a raw declaration answers its Class, as Java does
+    System.out.println(Holder.class.getDeclaredField("raw").getGenericType() instanceof Class)
+    // a type with no arguments at all does too
+    System.out.println(Holder.class.getDeclaredField("nums").getGenericType() instanceof Class)
+    System.out.println(((Class) Holder.class.getDeclaredField("nums").getGenericType()).getName())
+    System.out.println(Holder.class.getDeclaredField("plain").getGenericType() instanceof Class)
+
+    Method peopleOf = Holder.class.getMethod("peopleOf", String.class)
+    System.out.println(((ParameterizedType) peopleOf.getGenericReturnType()).getTypeName())
+    Type[] ps = peopleOf.getGenericParameterTypes()
+    System.out.println(ps.length + " " + ps[0].getTypeName())
+
+    Method fill = Holder.class.getMethod("fill", Map.class, int.class)
+    Type[] fp = fill.getGenericParameterTypes()
+    System.out.println(fp.length + " " + fp[0].getTypeName() + " " + fp[1].getTypeName())
+
+    Constructor ctor = Holder.class.getDeclaredConstructor(List.class)
+    Type[] cp = ctor.getGenericParameterTypes()
+    System.out.println(cp.length + " " + cp[0].getTypeName())
+
+    // a generic superclass is the declaration's own shape
+    Type sup = People.class.getGenericSuperclass()
+    System.out.println(sup instanceof ParameterizedType)
+    ParameterizedType sp = (ParameterizedType) sup
+    System.out.println(sp.getRawType().getName() + " " + ((Class) sp.getActualTypeArguments()[0]).getName())
+
+    // refusals: each says what could not be represented
+    try {
+      Holder.class.getDeclaredField("nested").getGenericType()
+      System.out.println("nested accepted")
+    } catch (UnsupportedOperationException e) {
+      System.out.println("nested refused: " + e.getMessage())
+    }
+    try {
+      Holder.class.getDeclaredField("wild").getGenericType()
+      System.out.println("wild accepted")
+    } catch (UnsupportedOperationException e) {
+      System.out.println("wild refused: " + e.getMessage())
+    }
+    try {
+      Box.class.getDeclaredField("value").getGenericType()
+      System.out.println("variable accepted")
+    } catch (UnsupportedOperationException e) {
+      System.out.println("variable refused: " + e.getMessage())
+    }
+  }
+}
