@@ -1,0 +1,55 @@
+/* The same program as t291_thread_local.teyru, in Java. Compiled and run on
+   OpenJDK 21; its output is t291_thread_local.expected. */
+import java.util.function.Supplier;
+
+public class Main {
+  public static void main(String[] args) {
+    final ThreadLocal<String> local = new ThreadLocal<String>();
+    local.set("main");
+    System.out.println("main own=" + local.get());
+
+    Thread a = new Thread(new Runnable() {
+      public void run() {
+        System.out.println("a initial=" + local.get());
+        local.set("A");
+        System.out.println("a own=" + local.get());
+        local.remove();
+        System.out.println("a removed=" + local.get());
+      }
+    }, "a");
+    a.start();
+    try {
+      a.join();
+    } catch (InterruptedException e) {
+      System.out.println("join interrupted");
+    }
+
+    Thread b = new Thread(new Runnable() {
+      public void run() {
+        System.out.println("b initial=" + local.get());
+        local.set("B");
+        System.out.println("b own=" + local.get());
+      }
+    }, "b");
+    b.start();
+    try {
+      b.join();
+    } catch (InterruptedException e) {
+      System.out.println("join interrupted");
+    }
+
+    System.out.println("main still=" + local.get());
+
+    ThreadLocal<Integer> counter = ThreadLocal.withInitial(new Supplier<Integer>() {
+      public Integer get() {
+        return 7;
+      }
+    });
+    System.out.println("withInitial=" + counter.get());
+    counter.set(9);
+    System.out.println("after set=" + counter.get());
+    counter.remove();
+    System.out.println("after remove=" + counter.get());
+    System.out.println("done");
+  }
+}

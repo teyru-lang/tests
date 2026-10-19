@@ -1,0 +1,5 @@
+daemon=true
+setDaemon after start rejected
+worker daemon=false
+main returning
+non-daemon worker finished

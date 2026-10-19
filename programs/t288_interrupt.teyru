@@ -1,0 +1,30 @@
+/* Interrupting a sleeping thread: it wakes, throws InterruptedException and
+   the interrupt status is cleared as the exception is thrown.
+
+   The program is written twice -- this file and t288_interrupt.java.ref -- and
+   the .expected file is what OpenJDK 21 printed for the Java one. The sleep is
+   long enough that the interrupt is what ends it, and the join afterwards is
+   what makes the output ordering deterministic. */
+
+class Main {
+  public static void main(String[] args) {
+    Thread sleeper = new Thread(new Runnable() {
+      public void run() {
+        try {
+          Thread.sleep(10000)
+          System.out.println("sleep returned normally")
+        } catch (InterruptedException e) {
+          System.out.println("sleep threw InterruptedException")
+          System.out.println("type ok=" + (e instanceof InterruptedException))
+          System.out.println("status cleared=" + (Thread.currentThread().isInterrupted() == false))
+        }
+      }
+    }, "sleeper")
+    sleeper.start()
+    Thread.sleep(100)
+    sleeper.interrupt()
+    sleeper.join()
+    System.out.println("sleeper alive after join=" + sleeper.isAlive())
+    System.out.println("done")
+  }
+}

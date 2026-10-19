@@ -1,0 +1,11 @@
+main own=main
+a initial=null
+a own=A
+a removed=null
+b initial=null
+b own=B
+main still=main
+withInitial=7
+after set=9
+after remove=7
+done
