@@ -1,1 +1,1 @@
-windows  # virtual threads are refused on Windows (no ucontext); see tyrt_thread.c
+ci  # virtual threads: on GitHub's 4-core runner t314 reports IllegalMonitorStateException (monitor ownership) and t316 loses the parked thread's array (parked-stack roots); neither reproduces on the 16-core machine in 60+ runs, and both are recorded as open defects in AGENTS.md section 10

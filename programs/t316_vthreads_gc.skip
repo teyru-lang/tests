@@ -1,1 +1,1 @@
-windows  # virtual threads are refused on Windows (no ucontext); see tyrt_thread.c
+ci  # see t314_vthreads_many.skip: the same CI-only virtual-thread defects

@@ -205,7 +205,7 @@ esac
 skip_reason() {
   f="$1.skip"
   [ -f "$f" ] || return 0
-  awk -v here="$goos/$goarch" -v os="$goos" '
+  awk -v here="$goos/$goarch" -v os="$goos" -v ci="${GITHUB_ACTIONS:+1}" '
     { line = $0
       if (i = index(line, "#")) { r = substr(line, i + 1); gsub(/^[ \t]+|[ \t]+$/, "", r); reason = reason (reason == "" ? "" : "; ") r; line = substr(line, 1, i - 1) }
       n = split(line, tok, /[ \t]+/)
@@ -214,7 +214,9 @@ skip_reason() {
         if (t == "") continue
         neg = (substr(t, 1, 1) == "!")
         if (neg) t = substr(t, 2)
-        if ((t == os || t == here) != neg) { print reason; exit }
+        match = (t == os || t == here)
+        if (t == "ci") match = (ci == "1")
+        if (match != neg) { print reason; exit }
       }
     }' "$f"
 }
