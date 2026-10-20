@@ -214,9 +214,9 @@ skip_reason() {
         if (t == "") continue
         neg = (substr(t, 1, 1) == "!")
         if (neg) t = substr(t, 2)
-        match = (t == os || t == here)
-        if (t == "ci") match = (ci == "1")
-        if (match != neg) { print reason; exit }
+        hit = (t == os || t == here)
+        if (t == "ci") hit = (ci == "1")
+        if (hit != neg) { print reason; exit }
       }
     }' "$f"
 }
