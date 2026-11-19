@@ -29,12 +29,17 @@ package teyru
    the end of a file's transition table answers -- the footer rule, which is
    where a reader that stops at the table goes wrong.
 
-   The two things this program deliberately does not print are the abbreviation
-   and the negative-DST flag of Europe/Dublin: the JVM has no API that answers a
+   Three things this program deliberately does not print. The abbreviation and
+   the negative-DST flag of Europe/Dublin: the JVM has no API that answers a
    tzfile's designation (its formatters answer CLDR's name for the zone) and its
-   copy of the database flattens Ireland's negative DST. t189 asserts those
+   copy of the database flattens Ireland's negative DST; t189 asserts those
    against the file instead, and the header of lib/46_timezone.teyru explains
-   both. */
+   both. And the alias ids: the JVM carries its own compiled database, so
+   Europe/Kiev always resolves there, but this reader reads the host's files and
+   Ubuntu 24.04 ships the backward-compatibility links in a separate package
+   (tzdata-legacy). An id whose presence depends on the host's package list
+   would make this file an assertion about that list rather than about the zone
+   layer; t189 pins the alias behaviour on a database it writes itself. */
 class T188 {
   static void p(String s) { System.out.println(s) }
 
@@ -121,10 +126,8 @@ class T188 {
     p("ms 2010 dst " + ms.getRules().isDaylightSavings(Instant.ofEpochSecond(1277942400L)))
     p("ms 2012 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1325376000L), ms))
     p("ms 2016 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1451606400L), ms))
-    p("kiev 1980 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(315532800L), ZoneId.of("Europe/Kiev")))
     p("kyiv 1980 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(315532800L), ky))
     p("kyiv 2020 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1577836800L), ky))
-    p("kiev id " + ZoneId.of("Europe/Kiev").getId())
     p("kyiv id " + ky.getId())
 
     // ---------- before the first transition of a file ----------

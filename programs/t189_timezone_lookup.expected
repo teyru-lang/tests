@@ -9,6 +9,8 @@ the ids of a database of our own: 2 Asia/Taipei,UTC
 its Asia/Taipei is +08:00: +08:00
 a zone the database does not have is refused: true
 a fixed offset needs no database: +08:00 GMT
+alias ids keep their own name: Europe/Greater Europe/Lesser
+alias ids read the same offset: true
 the search path goes back: true
 unknown id: Unknown time-zone ID: Not/AZone
 traversal /etc/passwd: Invalid zone id: /etc/passwd (a zone id is a path under the zone directory, so it cannot be absolute)

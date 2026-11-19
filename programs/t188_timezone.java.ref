@@ -107,10 +107,8 @@ public class T188 {
     p("ms 2010 dst " + ms.getRules().isDaylightSavings(Instant.ofEpochSecond(1277942400L)));
     p("ms 2012 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1325376000L), ms));
     p("ms 2016 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1451606400L), ms));
-    p("kiev 1980 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(315532800L), ZoneId.of("Europe/Kiev")));
     p("kyiv 1980 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(315532800L), ky));
     p("kyiv 2020 " + ZonedDateTime.ofInstant(Instant.ofEpochSecond(1577836800L), ky));
-    p("kiev id " + ZoneId.of("Europe/Kiev").getId());
     p("kyiv id " + ky.getId());
 
     // ---------- before the first transition of a file ----------

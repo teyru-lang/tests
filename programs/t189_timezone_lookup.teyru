@@ -129,6 +129,22 @@ class T189 {
     }
     p("a zone the database does not have is refused: " + refused)
     p("a fixed offset needs no database: " + ZoneId.of("+08:00") + " " + ZoneId.of("GMT"))
+
+    // ---------- two ids, one file ----------
+    // tzdata ships alias names as links to one zone file, so two ids answer the
+    // same offsets while each keeps the name its caller wrote. Java's getId does
+    // that too (measured on JDK 21: ZoneId.of("Europe/Kiev").getId() is
+    // "Europe/Kiev"). It is asserted on a database this test writes rather than
+    // on the host's, because Ubuntu 24.04 splits the backward-compatibility
+    // links into tzdata-legacy: without that package there is no Europe/Kiev
+    // file, and the assertion would be about the package list, not the reader.
+    Files.createDirectories(tmp.resolve("Europe"))
+    Files.write(tmp.resolve("Europe/Greater"), Files.readAllBytes(dir + "/Europe/Kyiv"))
+    Files.write(tmp.resolve("Europe/Lesser"), Files.readAllBytes(dir + "/Europe/Kyiv"))
+    ZoneId aliasA = ZoneId.of("Europe/Greater")
+    ZoneId aliasB = ZoneId.of("Europe/Lesser")
+    p("alias ids keep their own name: " + aliasA.getId() + " " + aliasB.getId())
+    p("alias ids read the same offset: " + aliasA.getRules().getOffset(Instant.ofEpochSecond(315532800L)).equals(aliasB.getRules().getOffset(Instant.ofEpochSecond(315532800L))))
     ZoneId.setZoneInfoDir(null)
     p("the search path goes back: " + ZoneId.getZoneInfoDir().equals(dir))
 
