@@ -1,7 +1,10 @@
-# GitHub's language statistics. This project is written in Teyru: the compiler
-# is Go and the runtime C, but the language, its standard library and every test
-# are .teyru, and Linguist does not know the extension unless it is told.
-*.teyru linguist-language=Teyru
+# Blob rendering. GitHub draws .teyru files with the Java grammar so they are
+# readable, but Teyru is not Java, so they are kept out of the language
+# statistics. This is a rendering stand-in only: GitHub's highlighting of
+# Markdown fences does not read this file, so a ```teyru fence stays plain until
+# the language is registered with Linguist, and that submission is the
+# maintainer's call.
+*.teyru linguist-language=Java linguist-detectable=false
 
 # The Java files under tests/ are references: javac's output is the
 # specification the .expected files were derived from, and several of them are
