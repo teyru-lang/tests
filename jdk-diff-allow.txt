@@ -65,6 +65,22 @@ t177_deflate java none checked exceptions: Inflater.inflate declares DataFormatE
 t178_gzip java none checked exceptions: GZIPOutputStream's constructor declares IOException in Java
 t185_zip_archive java none checked exceptions: ZipOutputStream.putNextEntry declares IOException in Java
 t99_file_shell_meta java none checked exceptions: Files.createTempDirectory declares IOException in java.nio.file
+# The thread and virtual-thread cases, added after this file's last pass: same
+# kind as the entries above, and named the same way rather than lumped into one
+# line, so that fixing one of these APIs narrows exactly one entry.
+t285_alloc_thread_stress java none checked exceptions: Thread.join declares InterruptedException in Java
+t288_interrupt java none checked exceptions: Thread.sleep and Thread.join declare InterruptedException in Java
+t290_daemon_exit java none checked exceptions: Thread.sleep declares InterruptedException in Java
+t291_thread_local java none checked exceptions: Thread.join declares InterruptedException in Java
+t304_thread_start java none checked exceptions: Thread.sleep, Thread.join and Object.wait declare InterruptedException in Java
+t314_vthreads_many java none checked exceptions: Thread.sleep declares InterruptedException in Java
+t316_vthreads_gc java none checked exceptions: Thread.sleep and Thread.join declare InterruptedException in Java
+t317_vthreads_identity java none checked exceptions: Thread.join and Object.wait declare InterruptedException in Java
+
+# ParameterizedType.getRawType answers a Class here and a Type in java.lang.reflect,
+# so `.getName()` on what it returns is this library's, not the JDK's (AGENTS.md
+# §10: the reflection API keeps one level and answers Class).
+t301_generic_reflection java none ParameterizedType.getRawType returns Class here and Type in java.lang.reflect, so getName() on the result does not resolve in Java
 
 # The standard library's own shape, where the JDK's class of the same name takes
 # a different parameter or returns a different type.

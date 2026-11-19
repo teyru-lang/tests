@@ -1,1 +1,2 @@
+ci  # virtual threads: on GitHub's 4-core runner t317 did not exit within the 2m harness timeout (it takes ~4 s here); see t314_vthreads_many.skip for the same family, and AGENTS.md section 10
 windows  # virtual threads are refused on Windows (no ucontext); see tyrt_thread.c
