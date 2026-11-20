@@ -82,6 +82,15 @@ class T209 {
     // the server answers one connection at a time, so this answer cannot arrive
     // until the WebSocket connection above has finished.
     System.out.println("after-the-socket -> " + get(port))
+    // ... but "the socket connection finished" is not "onClose has run". The
+    // close is delivered by the serving thread, and the HTTP answer comes from
+    // whatever thread handles the next connection; nothing orders the two. This
+    // read used to assume it did, and on a loaded CI runner the second count
+    // below came back one short (closed=1 where the run above had closed=2),
+    // which the back-end matrix reported as a divergence between its cells.
+    // Waiting for the count is what the assertion means: onClose runs, it runs
+    // once per connection, and it runs before the next connection is served.
+    awaitCount(EchoHandler.closed, 1)
     System.out.println("counts opened=" + EchoHandler.opened.get() +
         " messages=" + EchoHandler.messages.get() +
         " closed=" + EchoHandler.closed.get())
@@ -89,6 +98,7 @@ class T209 {
     // ---------- a client that disappears in the middle of a frame ----------
     half(port)
     System.out.println("after-the-disappearing-client -> " + get(port))
+    awaitCount(EchoHandler.closed, 2)
     System.out.println("counts opened=" + EchoHandler.opened.get() +
         " messages=" + EchoHandler.messages.get() +
         " closed=" + EchoHandler.closed.get())
@@ -177,6 +187,19 @@ class T209 {
 
   // get sends one plain request and answers the status line plus the body, so
   // that "the server is still answering" is one line of output.
+  /* awaitCount waits until an AtomicInteger reaches want: the counts are read
+     after this returns, so a timeout is a visible wrong number rather than a
+     silent wait. It is the
+     test's own synchronisation, not the server's promise -- the server promises
+     onClose runs once per connection, not that it has run by the time some
+     other connection is answered. */
+  static void awaitCount(AtomicInteger counter, int want) {
+    long deadline = System.currentTimeMillis() + 5000
+    while (counter.get() < want && System.currentTimeMillis() < deadline) {
+      Thread.sleep(5)
+    }
+  }
+
   static String get(int port) {
     RawClient c = new RawClient(port)
     try {
