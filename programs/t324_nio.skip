@@ -1,0 +1,1 @@
+windows  # the case binds and meets itself on 127.0.0.1; the Windows leg is Wine, where a loopback round trip has not been shown to work

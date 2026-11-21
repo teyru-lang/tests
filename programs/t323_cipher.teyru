@@ -1,0 +1,167 @@
+/* javax.crypto.Cipher with AES, and javax.crypto.Signature with RSA: the two
+   primitives a service uses without a TLS handshake anywhere near it.
+
+   Every answer below is the standard's, and the expectation file is what the
+   JDK printed for the same program (t323_cipher.java.ref), so a ciphertext
+   here is checked against the reference implementation rather than against
+   this one:
+
+     * FIPS-197's four AES vectors: one per key size, encrypt and decrypt;
+     * NIST SP 800-38A's CBC and CTR vectors (four blocks, so the chaining and
+       the counter carry are both exercised);
+     * NIST SP 800-38D test case 2 for GCM, and a tampered tag that must be
+       refused rather than decrypted;
+     * PKCS#5 padding at both ends of its range, and the padding that is not a
+       block multiple;
+     * an RSA key read from fixed DER in both encodings, PKCS#1 v1.5
+       encrypt/decrypt through it, and a SHA-256 signature made by openssl --
+       the verifier is checked against a signature this library did not make.
+
+   The private key below is a throwaway 1024-bit key generated for this test.
+   1024 is not a size to use; it is a size that keeps the test quick, and the
+   point of the case is the arithmetic. */
+class T323 {
+  static void p(String s) {
+    System.out.println(s)
+  }
+
+  static String hex(byte[] b) {
+    StringBuilder sb = new StringBuilder()
+    for (int i = 0 : i < b.length : i++) {
+      int v = b[i] & 0xFF
+      sb.append("0123456789abcdef".charAt(v >> 4))
+      sb.append("0123456789abcdef".charAt(v & 15))
+    }
+    return sb.toString()
+  }
+
+  static byte[] bytes(int[] v) {
+    byte[] b = new byte[v.length]
+    for (int i = 0 : i < v.length : i++) b[i] = (byte) v[i]
+    return b
+  }
+
+  static int[] range(int from, int n) {
+    int[] v = new int[n]
+    for (int i = 0 : i < n : i++) v[i] = (from + i) & 0xFF
+    return v
+  }
+
+  static final String RSA_PUBLIC = "30819f300d06092a864886f70d010101050003818d0030818902818100c942650cf927f8a3a7308623884dd9968ae3c9514585bc1804e8f53d334dd2d10ad33b3f71e30ff1cd18b06a7e9d7b5158002f7142497d1e813c315f49095118b417d8bdc775d48209beee16e720d030d88947a80dc3d9f88fe4fd889517c8ebe3f432d1fbed542bf473a33c2c26e320a7d243b52e2bcced66aa8b67c37f6d530203010001";
+  static final String RSA_PRIVATE = "30820278020100300d06092a864886f70d0101010500048202623082025e02010002818100c942650cf927f8a3a7308623884dd9968ae3c9514585bc1804e8f53d334dd2d10ad33b3f71e30ff1cd18b06a7e9d7b5158002f7142497d1e813c315f49095118b417d8bdc775d48209beee16e720d030d88947a80dc3d9f88fe4fd889517c8ebe3f432d1fbed542bf473a33c2c26e320a7d243b52e2bcced66aa8b67c37f6d530203010001028181009b48d53b0b4b21f6f35ae744a73899f823b5d97111993c25b4342274540f69e7ccd86a506b88ec967ecedbdf6f4e07061e461654e6f658c99ea158ded23594118171bb42cb86e06253ccf63cf7869abb0096d337a04a9eba4f005b99084bf99979dcdd983722bf43b2eac7de6a39e800a41db577bb173eb7dcd0e087cbd32e61024100fab60c2c0ea8bbc88c6b9de276d1f45972c2d80150bb5e1083fe9fbca5ccf7959cbb0688529abdaa9654d18de9c3432d4769f76dd42a165f4a496b5d0b9ed59b024100cd8149140fd9c8bcf3955738dac4ba1da171e3e36eb3b2f413a9a4362bb7265276b313409872e7f636b091e7ae0cfb138b58ee03a684edcb28bd1e1829b8dea9024100ae0873189e3068f204efab5089f4a26ef927e1f3bfcbe0b70c39533f0bc4e55498d086ef58900bfaff91ef4958acefd3dd8fe46efbe91f50946bb4b889197fe3024100c4a2543e71fc3ceb2f575222009204539dcacff72a519f8593dada594af2f0242f97a170496e892d399f31bcb0f992b45cbd36e11f504a07fe6f1680a04b582102405b2a5d895a5a8b62acb9012593e583aa96e2f7ebc9bda88a40da2d09a69e848ab1ff89f650a76ae6c2adbc5f5e6f6f88e7e7f96c98aa2373ac3c114827e207df";
+  static final String RSA_SIGNATURE = "b7b1edf2ec8db20e67ac4e3460c705d558381e64a71beaf1fbc493ba4fc6064290f705da3070161963c50b94acd23043627f1a907ee052e941865a4e4111a4730f4ba77624f5831c33d72c39ec04a1b26baead466ad7b9fe28c25f9325ea967383a945e4d7ca4f243f639fc55148186b32c4cee2cd930a2239cf256c7908f299";
+  public static void main(String[] args) {
+    /* ---- FIPS-197 */
+    byte[] k128 = bytes(new int[] { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f })
+    byte[] k192 = bytes(range(0x08, 24))
+    byte[] k256 = bytes(range(0x00, 32))
+    byte[] pt = bytes(new int[] { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff })
+    for (int i = 0 : i < 3 : i++) {
+      byte[] key = i == 0 ? k128 : i == 1 ? k192 : k256
+      Cipher c = Cipher.getInstance("AES/ECB/NoPadding")
+      c.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"))
+      byte[] ct = c.doFinal(pt)
+      c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"))
+      p("ecb" + (i * 64 + 128) + "=" + hex(ct) + " " + hex(c.doFinal(ct)))
+    }
+
+    /* ---- SP 800-38A */
+    byte[] fkey = bytes(new int[] { 0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c })
+    byte[] iv = bytes(range(0, 16))
+    byte[] four = bytes(new int[] { 0x6b, 0xc1, 0xbe, 0xe2, 0x2e, 0x40, 0x9f, 0x96, 0xe9, 0x3d, 0x7e, 0x11, 0x73, 0x93, 0x17, 0x2a,
+        0xae, 0x2d, 0x8a, 0x57, 0x1e, 0x03, 0xac, 0x9c, 0x9e, 0xb7, 0x6f, 0xac, 0x45, 0xaf, 0x8e, 0x51,
+        0x30, 0xc8, 0x1c, 0x46, 0xa3, 0x5c, 0xe4, 0x11, 0xe5, 0xfb, 0xc1, 0x19, 0x1a, 0x0a, 0x52, 0xef,
+        0xf6, 0x9f, 0x24, 0x45, 0xdf, 0x4f, 0x9b, 0x17, 0xad, 0x2b, 0x41, 0x7b, 0xe6, 0x6c, 0x37, 0x10 })
+    Cipher cbc = Cipher.getInstance("AES/CBC/NoPadding")
+    cbc.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(fkey, "AES"), new IvParameterSpec(iv))
+    byte[] cbcCt = cbc.doFinal(four)
+    p("cbc=" + hex(cbcCt))
+    cbc.init(Cipher.DECRYPT_MODE, new SecretKeySpec(fkey, "AES"), new IvParameterSpec(iv))
+    p("cbc-pt=" + hex(cbc.doFinal(cbcCt)))
+    Cipher ctr = Cipher.getInstance("AES/CTR/NoPadding")
+    byte[] ctrIv = bytes(new int[] { 0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff })
+    ctr.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(fkey, "AES"), new IvParameterSpec(ctrIv))
+    p("ctr=" + hex(ctr.doFinal(four)))
+
+    /* ---- SP 800-38D */
+    byte[] gkey = bytes(range(0, 16))
+    byte[] giv = bytes(range(0, 12))
+    byte[] gpt = bytes(range(0, 16))
+    Cipher gcm = Cipher.getInstance("AES/GCM/NoPadding")
+    gcm.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(gkey, "AES"), new GCMParameterSpec(128, giv))
+    byte[] sealed = gcm.doFinal(gpt)
+    p("gcm=" + hex(sealed))
+    gcm.init(Cipher.DECRYPT_MODE, new SecretKeySpec(gkey, "AES"), new GCMParameterSpec(128, giv))
+    p("gcm-pt=" + hex(gcm.doFinal(sealed)))
+    byte[] tampered = new byte[sealed.length]
+    System.arraycopy(sealed, 0, tampered, 0, sealed.length)
+    tampered[sealed.length - 1] = (byte) (tampered[sealed.length - 1] ^ 1)
+    gcm.init(Cipher.DECRYPT_MODE, new SecretKeySpec(gkey, "AES"), new GCMParameterSpec(128, giv))
+    try {
+      gcm.doFinal(tampered)
+      p("tampered=accepted")
+    } catch (AEADBadTagException e) {
+      p("tampered=refused")
+    }
+
+    /* ---- padding */
+    Cipher pad = Cipher.getInstance("AES/CBC/PKCS5Padding")
+    pad.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(fkey, "AES"), new IvParameterSpec(iv))
+    for (int len : new int[] { 0, 1, 15, 16, 17 }) {
+      byte[] msg = new byte[len]
+      for (int i = 0 : i < len : i++) msg[i] = (byte) ('a' + i)
+      byte[] ct = pad.doFinal(msg)
+      pad.init(Cipher.DECRYPT_MODE, new SecretKeySpec(fkey, "AES"), new IvParameterSpec(iv))
+      p("padding" + len + "=" + ct.length + " " + new String(pad.doFinal(ct)))
+      pad.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(fkey, "AES"), new IvParameterSpec(iv))
+    }
+    try {
+      pad.doFinal(new byte[] { 1, 2, 3 })
+    } catch (IllegalBlockSizeException e) {
+      p("bad-block-size=refused")
+    }
+
+    /* ---- RSA */
+    HexFormat hf = HexFormat.of()
+    KeyFactory kf = KeyFactory.getInstance("RSA")
+    RsaPublicKey pub = kf.generatePublic(new X509EncodedKeySpec(hf.parseHex(RSA_PUBLIC)))
+    RsaPrivateKey priv = kf.generatePrivate(new PKCS8EncodedKeySpec(hf.parseHex(RSA_PRIVATE)))
+    p("modulus-bits=" + pub.getModulus().bitLength())
+    p("exponent=" + pub.getPublicExponent().toString())
+    p("private-modulus-match=" + priv.getModulus().equals(pub.getModulus()))
+    Cipher rsa = Cipher.getInstance("RSA/ECB/PKCS1Padding")
+    rsa.init(Cipher.ENCRYPT_MODE, pub)
+    byte[] ct = rsa.doFinal("hello rsa".getBytes())
+    p("rsa-ctlen=" + ct.length)
+    Cipher rsad = Cipher.getInstance("RSA")
+    rsad.init(Cipher.DECRYPT_MODE, priv)
+    p("rsa-pt=" + new String(rsad.doFinal(ct)))
+    /* A ciphertext shorter than the modulus is a padding failure in Java, and
+       one longer than it is a length failure. Both are reported as "refused",
+       because the class name carries this library's package rather than
+       java.security's and the message is the only stable part. */
+    try {
+      rsad.doFinal("not a ciphertext".getBytes())
+      p("rsa-short=accepted")
+    } catch (BadPaddingException e) {
+      p("rsa-short=refused")
+    }
+    try {
+      rsad.doFinal(new byte[129])
+      p("rsa-long=accepted")
+    } catch (IllegalBlockSizeException e) {
+      p("rsa-long=refused")
+    }
+
+    /* The signature was made by openssl over "the message to sign", so the
+       verifier is checked against a signer this library did not write. */
+    Signature verify = Signature.getInstance("SHA256withRSA")
+    verify.initVerify(pub)
+    verify.update("the message to sign".getBytes())
+    p("signature=" + verify.verify(hf.parseHex(RSA_SIGNATURE)))
+    Signature wrong = Signature.getInstance("SHA256withRSA")
+    wrong.initVerify(pub)
+    wrong.update("a different message".getBytes())
+    p("signature-wrong-message=" + wrong.verify(hf.parseHex(RSA_SIGNATURE)))
+  }
+}

@@ -1,0 +1,18 @@
+stdout out
+stderr err
+status 0
+alive false
+echo through the pipe
+echo-status 0
+exit 7
+exitValue 7
+signalled 137
+merged-1 one
+merged-2 two
+merged-error-stream null
+directory /tmp
+environment from-the-builder
+missing start teyru-no-such-program: No such file or directory (errno 2)
+running true
+early false
+eventually 0

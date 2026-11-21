@@ -1,0 +1,22 @@
+pos=15 lim=64
+int=01020304
+long=0102030405060708
+short=0a0b
+byte=7f
+remaining=0
+clear=0 64
+rewind=0
+wrap=nio pos=3
+double=1.5
+float=2.5
+udp-sent=8
+udp=datagram n=8 from=127.0.0.1
+udp-empty=0 from=127.0.0.1
+select-accept=1
+acceptable=true
+accepted=true
+select-read-none=0
+select-read=1
+readable=true
+channel=through-the-channel r=19
+idle-read=0

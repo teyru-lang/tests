@@ -1,0 +1,79 @@
+/* java.lang.ProcessBuilder and Process, exercised against a real child process.
+
+   Everything below is deterministic: the child is `sh`, which exists on every
+   platform this test is not skipped for, and every line printed is a value the
+   child produced rather than a time or an id. What is checked, in order:
+
+     * the three streams are three pipes: stdout and stderr arrive separately
+       and in full;
+     * a write to the child's stdin is read back by it, and closing the parent's
+       end is what makes `cat` see the end of the stream -- a program that
+       forgets to close hangs, which is the failure this case would catch;
+     * the exit status is the shell's (7 for `exit 7`, and 128 + 9 for a
+       signalled child), waitFor and exitValue answer the same number;
+     * redirectErrorStream puts both descriptors on one pipe;
+     * the directory and the environment the builder names are the ones the
+       child sees;
+     * a program that does not exist is refused with the operating system's own
+       text rather than silently started.
+
+   The .skip file is there because `sh` is not a program Windows ships: the case
+   is skipped there by name rather than failing, which is what the suite asks of
+   anything it cannot run. */
+class T322 {
+  static void p(String s) {
+    System.out.println(s)
+  }
+
+  static String line(ProcInputStream in) {
+    return new BufferedReader(in).readLine()
+  }
+
+  public static void main(String[] args) {
+    Process p = new ProcessBuilder(new String[] { "sh", "-c", "echo out; echo err >&2" }).start()
+    p("stdout " + line(p.getInputStream()))
+    p("stderr " + line(p.getErrorStream()))
+    p("status " + p.waitFor())
+    p("alive " + p.isAlive())
+
+    Process cat = new ProcessBuilder(new String[] { "sh", "-c", "cat" }).start()
+    cat.getOutputStream().write("through the pipe\n")
+    cat.getOutputStream().close()
+    p("echo " + line(cat.getInputStream()))
+    p("echo-status " + cat.waitFor())
+
+    Process exit7 = new ProcessBuilder(new String[] { "sh", "-c", "exit 7" }).start()
+    p("exit " + exit7.waitFor())
+    p("exitValue " + exit7.exitValue())
+
+    Process killed = new ProcessBuilder(new String[] { "sh", "-c", "kill -9 $$" }).start()
+    p("signalled " + killed.waitFor())
+
+    Process merged = new ProcessBuilder(new String[] { "sh", "-c", "echo one; echo two >&2" }).redirectErrorStream(true).start()
+    p("merged-1 " + line(merged.getInputStream()))
+    p("merged-2 " + line(merged.getInputStream()))
+    merged.waitFor()
+    p("merged-error-stream " + line(merged.getErrorStream()))
+
+    Process inDir = new ProcessBuilder(new String[] { "sh", "-c", "pwd" }).directory("/tmp").start()
+    p("directory " + line(inDir.getInputStream()))
+    inDir.waitFor()
+
+    Process withEnv = new ProcessBuilder(new String[] { "sh", "-c", "printf %s \"$TEYRU_TEST_VAR\"" }).environment(new String[] { "TEYRU_TEST_VAR=from-the-builder", "PATH=/usr/bin:/bin" }).start()
+    p("environment " + line(withEnv.getInputStream()))
+    withEnv.waitFor()
+
+    try {
+      new ProcessBuilder(new String[] { "teyru-no-such-program" }).start()
+    } catch (ProcessException e) {
+      p("missing " + e.getMessage())
+    }
+
+    /* waitFor(millis) answers false while the child is still running, and the
+       child is not killed by the question. */
+    Process slow = new ProcessBuilder(new String[] { "sh", "-c", "sleep 0.2" }).start()
+    p("running " + slow.isAlive())
+    p("early " + slow.waitFor(1L))
+    p("eventually " + slow.waitFor())
+  }
+}

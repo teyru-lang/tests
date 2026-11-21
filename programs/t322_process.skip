@@ -1,0 +1,2 @@
+# The process case starts `sh`; Windows has no such program.
+windows # POSIX sh is the child every case starts
