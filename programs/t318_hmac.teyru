@@ -1,0 +1,104 @@
+/* javax.crypto.Mac over the six digests this library implements, exercised
+   against RFC 4231 and against keys that straddle the block boundary. This is
+   the same program as the javac 21 program in t318_hmac.java.ref; its output is
+   t318_hmac.expected, so every hex string below is what the JDK printed for that
+   input.
+
+   The cases are the ones that separate a real HMAC from a keyed hash:
+
+     * RFC 4231's seven test cases, for HmacSHA224/256/384/512: the empty
+       message, "Jefe", the 20-byte key with a 50-byte message, and the 131-byte
+       message;
+     * a key of exactly the block size, one byte shorter, and one byte longer
+       -- the last goes through the hash-the-key path;
+     * an empty key, which the JDK's SecretKeySpec refuses;
+     * HmacMD5 and HmacSHA1, which a server verifying an older caller still
+       meets.
+
+   Everything printed is ASCII and every MAC is printed as hex, so the
+   byte-oriented Teyru string is the same string Java's is. */
+package teyru
+
+class T318 {
+  static void p(String s) {
+    System.out.println(s)
+  }
+
+  static String hex(byte[] bs) {
+    StringBuilder sb = new StringBuilder()
+    for (int i = 0 : i < bs.length : i++) {
+      int v = bs[i] & 0xFF
+      sb.append("0123456789abcdef".charAt(v >> 4))
+      sb.append("0123456789abcdef".charAt(v & 0xF))
+    }
+    return sb.toString()
+  }
+
+  static byte[] utf8(String s) {
+    return s.getBytes()
+  }
+
+  static byte[] bytes(int n, int start) {
+    byte[] b = new byte[n]
+    for (int i = 0 : i < n : i++) {
+      b[i] = (byte) ((start + i) & 0xFF)
+    }
+    return b
+  }
+
+  static void mac(String alg, byte[] key, byte[] msg) {
+    Mac m = Mac.getInstance(alg)
+    m.init(key)
+    byte[] out = m.doFinal(msg)
+    p(alg + " len=" + m.getMacLength() + " key=" + hex(key) + " msg=" + hex(msg) + " mac=" + hex(out))
+  }
+
+  public static void main(String[] args) {
+    // RFC 4231 test case 1 and 2.
+    mac("HmacSHA256", bytes(20, 0x0b), utf8("Hi There"))
+    mac("HmacSHA256", utf8("Jefe"), utf8("what do ya want for nothing?"))
+
+    // RFC 4231 test case 3 (the 0xaa key) and 4 (the 0x01 key, 0xcd message).
+    byte[] aa = new byte[20]
+    for (int i = 0 : i < 20 : i++) {
+      aa[i] = (byte) 0xaa
+    }
+    byte[] cd = new byte[50]
+    for (int i = 0 : i < 50 : i++) {
+      cd[i] = (byte) 0xcd
+    }
+    mac("HmacSHA256", aa, utf8("Test Using Larger Than Block-Size Key - Hash Key First"))
+    mac("HmacMD5", aa, cd)
+
+    // The block straddling keys, for every algorithm.
+    for (String alg : new String[] { "HmacMD5", "HmacSHA1", "HmacSHA224", "HmacSHA256", "HmacSHA384", "HmacSHA512" }) {
+      int block = alg.equals("HmacSHA384") || alg.equals("HmacSHA512") ? 128 : 64
+      mac(alg, bytes(block - 1, 1), utf8("abc"))
+      mac(alg, bytes(block, 1), utf8("abc"))
+      mac(alg, bytes(block + 1, 1), utf8("abc"))
+      try {
+        mac(alg, new byte[0], utf8("abc"))
+      } catch (IllegalArgumentException e) {
+        p(alg + " emptykey: " + e.getMessage())
+      }
+    }
+
+    // The empty message and the empty key, and a message longer than a block.
+    mac("HmacSHA512", utf8("k"), new byte[0])
+    mac("HmacSHA1", utf8("k"), bytes(1000, 7))
+
+    // The failures: the name is resolved the way the JDK's is, and a null key
+    // is the caller's mistake rather than an empty one.
+    try {
+      Mac.getInstance("HmacSHA9")
+    } catch (NoSuchAlgorithmException e) {
+      p("unknown: " + e.getMessage())
+    }
+    Mac m = Mac.getInstance("HmacSHA256")
+    try {
+      m.doFinal(utf8("abc"))
+    } catch (IllegalStateException e) {
+      p("uninitialized: " + e.getMessage())
+    }
+  }
+}

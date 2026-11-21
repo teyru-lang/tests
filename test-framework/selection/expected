@@ -1,0 +1,4 @@
+PASS SelectionTest.always
+PASS SelectionTest.tagged
+SKIP SelectionTest.never: needs a database
+2 passed, 0 failed, 1 skipped

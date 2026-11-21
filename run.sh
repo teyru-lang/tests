@@ -433,7 +433,15 @@ if [ "$parts" = "programs packages diagnostics native java-compat test-framework
       verdict "$name" "missing $want or $wantcodef"
       continue
     fi
-    "$TEYRU" test "$dir" >"$tmp/tf-$name.out" 2>"$tmp/tf-$name.err"
+    # A case may name command-line flags in `args`, one line of shell words:
+    # the timeout and selection cases are the reason the runner's flags have
+    # to be exercised by the suite rather than only by hand.
+    tfargs=""
+    if [ -f "test-framework/$name/args" ]; then
+      tfargs=$(cat "test-framework/$name/args")
+    fi
+    # shellcheck disable=SC2086
+    "$TEYRU" test $tfargs "$dir" >"$tmp/tf-$name.out" 2>"$tmp/tf-$name.err"
     code=$?
     wantcode=$(cat "$wantcodef")
     problems=""

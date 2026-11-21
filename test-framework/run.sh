@@ -24,10 +24,16 @@ trap 'rm -rf "$tmp"' EXIT
 
 pass=0
 fail=0
-for dir in pass fail; do
+# Every directory of the fixture is a case; the two the runner's own script also
+# covers are here so this file can be run on its own.
+for path in */; do
+  dir=${path%/}
   want=$(cat "$dir/expected")
   wantcode=$(cat "$dir/exit")
-  got=$("$TEYRU" test "$dir" 2>"$tmp/$dir.err")
+  tfargs=""
+  [ -f "$dir/args" ] && tfargs=$(cat "$dir/args")
+  # shellcheck disable=SC2086
+  got=$("$TEYRU" test $tfargs "$dir" 2>"$tmp/$dir.err")
   code=$?
   problems=""
   [ "$code" = "$wantcode" ] || problems="exit $code, want $wantcode"

@@ -1,0 +1,15 @@
+// A test that prints. Its stdout must not reach the runner's own lines: the
+// capture holds it and the runner prints it above the FAIL line that explains
+// why, so the report stays parseable and the noise is still there to read.
+class NoisyTest {
+  @Test
+  public void printsThenFails() {
+    System.out.println("hello from the test")
+    Assert.assertEquals(3, 2 + 2)
+  }
+
+  @Test
+  public void printsAndPasses() {
+    System.out.println("passing noise")
+  }
+}

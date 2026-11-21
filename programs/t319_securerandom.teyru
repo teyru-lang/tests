@@ -1,0 +1,78 @@
+/* java.security.SecureRandom, tested by properties rather than by values: the
+   bytes are supposed to be unpredictable, so a golden file of them would be a
+   bug in the test. What can be asserted from inside a program is what the class
+   promises -- the array is filled, two draws differ, the values are not a
+   constant, the derived ints stay in range -- and each answer is printed as a
+   boolean or a small number, so the output is deterministic even though the
+   bytes are not.
+
+   The failure the test is written against is a SecureRandom built on
+   java.util.Random: a clock-seeded 48-bit LCG would pass "two draws differ" and
+   "fits in range" just as well, so those are not the whole story. The check
+   that does separate them is `nextLong` drawn twice with the seeds forced to
+   the same value -- a generator that consults the system gives different
+   answers, one that is a clock-seeded PRNG gives the same -- and the test asks
+   for that too, printing `false` for "same". */
+class T319 {
+  static void p(String s) {
+    System.out.println(s)
+  }
+
+  public static void main(String[] args) {
+    SecureRandom a = new SecureRandom()
+    byte[] x = new byte[32]
+    byte[] y = new byte[32]
+    a.nextBytes(x)
+    a.nextBytes(y)
+    p("filled " + x.length)
+    p("differs " +!MessageDigest.isEqual(x, y))
+
+    boolean nonzero = false
+    for (int i = 0 : i < x.length : i++) {
+      if (x[i] != 0) {
+        nonzero = true
+      }
+    }
+    p("not-all-zero " + nonzero)
+
+    int inRange = 0
+    for (int i = 0 : i < 200 : i++) {
+      int v = a.nextInt(10)
+      if (v >= 0 && v < 10) {
+        inRange++
+      }
+    }
+    p("in-range " + inRange)
+
+    boolean same = true
+    for (int i = 0 : i < 5 : i++) {
+      SecureRandom s1 = new SecureRandom()
+      s1.setSeed(42L)
+      SecureRandom s2 = new SecureRandom()
+      s2.setSeed(42L)
+      if (s1.nextLong() != s2.nextLong()) {
+        same = false
+      }
+    }
+    p("same-seed-same-result " + same)
+
+    // Random's derived surface must be served by the overridden next(), not by
+    // its own state: nextDouble is in [0,1) and nextBoolean is either value.
+    boolean doubles = true
+    for (int i = 0 : i < 100 : i++) {
+      double d = a.nextDouble()
+      if (d < 0.0 || d >= 1.0) {
+        doubles = false
+      }
+    }
+    p("double-range " + doubles)
+
+    boolean booleans = false
+    for (int i = 0 : i < 100 : i++) {
+      if (a.nextBoolean()) {
+        booleans = true
+      }
+    }
+    p("boolean-value " + booleans)
+  }
+}

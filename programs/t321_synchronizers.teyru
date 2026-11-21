@@ -1,0 +1,163 @@
+/* The synchronizers 38_concurrent_collections.teyru adds beyond the latch and
+   the atomics: Semaphore, CyclicBarrier and ReentrantLock.
+
+   All three are monitors -- this runtime has no hardware atomics -- so the test
+   uses them where a monitor's behaviour is observable: permits that block until
+   released, a barrier that only trips when the last party arrives, and a lock
+   that refuses an unlock by a thread that does not own it. Every wait uses a
+   condition rather than a sleep, and the threads are joined before the next
+   case, so the order of the report is fixed. */
+class T321 {
+  static void p(String s) {
+    System.out.println(s)
+  }
+
+  public static void main(String[] args) {
+    /* ---- Semaphore: two permits, three workers, one waits */
+    Semaphore sem = new Semaphore(2)
+    AtomicInteger inside = new AtomicInteger()
+    AtomicInteger peak = new AtomicInteger()
+    CountDownLatch done = new CountDownLatch(3)
+    for (int i = 0 : i < 3 : i++) {
+      Thread t = new Thread(new Runnable() {
+        public void run() {
+          sem.acquire()
+            int now = inside.incrementAndGet()
+            synchronized (sem) {
+            if (now > peak.get()) {
+              peak.set(now)
+            }
+          }
+            inside.addAndGet(-1)
+            sem.release()
+            done.countDown()
+        }
+      })
+      t.start()
+    }
+    done.await()
+    p("semaphore-peak<=2 " + (peak.get() <= 2))
+    p("semaphore-available " + sem.availablePermits())
+
+    /* ---- tryAcquire on an empty semaphore answers false without waiting */
+    Semaphore empty = new Semaphore(0)
+    p("try-acquire-empty " + empty.tryAcquire())
+    p("try-acquire-timeout " + empty.tryAcquire(10L))
+    empty.release()
+    p("try-acquire-after-release " + empty.tryAcquire())
+
+    p("drain " + new Semaphore(3).drainPermits())
+
+    /* ---- CyclicBarrier: three parties, the last one runs the action */
+    final AtomicInteger trips = new AtomicInteger()
+    CyclicBarrier barrier = new CyclicBarrier(3, new Runnable() {
+      public void run() {
+        trips.incrementAndGet()
+      }
+    })
+    final int[] indices = new int[3]
+    CountDownLatch met = new CountDownLatch(3)
+    for (int i = 0 : i < 3 : i++) {
+      final int slot = i
+      Thread t = new Thread(new Runnable() {
+        public void run() {
+          indices[slot] = barrier.await()
+            met.countDown()
+        }
+      })
+      t.start()
+    }
+    met.await()
+    p("barrier-tripped " + trips.get())
+    int lo = 99
+    int hi = -1
+    for (int i = 0 : i < 3 : i++) {
+      if (indices[i] < lo) {
+        lo = indices[i]
+      }
+      if (indices[i] > hi) {
+        hi = indices[i]
+      }
+    }
+    p("barrier-indices " + lo + " " + hi)
+    p("barrier-waiting " + barrier.getNumberWaiting())
+
+    /* ---- the barrier is reusable: the second generation trips again */
+    CountDownLatch twice = new CountDownLatch(3)
+    for (int i = 0 : i < 3 : i++) {
+      Thread t = new Thread(new Runnable() {
+        public void run() {
+          barrier.await()
+            twice.countDown()
+        }
+      })
+      t.start()
+    }
+    twice.await()
+    p("barrier-second-trip " + trips.get())
+
+    /* ---- ReentrantLock: reentrant, and an unlock by a non-owner fails */
+    ReentrantLock lock = new ReentrantLock()
+    lock.lock()
+    lock.lock()
+    p("lock-holds " + lock.getHoldCount())
+    lock.unlock()
+    p("lock-held-after-unlock " + lock.isHeldByCurrentThread())
+    lock.unlock()
+    p("lock-locked " + lock.isLocked())
+    p("lock-hold-count " + lock.getHoldCount())
+
+    final AtomicInteger rejected = new AtomicInteger()
+    lock.lock()
+    Thread other = new Thread(new Runnable() {
+      public void run() {
+        try {
+          lock.unlock()
+        } catch (IllegalMonitorStateException e) {
+          rejected.incrementAndGet()
+        }
+      }
+    })
+    other.start()
+    try {
+      other.join()
+    } catch (InterruptedException e) {
+      p("join interrupted")
+    }
+    lock.unlock()
+    p("lock-foreign-unlock-rejected " + rejected.get())
+
+    /* ---- tryLock while another thread holds it */
+    final ReentrantLock held = new ReentrantLock()
+    final CountDownLatch acquired = new CountDownLatch(1)
+    final CountDownLatch release = new CountDownLatch(1)
+    Thread holder = new Thread(new Runnable() {
+      public void run() {
+        held.lock()
+          acquired.countDown()
+          try {
+          release.await()
+        } catch (InterruptedException e) {
+          p("holder interrupted")
+        }
+          held.unlock()
+      }
+    })
+    holder.start()
+    try {
+      acquired.await()
+    } catch (InterruptedException e) {
+      p("acquired interrupted")
+    }
+    p("trylock-while-held " + held.tryLock())
+    p("trylock-timeout-while-held " + held.tryLock(10L))
+    release.countDown()
+    try {
+      holder.join()
+    } catch (InterruptedException e) {
+      p("join interrupted")
+    }
+    p("trylock-after-release " + held.tryLock())
+    held.unlock()
+  }
+}

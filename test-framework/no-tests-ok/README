@@ -1,0 +1,2 @@
+An empty directory: with -no-tests-ok the command says so and exits 0. Without
+it the same directory is exit 2, which is its own case in run.sh.

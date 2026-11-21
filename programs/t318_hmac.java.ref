@@ -1,0 +1,48 @@
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+public class T318 {
+  static void p(String s) { System.out.println(s); }
+
+  static String hex(byte[] bs) {
+    StringBuilder sb = new StringBuilder();
+    for (byte b : bs) sb.append(String.format("%02x", b));
+    return sb.toString();
+  }
+
+  static byte[] bytes(int n, int start) {
+    byte[] b = new byte[n];
+    for (int i = 0; i < n; i++) b[i] = (byte)((start + i) & 0xFF);
+    return b;
+  }
+
+  static void mac(String alg, byte[] key, byte[] msg) throws Exception {
+    Mac m = Mac.getInstance(alg);
+    m.init(new SecretKeySpec(key, alg));
+    byte[] out = m.doFinal(msg);
+    p(alg + " len=" + m.getMacLength() + " key=" + hex(key) + " msg=" + hex(msg) + " mac=" + hex(out));
+  }
+
+  public static void main(String[] args) throws Exception {
+    mac("HmacSHA256", bytes(20, 0x0b), "Hi There".getBytes());
+    mac("HmacSHA256", "Jefe".getBytes(), "what do ya want for nothing?".getBytes());
+    byte[] aa = new byte[20];
+    for (int i = 0; i < 20; i++) aa[i] = (byte)0xaa;
+    byte[] cd = new byte[50];
+    for (int i = 0; i < 50; i++) cd[i] = (byte)0xcd;
+    mac("HmacSHA256", aa, "Test Using Larger Than Block-Size Key - Hash Key First".getBytes());
+    mac("HmacMD5", aa, cd);
+    for (String alg : new String[]{"HmacMD5","HmacSHA1","HmacSHA224","HmacSHA256","HmacSHA384","HmacSHA512"}) {
+      int block = alg.equals("HmacSHA384") || alg.equals("HmacSHA512") ? 128 : 64;
+      mac(alg, bytes(block - 1, 1), "abc".getBytes());
+      mac(alg, bytes(block, 1), "abc".getBytes());
+      mac(alg, bytes(block + 1, 1), "abc".getBytes());
+      try { mac(alg, new byte[0], "abc".getBytes()); } catch (Exception e) { p(alg + " emptykey: " + e.getMessage()); }
+    }
+    mac("HmacSHA512", "k".getBytes(), new byte[0]);
+    mac("HmacSHA1", "k".getBytes(), bytes(1000, 7));
+    try { Mac.getInstance("HmacSHA9"); } catch (Exception e) { p("unknown: " + e.getMessage()); }
+    Mac m = Mac.getInstance("HmacSHA256");
+    try { m.doFinal("abc".getBytes()); } catch (Exception e) { p("uninitialized: " + e.getMessage()); }
+  }
+}

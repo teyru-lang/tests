@@ -1,0 +1,73 @@
+// Every assertion the framework adds: the message overloads, the delta form,
+// the array forms, identity, the throwing forms, and assertAll. The case
+// passing means each one accepted what it should; the failing cases below
+// exercise the messages.
+class AssertsTest {
+  @Test
+  public void messages() {
+    Assert.assertEquals(2, 1 + 1, "one plus one")
+    Assert.assertTrue(true, "true")
+    Assert.assertFalse(false, "false")
+    Assert.assertNull(null, "null")
+    Assert.assertNotNull("x", "not null")
+    Assert.assertEquals("a", "a", "strings")
+  }
+
+  @Test
+  public void deltas() {
+    Assert.assertEquals(0.3, 0.1 + 0.2, 1e-9)
+    Assert.assertEquals(1.0f, 1.0f, 0.0f)
+    Assert.assertEquals(2.0, 2.0, 0.0)
+  }
+
+  @Test
+  public void arrays() {
+    Assert.assertArrayEquals(new int[]{1, 2, 3}, new int[]{1, 2, 3})
+    Assert.assertArrayEquals(new String[]{"a", "b"}, new String[]{"a", "b"}, "strings")
+    Assert.assertArrayEquals(new double[]{0.1}, new double[]{0.1})
+    Assert.assertArrayEquals(new byte[]{1, 2}, new byte[]{1, 2})
+    Assert.assertArrayEquals(new char[]{'a'}, new char[]{'a'})
+    Assert.assertArrayEquals(new boolean[]{true}, new boolean[]{true})
+    Assert.assertArrayEquals(new long[]{1L}, new long[]{1L})
+  }
+
+  @Test
+  public void identity() {
+    Object a = new Object()
+    Assert.assertSame(a, a)
+    Assert.assertNotSame(a, new Object())
+    Assert.assertNotEquals(1, 2)
+    Assert.assertNotEquals("a", "b")
+    Assert.assertNotEquals(1.5, 2.5)
+    Assert.assertNotEquals('a', 'b')
+    Assert.assertNotEquals(true, false)
+  }
+
+  @Test
+  public void throwing() {
+    Throwable t = Assert.assertThrows(RuntimeException.class, new Runnable() {
+      public void run() {
+        throw new RuntimeException("boom")
+      }
+    })
+    Assert.assertEquals("boom", t.getMessage())
+    Assert.assertDoesNotThrow(new Runnable() {
+      public void run() {
+        Assert.assertEquals(1, 1)
+      }
+    })
+  }
+
+  @Test
+  public void all() {
+    Assert.assertAll(new Runnable() {
+      public void run() {
+        Assert.assertEquals(1, 1)
+      }
+    }, new Runnable() {
+      public void run() {
+        Assert.assertEquals(2, 1 + 1)
+      }
+    })
+  }
+}

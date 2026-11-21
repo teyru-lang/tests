@@ -1,0 +1,2 @@
+PASS SlowTest.quick
+FAIL SlowTest.hangs: timed out after 2s

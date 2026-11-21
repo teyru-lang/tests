@@ -1,0 +1,2 @@
+A directory with no tests at all is a failure (exit 2): a mistyped path must not
+be green. -no-tests-ok is the other case, beside this one.

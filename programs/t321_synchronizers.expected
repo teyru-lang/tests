@@ -1,0 +1,18 @@
+semaphore-peak<=2 true
+semaphore-available 2
+try-acquire-empty false
+try-acquire-timeout false
+try-acquire-after-release true
+drain 3
+barrier-tripped 1
+barrier-indices 0 2
+barrier-waiting 0
+barrier-second-trip 2
+lock-holds 2
+lock-held-after-unlock true
+lock-locked false
+lock-hold-count 0
+lock-foreign-unlock-rejected 1
+trylock-while-held false
+trylock-timeout-while-held false
+trylock-after-release true

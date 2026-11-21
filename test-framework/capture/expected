@@ -1,0 +1,5 @@
+output: hello from the test
+FAIL NoisyTest.printsThenFails: expected 3, but was 4
+java.lang.AssertionError: expected 3, but was 4
+PASS NoisyTest.printsAndPasses
+1 passed, 1 failed

@@ -1,0 +1,70 @@
+/* The logging framework: a level per logger, a level per handler, the
+   inheritance through dotted names, the global level, and both formatters.
+
+   There is no .java.ref beside this one: java.util.logging's SimpleFormatter
+   carries a timestamp and a two-line layout this formatter deliberately does
+   not, so the JDK's output would be a different format rather than the same
+   answer. What the test pins is this library's contract -- which records are
+   emitted, and the shape of the line -- and the two records whose shape the JDK
+   does share are identical ("LEVEL logger message"). The JSON formatter has no
+   JDK counterpart at all; its escaping is the part that can be wrong, so a
+   message with a quote, a backslash and a tab is in the test. */
+class T320 {
+  static void p(String s) {
+    System.out.println(s)
+  }
+
+  public static void main(String[] args) {
+    /* ---- the shape of a line: SimpleFormatter */
+    /* The stream is the program's stdout, so the golden file is the record. */
+    StreamHandler h = new StreamHandler(System.out)
+    h.setFormatter(new SimpleFormatter())
+
+    Logger log = Logger.getLogger("app.db")
+    log.setHandler(h)
+    log.setLevel(LogLevel.ALL)
+
+    log.severe("storage is full")
+    log.warning("retrying")
+    log.info("connected")
+    log.config("pool size 8")
+    log.fine("query took 3ms")
+
+    /* ---- the level filter, including inheritance */
+    Logger child = Logger.getLogger("app.db.pool")
+    p("child-is-loggable-fine " + child.isLoggable(LogLevel.FINE))
+    Logger root = Logger.getRootLogger()
+    Logger other = Logger.getLogger("other")
+    p("other-is-loggable-fine " + other.isLoggable(LogLevel.FINE))
+
+    /* The global level is what an unconfigured logger inherits. */
+    Logger.setGlobalLevel(LogLevel.WARNING)
+    p("other-after-global-fine " + other.isLoggable(LogLevel.FINE))
+    p("other-after-global-warning " + other.isLoggable(LogLevel.WARNING))
+    p("app-still-fine " + log.isLoggable(LogLevel.FINE))
+    Logger.setGlobalLevel(LogLevel.INFO)
+
+    /* ---- a stricter handler keeps the logger quiet, which is the whole point */
+    h.setLevel(LogLevel.WARNING)
+    log.info("hidden by the handler")
+    log.warning("shown by the handler")
+    h.setLevel(LogLevel.ALL)
+
+    /* ---- the level names, as a formatter prints them */
+    p("name " + LogLevel.name(LogLevel.SEVERE) + " " + LogLevel.name(LogLevel.WARNING) + " " +
+      LogLevel.name(LogLevel.INFO) + " " + LogLevel.name(LogLevel.CONFIG) + " " +
+      LogLevel.name(LogLevel.FINE) + " " + LogLevel.name(LogLevel.FINER) + " " +
+      LogLevel.name(LogLevel.FINEST))
+
+    /* ---- JSON, one line per record, escaped */
+    StreamHandler jh = new StreamHandler(System.out)
+    jh.setFormatter(new JsonFormatter())
+    Logger json = Logger.getLogger("api")
+    json.setHandler(jh)
+    json.setLevel(LogLevel.ALL)
+    json.info("quote \" and backslash \\ and tab \t done")
+    json.warning("with an exception", new IllegalStateException("boom"))
+
+    p("done")
+  }
+}

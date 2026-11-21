@@ -1,0 +1,21 @@
+// @Disabled and @Tag, which the runner selects on. The command line selects
+// with -run and -tag, and a selected pass proves the filter kept the right
+// test; the unselected ones prove it dropped the others.
+class SelectionTest {
+  @Test
+  public void always() {
+    Assert.assertEquals(1, 1)
+  }
+
+  @Test
+  @Disabled("needs a database")
+  public void never() {
+    Assert.assertEquals(1, 2)
+  }
+
+  @Test
+  @Tag("slow")
+  public void tagged() {
+    Assert.assertEquals(2, 1 + 1)
+  }
+}

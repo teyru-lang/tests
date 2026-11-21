@@ -1,0 +1,15 @@
+SEVERE app.db storage is full
+WARNING app.db retrying
+INFO app.db connected
+CONFIG app.db pool size 8
+FINE app.db query took 3ms
+child-is-loggable-fine true
+other-is-loggable-fine false
+other-after-global-fine false
+other-after-global-warning true
+app-still-fine true
+WARNING app.db shown by the handler
+name SEVERE WARNING INFO CONFIG FINE FINER FINEST
+{"level":"INFO","logger":"api","message":"quote \" and backslash \\ and tab \t done"}
+{"level":"WARNING","logger":"api","message":"with an exception","exception":"java.lang.IllegalStateException: boom"}
+done

@@ -1,0 +1,13 @@
+// A test that hangs is killed and named. -timeout is the budget for one test,
+// and the FAIL line names the test that was running when it ran out.
+class SlowTest {
+  @Test
+  public void quick() {
+    Assert.assertEquals(1, 1)
+  }
+
+  @Test
+  public void hangs() {
+    Thread.sleep(60000)
+  }
+}
