@@ -1,0 +1,4 @@
+csv rows=300 mismatches=0 checksum=-4966826758343077852
+toml docs=200 mismatches=0 checksum=7078341631685725502
+yaml docs=200 mismatches=0 checksum=-8500496825004806385
+xml docs=100 mismatches=0 checksum=3481774687876595839

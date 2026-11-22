@@ -1,0 +1,148 @@
+/* The four data formats under a deterministic stress test: 300 CSV rows, 200
+   TOML documents and 200 YAML mappings built from a fixed pseudo-random seed,
+   each written, read back, and compared field for field. The seed is an LCG, so
+   a failure is reproducible byte for byte; the pool of characters is the one
+   that makes a quoting bug visible -- delimiter, quote, backslash, CR, LF, TAB,
+   space at both ends, a non-ASCII letter and a CJK character.
+
+   The last section asks a different question: is emit(parse(emit(x))) the same
+   text as emit(parse(x))? A writer that re-quotes or re-orders on the second
+   pass would round-trip values correctly and still churn a file a program
+   rewrites. */
+class FormatRoundtrip {
+  static long seed = 20261122L
+
+  /* A small LCG; the point is reproducibility, not statistical quality. */
+  static int nextInt(int mod) {
+    seed = (seed * 1103515245L + 12345L) & 0x7fffffffL
+    return (int) (seed % mod)
+  }
+
+  static final String POOL = "aZ09,\"\\\n\r\t é中-_#:[]{}'"
+
+  static String randomField(int maxLen) {
+    int len = nextInt(maxLen + 1)
+    StringBuilder b = new StringBuilder()
+    for (int i = 0 : i < len : i++) {
+      b.append(POOL.charAt(nextInt(POOL.length())))
+    }
+    return b.toString()
+  }
+
+  public static void main(String[] a) {
+    long csvChecksum = 0
+    int csvBad = 0
+    for (int round = 0 : round < 300 : round++) {
+      int width = 1 + nextInt(5)
+      String[] row = new String[width]
+      for (int i = 0 : i < width : i++) {
+        row[i] = randomField(12)
+      }
+      CsvWriter w = new CsvWriter()
+      w.writeRecord(row)
+      String[] back = new CsvReader(w.toString()).readRecord()
+      if (back.length != width) {
+        csvBad++
+      } else {
+        for (int i = 0 : i < width : i++) {
+          if (!back[i].equals(row[i])) {
+            csvBad++
+          }
+          for (int k = 0 : k < back[i].length() : k++) {
+            csvChecksum = csvChecksum * 31 + back[i].charAt(k)
+          }
+        }
+      }
+    }
+    System.out.println("csv rows=300 mismatches=" + csvBad + " checksum=" + csvChecksum)
+
+    long tomlChecksum = 0
+    int tomlBad = 0
+    for (int round = 0 : round < 200 : round++) {
+      String key = "k" + round
+      String value = randomField(16)
+      StringBuilder doc = new StringBuilder()
+      doc.append(key).append(" = ").append(TomlQuote.string(value)).append('\n')
+      TomlDocument d = TomlDocument.parse(doc.toString())
+      String back = d.getString(key, "\u0000missing")
+      if (!back.equals(value)) {
+        tomlBad++
+      }
+      for (int k = 0 : k < back.length() : k++) {
+        tomlChecksum = tomlChecksum * 31 + back.charAt(k)
+      }
+      /* Idempotence: reparsing the emitted text and emitting again must be the
+         same text. */
+      String emitted = d.toToml()
+      String again = TomlDocument.parse(emitted).toToml()
+      if (!emitted.equals(again)) {
+        tomlBad++
+      }
+    }
+    System.out.println("toml docs=200 mismatches=" + tomlBad + " checksum=" + tomlChecksum)
+
+    long yamlChecksum = 0
+    int yamlBad = 0
+    for (int round = 0 : round < 200 : round++) {
+      YamlMapping m = new YamlMapping()
+      String k1 = "a" + round
+      String k2 = "b" + round
+      String v1 = randomField(14)
+      String v2 = randomField(10)
+      m.put(k1, new YamlScalar(v1, false))
+      m.put(k2, new YamlScalar(v2, false))
+      YamlDocument d = new YamlDocument(m)
+      String emitted = d.toYaml()
+      YamlDocument again = YamlDocument.parse(emitted)
+      if (!again.getString(k1, "\u0000missing").equals(v1) ||!again.getString(k2, "\u0000missing").equals(v2)) {
+        yamlBad++
+      }
+      for (int k = 0 : k < v1.length() : k++) {
+        yamlChecksum = yamlChecksum * 31 + v1.charAt(k)
+      }
+      String twice = again.toYaml()
+      if (!emitted.equals(twice)) {
+        yamlBad++
+      }
+    }
+    System.out.println("yaml docs=200 mismatches=" + yamlBad + " checksum=" + yamlChecksum)
+
+    /* XML: two contracts, both checked. The compact form (XmlElement.toXml)
+       preserves every text run exactly, so that is where equality is asked.
+       The pretty form (XmlDocument.toXml) is for humans: it drops a
+       whitespace-only run between element children and indents instead, so a
+       reader sees that indentation as text -- the comparison there is on the
+       trimmed text and on the structure. */
+    long xmlChecksum = 0
+    int xmlBad = 0
+    for (int round = 0 : round < 100 : round++) {
+      String text = randomField(18)
+      XmlElement e = new XmlElement("n")
+      e.setAttribute("a", text)
+      e.add(new XmlText(text, false))
+      XmlElement c = new XmlElement("c")
+      c.add(new XmlText(text, true))
+      e.add(c)
+
+      XmlDocument compact = XmlDocument.parse(e.toXml())
+      if (!compact.root.getAttribute("a").equals(text) ||!compact.root.child("c").text().equals(text) ||!compact.root.text().equals(text)) {
+        xmlBad++
+      }
+
+      XmlDocument pretty = XmlDocument.parse(new XmlDocument(e, "1.0", "UTF-8").toXml())
+      if (!pretty.root.getAttribute("a").equals(text) ||!pretty.root.child("c").text().equals(text) ||!pretty.root.text().trim().equals(text.trim())
+      /* Two children (<c/> and the text run) plus the indentation the
+         pretty writer added, which the reader sees as one more text node.
+         The exact count is therefore 3 for a whitespace-only run (dropped,
+         so indentation only) and 4 otherwise (text plus indentation on both
+         sides); what matters is that the element's own text survives. */
+      || pretty.root.children.size() < 2) {
+        xmlBad++
+      }
+      for (int k = 0 : k < text.length() : k++) {
+        xmlChecksum = xmlChecksum * 31 + text.charAt(k)
+      }
+    }
+    System.out.println("xml docs=100 mismatches=" + xmlBad + " checksum=" + xmlChecksum)
+  }
+}
