@@ -1,0 +1,30 @@
+/* All 47 carried locales through one line each: a number, a currency, a
+   percent, a long date and a medium time. The .java.ref is the same program and
+   the .expected is OpenJDK 21's output for it (with -Duser.timezone=UTC), so
+   every row is the reference implementation's answer -- including ROOT, whose
+   "full" month names are the abbreviated ones in the root bundle.
+
+   One deliberate difference: this library does not emit bidi control characters
+   (U+061C, U+200E, U+200F), so the .expected beside this file is the JDK's
+   output with those three removed. Everything visible is compared byte for
+   byte; the marks are a directionality hint, not text. */
+class LocaleTable {
+  public static void main(String[] a) {
+    String[] tags = { "", "en", "en-US", "en-GB", "en-CA", "de", "de-DE", "fr", "fr-FR", "ja", "ja-JP", "zh", "zh-TW", "zh-CN", "es", "es-ES", "it", "pt", "pt-BR", "ru", "ru-RU", "ko", "ko-KR", "ar", "nl", "pl", "sv", "tr", "uk", "cs", "el", "he", "th", "vi", "id", "fi", "da", "no", "hu", "ro", "bg", "hr", "sk", "sl", "et", "lv", "ca" }
+    long ms = 1700000000000L
+    for (String t : tags) {
+      Locale l = t.length() == 0 ? Locale.ROOT : Locale.forLanguageTag(t)
+      NumberFormat nf = NumberFormat.getInstance(l)
+      nf.setMinimumFractionDigits(2)
+      nf.setMaximumFractionDigits(3)
+      StringBuilder b = new StringBuilder()
+      b.append(t.length() == 0 ? "ROOT" : t).append(" ")
+      b.append(nf.format(1234567.891)).append(" | ")
+      b.append(NumberFormat.getCurrencyInstance(l).format(-42.5)).append(" | ")
+      b.append(NumberFormat.getPercentInstance(l).format(0.256)).append(" | ")
+      b.append(DateFormat.getDateInstance(DateFormat.LONG, l).format(Instant.ofEpochMilli(ms))).append(" | ")
+      b.append(DateFormat.getTimeInstance(DateFormat.MEDIUM, l).format(Instant.ofEpochMilli(ms)))
+      System.out.println(b)
+    }
+  }
+}

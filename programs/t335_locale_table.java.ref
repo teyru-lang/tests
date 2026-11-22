@@ -1,0 +1,31 @@
+// The Java this case was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t335_locale_table.java.ref /tmp/LocaleAll.java
+//   javac -d /tmp/out /tmp/LocaleAll.java
+//   java -Duser.timezone=UTC -Duser.language=en -Duser.country=US -cp /tmp/out LocaleAll
+
+import java.text.*;
+import java.time.*;
+import java.util.*;
+
+class LocAll {
+  public static void main(String[] a) {
+    String[] tags = {"", "en", "en-US", "en-GB", "en-CA", "de", "de-DE", "fr", "fr-FR", "ja", "ja-JP", "zh", "zh-TW", "zh-CN", "es", "es-ES", "it", "pt", "pt-BR", "ru", "ru-RU", "ko", "ko-KR", "ar", "nl", "pl", "sv", "tr", "uk", "cs", "el", "he", "th", "vi", "id", "fi", "da", "no", "hu", "ro", "bg", "hr", "sk", "sl", "et", "lv", "ca"};
+    long ms = 1700000000000L;
+    for (String t : tags) {
+      Locale l = t.isEmpty() ? Locale.ROOT : Locale.forLanguageTag(t);
+      NumberFormat nf = NumberFormat.getInstance(l);
+      nf.setMinimumFractionDigits(2);
+      nf.setMaximumFractionDigits(3);
+      StringBuilder b = new StringBuilder();
+      b.append(t.isEmpty() ? "ROOT" : t).append(" ");
+      b.append(nf.format(1234567.891)).append(" | ");
+      b.append(NumberFormat.getCurrencyInstance(l).format(-42.5)).append(" | ");
+      b.append(NumberFormat.getPercentInstance(l).format(0.256)).append(" | ");
+      b.append(DateFormat.getDateInstance(DateFormat.LONG, l).format(new Date(ms))).append(" | ");
+      b.append(DateFormat.getTimeInstance(DateFormat.MEDIUM, l).format(new Date(ms)));
+      System.out.println(b);
+    }
+  }
+}
