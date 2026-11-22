@@ -20,5 +20,7 @@ doc8 rows=1
   2 [ leading]|[trailing ]
 doc9 rows=1
   3 [x]|[y,z]|[w]
+doc10 rows=1
+  2 [a]|[b]
 encoded=plain,"with,comma","with""quote","with\nnewline"," leading","trailing ",\n
 roundtrip=true

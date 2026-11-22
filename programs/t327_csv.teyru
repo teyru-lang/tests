@@ -35,7 +35,11 @@ class CsvCase {
       "a,b\r\nc,d\r\n",
       "\"a\",\"b\"\n",
       " leading,trailing \n",
-      "x,\"y,z\",w\n"
+      "x,\"y,z\",w\n",
+      /* A blank line between records is skipped. RFC 4180 does not settle it
+         and Python's csv module answers an empty row instead; the reader's
+         header names skipping as the decision, so it is pinned here. */
+      "\n\na,b\r\n"
     }
     for (int d = 0 : d < docs.length : d++) {
       CsvReader r = new CsvReader(docs[d])
@@ -44,7 +48,7 @@ class CsvCase {
     /* The writer's inverse: every document parsed is written back, reparsed,
        and compared row for row. Nothing here prints a mismatch because there is
        none; a field that did not survive is the failure. */
-    String[] fields = {"plain", "with,comma", "with\"quote", "with\nnewline", " leading", "trailing ", ""}
+    String[] fields = { "plain", "with,comma", "with\"quote", "with\nnewline", " leading", "trailing ", "" }
     CsvWriter w = new CsvWriter()
     w.writeRecord(fields)
     String encoded = w.toString()
