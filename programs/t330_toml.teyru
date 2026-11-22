@@ -1,0 +1,117 @@
+/* TOML 1.0.0: every construct once, then written back and reparsed.
+
+   TOML has no parser in the JDK, so there is no .java.ref and the expectation
+   is this program's own output: the value lines are what the parser must
+   answer for the document, and the "emit" section is the writer's inverse. The
+   document is the TOML spec's own example shapes -- tables, a dotted table, an
+   array of tables, an inline table, all four date/time forms, and every scalar
+   kind -- so a construct that stopped working shows up as a changed line even
+   though the comparison is against itself.
+
+   The refusals at the end are the ones TOML's own rules name: a duplicate key,
+   a table header that collides with a value, and a header defined twice. Each
+   is caught and its message printed, which is the contract this library keeps
+   for every parser. */
+class TomlCase {
+  public static void main(String[] a) {
+    StringBuilder db = new StringBuilder()
+    db.append("# a comment, then the document\n")
+    db.append("title = \"TOML Example\"\n")
+    db.append("literal = 'C:\\Users\\nodejs\\templates'\n")
+    db.append("multi = \"\"\"\nline one\nline \\\"quoted\\\"\ntwo\"\"\"\n")
+    db.append("multilit = '''\nraw \\n here'''\n")
+    db.append("int = 42\n")
+    db.append("hex = 0xDEADBEEF\n")
+    db.append("oct = 0o755\n")
+    db.append("bin = 0b1101\n")
+    db.append("under = 1_000_000\n")
+    db.append("neg = -17\n")
+    db.append("pi = 3.1415\n")
+    db.append("exp = 5e+22\n")
+    db.append("big = inf\n")
+    db.append("notnum = nan\n")
+    db.append("yes = true\n")
+    db.append("no = false\n")
+    db.append("when = 1979-05-27T07:32:00Z\n")
+    db.append("local = 1979-05-27T07:32:00\n")
+    db.append("day = 1979-05-27\n")
+    db.append("clock = 07:32:00\n")
+    db.append("arr = [1, 2, 3]\n")
+    db.append("mixed = [\"a\", 1, true]\n")
+    db.append("nested = [[1, 2], [3]]\n")
+    db.append("inline = { x = 1, y = \"two\" }\n")
+    db.append("\n")
+    db.append("[owner]\n")
+    db.append("name = \"Tom\"\n")
+    db.append("dob = 1979-05-27T07:32:00Z\n")
+    db.append("\n")
+    db.append("[database]\n")
+    db.append("ports = [8001, 8001, 8002]\n")
+    db.append("enabled = true\n")
+    db.append("\n")
+    db.append("[servers.alpha]\n")
+    db.append("ip = \"10.0.0.1\"\n")
+    db.append("\n")
+    db.append("[servers.beta]\n")
+    db.append("ip = \"10.0.0.2\"\n")
+    db.append("\n")
+    db.append("[[products]]\n")
+    db.append("name = \"Hammer\"\n")
+    db.append("sku = 738594937\n")
+    db.append("\n")
+    db.append("[[products]]\n")
+    db.append("name = \"Nail\"\n")
+    db.append("sku = 284758393\n")
+    db.append("color = \"gray\"\n")
+    String doc = db.toString()
+    TomlDocument d = TomlDocument.parse(doc)
+    String[] fields = {
+      "title", "literal", "multi", "multilit",
+      "int", "hex", "oct", "bin", "under", "neg",
+      "pi", "exp", "big", "notnum", "yes", "no",
+      "when", "local", "day", "clock",
+      "arr", "mixed", "nested", "inline", "inline.x",
+      "owner.name", "owner.dob", "database.ports", "database.enabled",
+      "servers.alpha.ip", "servers.beta.ip"
+    }
+    for (int i = 0 : i < fields.length : i++) {
+      TomlNode n = d.get(fields[i])
+      String text = n.kind() + ":" + n.asText().replace("\n", "\\n")
+      System.out.println(fields[i] + " = " + text)
+    }
+    TomlArray products = d.getArray("products")
+    System.out.println("products = " + products.size())
+    for (int i = 0 : i < products.size() : i++) {
+      TomlTable p = (TomlTable) products.get(i)
+      System.out.println("  product[" + i + "] " + ((TomlString) p.get("name")).value
+        + " " + ((TomlInteger) p.get("sku")).value)
+    }
+    System.out.println("missing = " + d.describe("no.such.key"))
+
+    /* The writer's inverse: reparse the emitted text and ask it the same
+       questions. */
+    String emitted = d.toToml()
+    TomlDocument again = TomlDocument.parse(emitted)
+    System.out.println("emit.title = " + again.describe("title"))
+    System.out.println("emit.products = " + again.getArray("products").size())
+    System.out.println("emit.hex = " + again.getInt("hex", -1))
+    System.out.println("emit.pi = " + again.getDouble("pi", -1))
+    System.out.println("emit.mixed = " + again.describe("mixed"))
+    System.out.println("emit.owner.name = " + again.describe("owner.name"))
+
+    refused("a = 1\na = 2\n")
+    refused("a = 1\n[a]\nb = 2\n")
+    refused("[a]\nb = 1\n\n[a]\nc = 2\n")
+    refused("a = [1, 2\n")
+    refused("a = \"unclosed\n")
+  }
+
+  static void refused(String text) {
+    try {
+      TomlDocument.parse(text)
+      System.out.println("refused: NOT REFUSED: " + text.replace("\n", "\\n"))
+    } catch (TomlParseException e) {
+      System.out.println("refused: " + e.getMessage())
+    }
+  }
+}

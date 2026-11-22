@@ -1,0 +1,118 @@
+// The Java this case was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t325_regex_advanced.java.ref /tmp/RegexAdvanced.java
+//   javac -d /tmp/out /tmp/RegexAdvanced.java
+//   java -cp /tmp/out RegexAdvanced
+//
+// Five cases of the full probe are commented out here because this library
+// refuses the construct by name (POSIX bracket classes, \G, \R, \0, and a
+// duplicate named group); t329_regex_refusals.teyru is where those answers are
+// pinned.
+
+import java.util.regex.*;
+import java.util.*;
+
+public class RegexAdvanced {
+  static int n = 0;
+  static void t(String pat, String in) {
+    n++;
+    try {
+      Matcher m = Pattern.compile(pat).matcher(in);
+      StringBuilder b = new StringBuilder();
+      boolean found = m.find();
+      if (!found) {
+        System.out.println(n + " " + pat + " / " + in + " -> none");
+        return;
+      }
+      int guard = 0;
+      while (found && guard < 8) {
+        b.append(m.start()).append('-').append(m.end()).append(':').append(m.group());
+        for (int g = 1; g <= m.groupCount(); g++) {
+          b.append('|').append(m.group(g));
+        }
+        b.append(';');
+        found = m.find();
+        guard++;
+      }
+      System.out.println(n + " " + pat + " / " + in + " -> " + b);
+    } catch (PatternSyntaxException e) {
+      System.out.println(n + " " + pat + " -> refused: " + e.getDescription());
+    }
+  }
+
+  public static void main(String[] a) {
+    t("a(?i)BC", "abc");
+    t("(?i:ab)c", "ABc");
+    t("(?i:ab)c", "ABC");
+    t("a*+a", "aaa");
+    t("(?>a+)b", "aaab");
+    t("(?<=foo)bar", "foobar");
+    t("(?<!foo)bar", "bazbar");
+    t("(?<=a{2})b", "aab");
+    t("(a)\\1", "aa");
+    t("(?<name>\\d+)-(?<name2>\\d+)", "x12-34");
+    t("\\p{L}+", "中文abc");
+    t("\\p{Lu}+", "ABCdef");
+    t("\\p{Nd}+", "a123b");
+    t("x\\Qa.b\\E", "xa.b");
+    t("x\\Qa.b\\E", "axxb");
+    t("\\bword\\b", "a word here");
+    t("\\Bord\\B", "words");
+    t("\\Aab", "abc");
+    t("abc\\z", "abc");
+    t("(?s)a.b", "a\nb");
+    t("(?m)^b$", "a\nb\nc");
+    t("(?x) a b c", "abc");
+    // refused by this library: see t329_regex_refusals
+    // refused by this library: see t329_regex_refusals
+    // refused by this library: see t329_regex_refusals
+    t("a{2,3}?", "aaaa");
+    t("(?:ab)+", "ababab");
+    t("a(?=b)", "ab");
+    t("a(?!b)", "ac");
+    // refused by this library: see t329_regex_refusals
+    t("\\x41\\x{42}", "AB");
+    t("\\u0041", "A");
+    // refused by this library: see t329_regex_refusals
+    t("(a)(b)(c)", "abc");
+    t("a++", "aaa");
+    t("[a-z&&[^aeiou]]+", "hello");
+    t("(?i)[a-z]+", "HeLLo");
+    t("", "abc");
+    t("(a)?b", "b");
+    t("(?i)AB", "xaby");
+    t("(?i:AB)C", "abC");
+    t("a(?i)bc|d", "d");
+    t("(?s).", "\n");
+    t("(?m)^x", "a\nx");
+    t("(?x) a  b", "ab");
+    t("(?i)[^a]", "A");
+    t("(?i)a|b", "B");
+    t("[\\p{L}&&[^a-z]]", "1Q");
+    t("[a-z&&[def]]", "e");
+    t("[a-z&&[^m-p]]", "a");
+    t("\\Qa|b\\E", "a|b");
+    t("\\Qa\\E\\Qb\\E", "ab");
+    t("(a)(b)?", "a");
+    t("(?<year>\\d{4})-(?<month>\\d{2})", "2024-11");
+    t("\\1", "aa");
+    t("(a)\\1(b)", "aab");
+    t("x*", "yyy");
+    t("x*?", "yyy");
+    t("a*+b", "aaab");
+    t("a{2,}+", "aaa");
+    t("(?>ab|a)b", "ab");
+    t("(?:a|ab)c", "abc");
+    t("a++b", "aaab");
+    t("\\p{Upper}+", "ABc");
+    t("\\p{javaLowerCase}+", "abC");
+    t("\\b", "ab");
+    t("\\B", "ab");
+    t("^$", "");
+    t("\\A\\z", "");
+    t("(|a)", "a");
+    t("(a|)", "a");
+    System.out.println("total=" + n);
+  }
+}

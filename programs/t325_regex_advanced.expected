@@ -1,0 +1,74 @@
+1 a(?i)BC / abc -> 0-3:abc;
+2 (?i:ab)c / ABc -> 0-3:ABc;
+3 (?i:ab)c / ABC -> none
+4 a*+a / aaa -> none
+5 (?>a+)b / aaab -> 0-4:aaab;
+6 (?<=foo)bar / foobar -> 3-6:bar;
+7 (?<!foo)bar / bazbar -> 3-6:bar;
+8 (?<=a{2})b / aab -> 2-3:b;
+9 (a)\1 / aa -> 0-2:aa|a;
+10 (?<name>\d+)-(?<name2>\d+) / x12-34 -> 1-6:12-34|12|34;
+11 \p{L}+ / 中文abc -> 0-5:中文abc;
+12 \p{Lu}+ / ABCdef -> 0-3:ABC;
+13 \p{Nd}+ / a123b -> 1-4:123;
+14 x\Qa.b\E / xa.b -> 0-4:xa.b;
+15 x\Qa.b\E / axxb -> none
+16 \bword\b / a word here -> 2-6:word;
+17 \Bord\B / words -> 1-4:ord;
+18 \Aab / abc -> 0-2:ab;
+19 abc\z / abc -> 0-3:abc;
+20 (?s)a.b / a
+b -> 0-3:a
+b;
+21 (?m)^b$ / a
+b
+c -> 2-3:b;
+22 (?x) a b c / abc -> 0-3:abc;
+23 a{2,3}? / aaaa -> 0-2:aa;2-4:aa;
+24 (?:ab)+ / ababab -> 0-6:ababab;
+25 a(?=b) / ab -> 0-1:a;
+26 a(?!b) / ac -> 0-1:a;
+27 \x41\x{42} / AB -> 0-2:AB;
+28 \u0041 / A -> 0-1:A;
+29 (a)(b)(c) / abc -> 0-3:abc|a|b|c;
+30 a++ / aaa -> 0-3:aaa;
+31 [a-z&&[^aeiou]]+ / hello -> 0-1:h;2-4:ll;
+32 (?i)[a-z]+ / HeLLo -> 0-5:HeLLo;
+33  / abc -> 0-0:;1-1:;2-2:;3-3:;
+34 (a)?b / b -> 0-1:b|null;
+35 (?i)AB / xaby -> 1-3:ab;
+36 (?i:AB)C / abC -> 0-3:abC;
+37 a(?i)bc|d / d -> 0-1:d;
+38 (?s). / 
+ -> 0-1:
+;
+39 (?m)^x / a
+x -> 2-3:x;
+40 (?x) a  b / ab -> 0-2:ab;
+41 (?i)[^a] / A -> none
+42 (?i)a|b / B -> 0-1:B;
+43 [\p{L}&&[^a-z]] / 1Q -> 1-2:Q;
+44 [a-z&&[def]] / e -> 0-1:e;
+45 [a-z&&[^m-p]] / a -> 0-1:a;
+46 \Qa|b\E / a|b -> 0-3:a|b;
+47 \Qa\E\Qb\E / ab -> 0-2:ab;
+48 (a)(b)? / a -> 0-1:a|a|null;
+49 (?<year>\d{4})-(?<month>\d{2}) / 2024-11 -> 0-7:2024-11|2024|11;
+50 \1 / aa -> none
+51 (a)\1(b) / aab -> 0-3:aab|a|b;
+52 x* / yyy -> 0-0:;1-1:;2-2:;3-3:;
+53 x*? / yyy -> 0-0:;1-1:;2-2:;3-3:;
+54 a*+b / aaab -> 0-4:aaab;
+55 a{2,}+ / aaa -> 0-3:aaa;
+56 (?>ab|a)b / ab -> none
+57 (?:a|ab)c / abc -> 0-3:abc;
+58 a++b / aaab -> 0-4:aaab;
+59 \p{Upper}+ / ABc -> 0-2:AB;
+60 \p{javaLowerCase}+ / abC -> 0-2:ab;
+61 \b / ab -> 0-0:;2-2:;
+62 \B / ab -> 1-1:;
+63 ^$ /  -> 0-0:;
+64 \A\z /  -> 0-0:;
+65 (|a) / a -> 0-0:|;1-1:|;
+66 (a|) / a -> 0-1:a|a;1-1:|;
+total=66

@@ -1,0 +1,60 @@
+name = demo
+version = 1.10
+count = 3
+empty = null
+nulls = null
+quoted = a	b
+single = it's
+nested.child.deep = 42
+flowmap.b = two
+enabled = true
+folded = [one two\nthree\n]
+literal = [line1\nline2\n]
+sequence = 2
+sameindent = 2
+flow = 3
+objects = 2
+  one/1
+  two/2
+emit:
+name: demo
+version: 1.10
+count: 3
+enabled: "true"
+empty: null
+nulls: null
+nested:
+  child:
+    deep: 42
+sequence:
+  - alpha
+  - beta
+sameindent:
+  - x
+  - y
+quoted: "a\tb"
+single: "it's"
+folded: "one two\nthree\n"
+literal: "line1\nline2\n"
+flow:
+  - 1
+  - 2
+  - 3
+flowmap:
+  a: 1
+  b: two
+objects:
+  - name: one
+    id: 1
+  - name: two
+    id: 2
+
+again.name = demo
+again.count = 3
+again.objects = 2
+again.literal = [line1\nline2\n]
+refused: anchors (&name) are not supported: resolving one needs a document-wide graph at line 1
+refused: aliases (*name) are not supported: resolving one needs a document-wide graph at line 2
+refused: explicit tags (!tag) are not supported at line 1
+refused: unclosed flow sequence at line 1
+refused: unexpected indentation at line 2

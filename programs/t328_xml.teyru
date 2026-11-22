@@ -1,0 +1,80 @@
+/* XML 1.0: the tree, the escapes, CDATA, comments, and the two refusals that
+   matter for a program reading files it did not write.
+
+   There is no .java.ref: the JDK's DOM API is a different shape (a
+   DocumentBuilderFactory and org.w3c.dom nodes), so a translated program would
+   be a different program. The expectation is this program's own output, and it
+   is pinned so that a change to the tree or the writer is a visible diff.
+
+   The refusal half is the security half: a DOCTYPE is refused by name because
+   an internal DTD can redefine entities (the XXE hole), and a mismatched end tag
+   is refused with its position. Both are printed with their message, so a
+   parser that started accepting them fails this file. */
+class XmlCase {
+  public static void main(String[] a) {
+    StringBuilder db = new StringBuilder()
+    db.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+    db.append("<catalog owner=\"Ada &amp; Bob\" count=\"2\">\n")
+    db.append("  <book id=\"b1\" lang=\"en\">\n")
+    db.append("    <title>Dune &lt;1965&gt;</title>\n")
+    db.append("    <price currency=\"USD\">9.99</price>\n")
+    db.append("    <note><![CDATA[raw <markup> & ampersands]]></note>\n")
+    db.append("  </book>\n")
+    db.append("  <book id=\"b2\" lang=\"fr\">\n")
+    db.append("    <title>Les Mis&#233;rables</title>\n")
+    db.append("    <price currency=\"EUR\">12,50</price>\n")
+    db.append("    <!-- out of print -->\n")
+    db.append("  </book>\n")
+    db.append("  <empty/>\n")
+    db.append("</catalog>")
+    String doc = db.toString()
+    XmlDocument d = XmlDocument.parse(doc)
+    System.out.println("root=" + d.root.name + " version=" + d.version)
+    System.out.println("owner=" + d.root.getAttribute("owner"))
+    System.out.println("count=" + d.root.getAttribute("count"))
+    System.out.println("missing=" + d.root.getAttribute("nope", "(none)"))
+    List<XmlElement> books = d.root.elements("book")
+    System.out.println("books=" + books.size())
+    for (int i = 0 : i < books.size() : i++) {
+      XmlElement b = books.get(i)
+      System.out.println("  " + b.getAttribute("id") + "/" + b.getAttribute("lang")
+        + " title=[" + b.child("title").text() + "]"
+        + " price=" + b.child("price").text().trim()
+        + " " + b.child("price").getAttribute("currency"))
+    }
+    System.out.println("note=" + books.get(0).child("note").text())
+    /* The comment sits after the price and the newline that follows it, so it
+       is found by asking the children rather than by an index. */
+    XmlComment note = null
+    for (int i = 0 : i < books.get(1).children.size() : i++) {
+      if (books.get(1).children.get(i) instanceof XmlComment) {
+        note = (XmlComment) books.get(1).children.get(i)
+      }
+    }
+    System.out.println("comment=" + (note == null ? "(none)" : note.text))
+    System.out.println("empty children=" + d.root.child("empty").children.size())
+    System.out.println("deep=" + d.root.deepText().trim())
+
+    System.out.println("write-back:")
+    System.out.println(d.toXml())
+
+    XmlElement made = new XmlElement("greeting")
+    made.setAttribute("who", "you & me")
+    made.add(new XmlText("hello <world>", false))
+    System.out.println("built=" + made.toXml())
+
+    refused("<a><b></a>")
+    refused("<!DOCTYPE x [<!ENTITY e SYSTEM \"file:///etc/passwd\">]><x>&e;</x>")
+    refused("<a b=1/>")
+    refused("<a>&nope;</a>")
+  }
+
+  static void refused(String text) {
+    try {
+      XmlDocument.parse(text)
+      System.out.println("refused: NOT REFUSED: " + text)
+    } catch (XmlParseException e) {
+      System.out.println("refused: " + e.getMessage())
+    }
+  }
+}

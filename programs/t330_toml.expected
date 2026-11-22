@@ -1,0 +1,46 @@
+title = string:TOML Example
+literal = string:C:\Users\nodejs\templates
+multi = string:line one\nline "quoted"\ntwo
+multilit = string:raw \n here
+int = integer:42
+hex = integer:3735928559
+oct = integer:493
+bin = integer:13
+under = integer:1000000
+neg = integer:-17
+pi = float:3.1415
+exp = float:5.0E22
+big = float:Infinity
+notnum = float:NaN
+yes = boolean:true
+no = boolean:false
+when = offset-date-time:1979-05-27T07:32:00Z
+local = local-date-time:1979-05-27T07:32:00
+day = local-date:1979-05-27
+clock = local-time:07:32:00
+arr = array:[1, 2, 3]
+mixed = array:["a", 1, true]
+nested = array:[[1, 2], [3]]
+inline = table:x = 1\ny = "two"\n
+inline.x = integer:1
+owner.name = string:Tom
+owner.dob = offset-date-time:1979-05-27T07:32:00Z
+database.ports = array:[8001, 8001, 8002]
+database.enabled = boolean:true
+servers.alpha.ip = string:10.0.0.1
+servers.beta.ip = string:10.0.0.2
+products = 2
+  product[0] Hammer 738594937
+  product[1] Nail 284758393
+missing = absent
+emit.title = string=TOML Example
+emit.products = 2
+emit.hex = 3735928559
+emit.pi = 3.1415
+emit.mixed = array=["a", 1, true]
+emit.owner.name = string=Tom
+refused: duplicate key 'a' at line 2, column 6
+refused: [a] names a value, not a table at line 3, column 1
+refused: table [a] is defined twice at line 5, column 1
+refused: expected ',' or ']' in an array at line 2, column 1
+refused: unclosed string at line 1, column 14

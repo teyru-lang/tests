@@ -1,0 +1,66 @@
+import java.text.*
+import java.util.*
+
+/* The locale-carrying layers: the number/currency/percent formatters, the long
+   date pattern, the date symbols, the display names and tags, and the three
+   case-mapping locales.
+
+   This is the same program as t326_locale.java.ref, and the .expected beside it
+   is what OpenJDK 21.0.11+10 printed for that file with -Duser.timezone=UTC and
+   -Duser.language=en -- so every line is the reference implementation's answer
+   rather than this library's own. The data behind it (the number rows in
+   54_locale.teyru, the names in 55_datesymbols.teyru, the patterns in
+   60_localeformats.teyru) was read out of that same JDK, which is what makes a
+   stale name or a wrong NBSP a test failure instead of a surprise.
+
+   The default locale is not printed: it is the environment's. */
+class Loc {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v)
+  }
+
+  static void num(String tag, double v) {
+    Locale l = Locale.forLanguageTag(tag)
+    NumberFormat nf = NumberFormat.getInstance(l)
+    nf.setMaximumFractionDigits(3)
+    nf.setMinimumFractionDigits(2)
+    p("num." + tag, nf.format(v))
+    NumberFormat cf = NumberFormat.getCurrencyInstance(l)
+    p("cur." + tag, cf.format(v))
+    NumberFormat pf = NumberFormat.getPercentInstance(l)
+    p("pct." + tag, pf.format(0.256))
+  }
+
+  static void date(String tag, long ms) {
+    Locale l = Locale.forLanguageTag(tag)
+    DateFormat df = DateFormat.getDateInstance(DateFormat.LONG, l)
+    p("date." + tag, df.format(Instant.ofEpochMilli(ms)))
+  }
+
+  public static void main(String[] a) {
+    long ms = 1700000000000L
+    String[] tags = {"en", "en-US", "en-GB", "de", "de-DE", "fr", "fr-FR", "ja", "ja-JP",
+                     "zh-TW", "zh-CN", "ko", "it", "pt-BR", "es-ES", "ru"}
+    for (String t : tags) {
+      num(t, 1234567.891)
+    }
+    for (String t : tags) {
+      num(t, -42.5)
+    }
+    for (String t : tags) {
+      date(t, ms)
+    }
+    Locale def = Locale.getDefault()
+    p("disp.de-DE", Locale.GERMANY.getDisplayName(Locale.US))
+    p("disp.zh-TW", Locale.TAIWAN.getDisplayName(Locale.US))
+    p("tag.zh_TW", Locale.forLanguageTag("zh-TW").toLanguageTag())
+    p("tag.junk", Locale.forLanguageTag("xx-YY").toLanguageTag())
+    p("dateFormat.de", new SimpleDateFormat("d. MMMM y", Locale.GERMANY).format(Instant.ofEpochMilli(ms)))
+    p("dateFormat.ja", new SimpleDateFormat("yyyy年M月d日", Locale.JAPAN).format(Instant.ofEpochMilli(ms)))
+    p("upper.tr", "istanbul".toUpperCase(Locale.forLanguageTag("tr")))
+    p("lower.tr", "ISTANBUL".toLowerCase(Locale.forLanguageTag("tr")))
+    p("upper.root", "straße".toUpperCase(Locale.ROOT))
+    p("months.de", DateFormatSymbols.getInstance(Locale.GERMANY).getMonths()[10])
+    p("months.ja", DateFormatSymbols.getInstance(Locale.JAPAN).getMonths()[0])
+  }
+}

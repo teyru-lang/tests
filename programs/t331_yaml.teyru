@@ -1,0 +1,98 @@
+/* YAML 1.2: the block-and-flow subset a config file uses, plus the refusals
+   that make "not implemented" visible instead of silently different.
+
+   YAML has no parser in the JDK either, so there is no .java.ref and the
+   expectation is this program's own output: the value lines are what the
+   parser must answer, the "emit" section is the writer's inverse (emit, reparse,
+   ask the same questions), and the refusals are the constructs the reader names
+   rather than guesses at.
+
+   Everything printed is deliberately a scalar's text or a collection's shape; a
+   YAML *parser* answers what the file says, and turning "1.10" into a float is a
+   typing decision the caller makes. */
+class YamlCase {
+  public static void main(String[] a) {
+    StringBuilder db = new StringBuilder()
+    db.append("# a comment\n")
+    db.append("---\n")
+    db.append("name: demo\n")
+    db.append("version: '1.10'\n")
+    db.append("count: 3\n")
+    db.append("enabled: true\n")
+    db.append("empty:\n")
+    db.append("nulls: ~\n")
+    db.append("nested:\n")
+    db.append("  child:\n")
+    db.append("    deep: 42\n")
+    db.append("sequence:\n")
+    db.append("  - alpha\n")
+    db.append("  - beta\n")
+    db.append("sameindent:\n")
+    db.append("- x\n")
+    db.append("- y\n")
+    db.append("quoted: \"a\\tb\"\n")
+    db.append("single: 'it''s'\n")
+    db.append("folded: >\n")
+    db.append("  one\n")
+    db.append("  two\n")
+    db.append("\n")
+    db.append("  three\n")
+    db.append("literal: |\n")
+    db.append("  line1\n")
+    db.append("  line2\n")
+    db.append("flow: [1, 2, 3]\n")
+    db.append("flowmap: {a: 1, b: \"two\"}\n")
+    db.append("objects:\n")
+    db.append("  - name: one\n")
+    db.append("    id: 1\n")
+    db.append("  - name: two\n")
+    db.append("    id: 2\n")
+    db.append("...\n")
+    YamlDocument d = YamlDocument.parse(db.toString())
+    String[] scalars = {
+      "name", "version", "count", "empty", "nulls", "quoted", "single",
+      "nested.child.deep", "flowmap.b"
+    }
+    for (int i = 0 : i < scalars.length : i++) {
+      System.out.println(scalars[i] + " = " + d.describe(scalars[i]))
+    }
+    System.out.println("enabled = " + d.getBoolean("enabled", false))
+    System.out.println("folded = [" + d.getString("folded", "?").replace("\n", "\\n") + "]")
+    System.out.println("literal = [" + d.getString("literal", "?").replace("\n", "\\n") + "]")
+    System.out.println("sequence = " + d.getSequence("sequence").size())
+    System.out.println("sameindent = " + d.getSequence("sameindent").size())
+    System.out.println("flow = " + d.getSequence("flow").size())
+    YamlSequence objs = d.getSequence("objects")
+    System.out.println("objects = " + objs.size())
+    for (int i = 0 : i < objs.size() : i++) {
+      YamlMapping m = (YamlMapping) objs.get(i)
+      System.out.println("  " + ((YamlScalar) m.get("name")).value
+        + "/" + ((YamlScalar) m.get("id")).value)
+    }
+
+    /* The writer's inverse. */
+    System.out.println("emit:")
+    String emitted = d.toYaml()
+    System.out.println(emitted)
+    YamlDocument again = YamlDocument.parse(emitted)
+    System.out.println("again.name = " + again.describe("name"))
+    System.out.println("again.count = " + again.getLong("count", -1))
+    System.out.println("again.objects = " + again.getSequence("objects").size())
+    System.out.println("again.literal = [" + again.getString("literal", "?").replace("\n", "\\n") + "]")
+
+    refused("a: &anchor 1\nb: *anchor\n")
+    refused("a: 1\nb: *missing\n")
+    refused("a: !!str 1\n")
+    refused("a: [1, 2\n")
+    refused("a: 1\n  b: 2\n")
+  }
+
+  static void refused(String text) {
+    try {
+      YamlDocument.parse(text)
+      System.out.println("refused: NOT REFUSED: " + text.replace("\n", "\\n"))
+    } catch (YamlParseException e) {
+      System.out.println("refused: " + e.getMessage())
+    }
+  }
+}

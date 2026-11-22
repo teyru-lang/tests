@@ -1,0 +1,38 @@
+root=catalog version=1.0
+owner=Ada & Bob
+count=2
+missing=(none)
+books=2
+  b1/en title=[Dune <1965>] price=9.99 USD
+  b2/fr title=[Les Misérables] price=12,50 EUR
+note=raw <markup> & ampersands
+comment= out of print 
+empty children=0
+deep=Dune <1965>
+    9.99
+    raw <markup> & ampersands
+  
+  
+    Les Misérables
+    12,50
+write-back:
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog owner="Ada &amp; Bob" count="2">
+  <book id="b1" lang="en">
+    <title>Dune &lt;1965&gt;</title>
+    <price currency="USD">9.99</price>
+    <note><![CDATA[raw <markup> & ampersands]]></note>
+  </book>
+  <book id="b2" lang="fr">
+    <title>Les Misérables</title>
+    <price currency="EUR">12,50</price>
+    <!-- out of print -->
+  </book>
+  <empty/>
+</catalog>
+
+built=<greeting who="you &amp; me">hello &lt;world&gt;</greeting>
+refused: end tag </a> does not match <b> at line 1, column 11
+refused: a DOCTYPE is not supported: this parser does not expand entities, which is what keeps an external entity from reading a local file at line 1, column 1
+refused: expected a quoted value at line 1, column 6
+refused: unknown entity &nope; (a DTD is not read, so only the five predefined entities exist) at line 1, column 10

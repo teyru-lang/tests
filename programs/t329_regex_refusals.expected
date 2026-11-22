@@ -1,0 +1,13 @@
+[[:alpha:]] -> POSIX bracket classes are not supported near index 1
+\Gabc -> \G is not supported near index 0
+\R -> \R is not supported near index 0
+\X -> \X is not supported near index 0
+\h -> \h is not supported near index 0
+\v -> \v is not supported near index 0
+\0abc -> octal escapes are not supported near index 0
+(?<n>a)|(?<n>b) -> named capturing group <n> is already defined near index 8
+(?<n>a)\k<n2> -> named capturing group <n2> does not exist near index 0
+\p{Script=Greek} -> Unknown character property name {Script=Greek} near index 3
+\p{InGreek} -> Unknown character property name {InGreek} near index 3
+\p{Alpha} -> #1#
+(?#comment) -> Unknown inline modifier near index 2

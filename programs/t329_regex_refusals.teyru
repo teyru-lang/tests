@@ -1,0 +1,38 @@
+import java.util.regex.*
+
+/* The patterns this engine still refuses, each with the message it refuses with.
+   Kept apart from t325_regex_advanced because that program's expectation is the
+   JDK's output and this one's is a refusal: a construct that Java accepts is
+   named here rather than matched as something else, which is the rule the whole
+   standard library follows.
+
+   Every line below is "PATTERN -> first line of getMessage". A pattern that
+   starts matching instead of refusing will fail this file even if the match is
+   correct, because the point is the refusal being deliberate. */
+class RegexRefusals {
+  static void refused(String pat) {
+    try {
+      Pattern.compile(pat)
+      System.out.println(pat + " -> MATCHED (should have been refused)")
+    } catch (PatternSyntaxException e) {
+      System.out.println(pat + " -> " + e.getMessage().split("\n")[0])
+    }
+  }
+
+  public static void main(String[] a) {
+    refused("[[:alpha:]]")
+    refused("\\Gabc")
+    refused("\\R")
+    refused("\\X")
+    refused("\\h")
+    refused("\\v")
+    refused("\\0abc")
+    refused("(?<n>a)|(?<n>b)")
+    refused("(?<n>a)\\k<n2>")
+    refused("\\p{Script=Greek}")
+    refused("\\p{InGreek}")
+    /* \p{Alpha} is implemented and matches, so it is asserted the other way. */
+    System.out.println("\\p{Alpha} -> " + Pattern.compile("\\p{Alpha}+").matcher("a1B").replaceAll("#"))
+    refused("(?#comment)")
+  }
+}

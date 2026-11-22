@@ -1,0 +1,80 @@
+// The Java this case was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t327_csv.java.ref /tmp/Csv.java
+//   javac -d /tmp/out /tmp/Csv.java
+//   java -cp /tmp/out Csv
+//
+// Java's standard library has no CSV reader, so the reference here is a small
+// hand-written one carrying the same RFC 4180 rules. That is the point: the
+// expected rows come from a second implementation of the spec, not from the
+// library under test. The writer half of the Teyru program has no Java
+// counterpart and prints its own round-trip result.
+
+import java.io.*;
+import java.util.*;
+
+class Csv {
+  static List<String[]> parse(String text) {
+    List<String[]> rows = new ArrayList<>();
+    int i = 0;
+    int n = text.length();
+    String[] cur = new String[64];
+    int nf = 0;
+    while (i < n) {
+      String[] rec = new String[64];
+      int f = 0;
+      StringBuilder sb = new StringBuilder();
+      boolean quoted = false;
+      boolean any = false;
+      while (i < n) {
+        char c = text.charAt(i);
+        if (quoted) {
+          if (c == '"') {
+            if (i + 1 < n && text.charAt(i + 1) == '"') { sb.append('"'); i += 2; continue; }
+            quoted = false; i++; continue;
+          }
+          sb.append(c); i++; any = true; continue;
+        }
+        if (c == '"' && sb.length() == 0) { quoted = true; i++; any = true; continue; }
+        if (c == ',') { rec[f++] = sb.toString(); sb.setLength(0); any = true; i++; continue; }
+        if (c == '\r') { if (i + 1 < n && text.charAt(i + 1) == '\n') i++; i++; break; }
+        if (c == '\n') { i++; break; }
+        sb.append(c); i++; any = true;
+      }
+      if (!any && i >= n && f == 0) break;
+      rec[f++] = sb.toString();
+      String[] r = new String[f];
+      System.arraycopy(rec, 0, r, 0, f);
+      rows.add(r);
+    }
+    return rows;
+  }
+
+  public static void main(String[] a) {
+    String[] docs = {
+      "a,b,c\n1,2,3\n",
+      "name,quote\nAda,\"said \"\"hi\"\", then left\"\n",
+      "\"multi\nline\",x\n",
+      "a,\"\",c\n",
+      "one\n",
+      "",
+      "a,b\r\nc,d\r\n",
+      "\"a\",\"b\"\n",
+      " leading,trailing \n",
+      "x,\"y,z\",w\n"
+    };
+    for (int d = 0; d < docs.length; d++) {
+      List<String[]> rows = parse(docs[d]);
+      System.out.println("doc" + d + " rows=" + rows.size());
+      for (String[] r : rows) {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < r.length; i++) {
+          if (i > 0) b.append('|');
+          b.append('[').append(r[i].replace("\n", "\\n").replace("\r", "\\r")).append(']');
+        }
+        System.out.println("  " + r.length + " " + b);
+      }
+    }
+  }
+}

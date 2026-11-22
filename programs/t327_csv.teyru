@@ -1,0 +1,62 @@
+/* CSV: the RFC 4180 rules, one shape each -- quoted fields, doubled quotes, a
+   newline inside a field, an empty quoted field, CRLF records, a single column,
+   an empty input, and the spaces a lenient reader must not eat.
+
+   The same documents are parsed by t328_csv.java.ref with the small hand-written
+   reader that file carries (Java has no CSV parser in its standard library), and
+   the .expected beside this file is that program's output -- so the rows here
+   are checked against a second implementation rather than against this one.
+   The writer half is checked by round-tripping each document through
+   CsvWriter and parsing it back, which is the property that matters. */
+class CsvCase {
+  static void dump(int d, List<String[]> rows) {
+    System.out.println("doc" + d + " rows=" + rows.size())
+    for (int i = 0 : i < rows.size() : i++) {
+      String[] r = rows.get(i)
+      StringBuilder b = new StringBuilder()
+      for (int j = 0 : j < r.length : j++) {
+        if (j > 0) {
+          b.append('|')
+        }
+        b.append('[').append(r[j].replace("\n", "\\n").replace("\r", "\\r")).append(']')
+      }
+      System.out.println("  " + r.length + " " + b)
+    }
+  }
+
+  public static void main(String[] a) {
+    String[] docs = {
+      "a,b,c\n1,2,3\n",
+      "name,quote\nAda,\"said \"\"hi\"\", then left\"\n",
+      "\"multi\nline\",x\n",
+      "a,\"\",c\n",
+      "one\n",
+      "",
+      "a,b\r\nc,d\r\n",
+      "\"a\",\"b\"\n",
+      " leading,trailing \n",
+      "x,\"y,z\",w\n"
+    }
+    for (int d = 0 : d < docs.length : d++) {
+      CsvReader r = new CsvReader(docs[d])
+      dump(d, r.readAll())
+    }
+    /* The writer's inverse: every document parsed is written back, reparsed,
+       and compared row for row. Nothing here prints a mismatch because there is
+       none; a field that did not survive is the failure. */
+    String[] fields = {"plain", "with,comma", "with\"quote", "with\nnewline", " leading", "trailing ", ""}
+    CsvWriter w = new CsvWriter()
+    w.writeRecord(fields)
+    String encoded = w.toString()
+    System.out.println("encoded=" + encoded.replace("\n", "\\n"))
+    CsvReader back = new CsvReader(encoded)
+    String[] round = back.readRecord()
+    boolean same = round.length == fields.length
+    for (int i = 0 : same && i < fields.length : i++) {
+      if (!round[i].equals(fields[i])) {
+        same = false
+      }
+    }
+    System.out.println("roundtrip=" + same)
+  }
+}

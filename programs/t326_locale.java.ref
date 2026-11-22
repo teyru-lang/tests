@@ -1,0 +1,62 @@
+// The Java this case was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t326_locale.java.ref /tmp/Loc.java
+//   javac -d /tmp/out /tmp/Loc.java
+//   java -Duser.timezone=UTC -Duser.language=en -Duser.country=US -cp /tmp/out Loc
+//
+// The default locale is deliberately not printed: it is the environment's,
+// and the Teyru program does not print it either.
+
+import java.text.*;
+import java.util.*;
+
+class Loc {
+  static void p(String k, Object v) {
+    System.out.println(k + " = " + v);
+  }
+
+  static void num(String tag, double v) {
+    Locale l = Locale.forLanguageTag(tag);
+    NumberFormat nf = NumberFormat.getInstance(l);
+    nf.setMaximumFractionDigits(3);
+    nf.setMinimumFractionDigits(2);
+    p("num." + tag, nf.format(v));
+    NumberFormat cf = NumberFormat.getCurrencyInstance(l);
+    p("cur." + tag, cf.format(v));
+    NumberFormat pf = NumberFormat.getPercentInstance(l);
+    p("pct." + tag, pf.format(0.256));
+  }
+
+  static void date(String tag, long ms) {
+    Locale l = Locale.forLanguageTag(tag);
+    DateFormat df = DateFormat.getDateInstance(DateFormat.LONG, l);
+    p("date." + tag, df.format(new Date(ms)));
+  }
+
+  public static void main(String[] a) {
+    long ms = 1700000000000L;
+    String[] tags = {"en", "en-US", "en-GB", "de", "de-DE", "fr", "fr-FR", "ja", "ja-JP",
+                     "zh-TW", "zh-CN", "ko", "it", "pt-BR", "es-ES", "ru"};
+    for (String t : tags) {
+      num(t, 1234567.891);
+    }
+    for (String t : tags) {
+      num(t, -42.5);
+    }
+    for (String t : tags) {
+      date(t, ms);
+    }
+    p("disp.de-DE", Locale.GERMANY.getDisplayName(Locale.US));
+    p("disp.zh-TW", Locale.TAIWAN.getDisplayName(Locale.US));
+    p("tag.zh_TW", Locale.forLanguageTag("zh-TW").toLanguageTag());
+    p("tag.junk", Locale.forLanguageTag("xx-YY").toLanguageTag());
+    p("dateFormat.de", new SimpleDateFormat("d. MMMM y", Locale.GERMANY).format(new Date(ms)));
+    p("dateFormat.ja", new SimpleDateFormat("yyyy\u5e74M\u6708d\u65e5", Locale.JAPAN).format(new Date(ms)));
+    p("upper.tr", "istanbul".toUpperCase(Locale.forLanguageTag("tr")));
+    p("lower.tr", "ISTANBUL".toLowerCase(Locale.forLanguageTag("tr")));
+    p("upper.root", "stra\u00dfe".toUpperCase(Locale.ROOT));
+    p("months.de", DateFormatSymbols.getInstance(Locale.GERMANY).getMonths()[10]);
+    p("months.ja", DateFormatSymbols.getInstance(Locale.JAPAN).getMonths()[0]);
+  }
+}
