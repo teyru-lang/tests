@@ -1,0 +1,37 @@
+// The Java this case was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t332_base64.java.ref /tmp/B64.java
+//   javac -d /tmp/out /tmp/B64.java
+//   java -cp /tmp/out B64
+
+import java.util.*;
+
+class B64 {
+  public static void main(String[] a) {
+    String[] texts = {"", "f", "fo", "foo", "foob", "fooba", "foobar", "hello world", "\u4e2d\u6587"};
+    for (String t : texts) {
+      byte[] bytes = t.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+      String e = Base64.getEncoder().encodeToString(bytes);
+      String d = new String(Base64.getDecoder().decode(e), java.nio.charset.StandardCharsets.UTF_8);
+      System.out.println("[" + t + "] -> " + e + " -> [" + d + "]");
+    }
+    byte[] raw = {0, 1, 2, (byte) 250, (byte) 251, (byte) 252, (byte) 253, (byte) 254, (byte) 255};
+    String u = Base64.getUrlEncoder().encodeToString(raw);
+    System.out.println("url=" + u + " back=" + Base64.getEncoder().encodeToString(Base64.getUrlDecoder().decode(u)));
+    StringBuilder big = new StringBuilder();
+    for (int i = 0; i < 60; i++) big.append("0123456789");
+    String m = Base64.getMimeEncoder().encodeToString(big.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    System.out.println("mime-lines=" + m.split("\r\n").length + " decoded=" + Base64.getMimeDecoder().decode(m).length);
+    try {
+      Base64.getDecoder().decode("a$b=");
+    } catch (IllegalArgumentException e) {
+      System.out.println("refused=" + e.getMessage());
+    }
+    try {
+      Base64.getDecoder().decode("abcde");
+    } catch (IllegalArgumentException e) {
+      System.out.println("refused-tail=" + e.getMessage());
+    }
+  }
+}

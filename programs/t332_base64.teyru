@@ -1,0 +1,36 @@
+/* java.util.Base64, both directions. The vectors are RFC 4648's own test set
+   ("f", "fo", "foo", "foob", "fooba", "foobar") plus the three shapes the JDK
+   distinguishes: the basic alphabet, the URL-safe one, and the MIME encoder's
+   76-character lines. The same program is t332_base64.java.ref and the
+   .expected beside this file is what OpenJDK 21.0.11+10 printed for it,
+   including the two refusal messages, so the decoder's strictness is the
+   JDK's rather than this library's opinion. */
+class Base64Case {
+  public static void main(String[] a) {
+    String[] texts = { "", "f", "fo", "foo", "foob", "fooba", "foobar", "hello world", "中文" }
+    for (int i = 0 : i < texts.length : i++) {
+      String e = Base64.encodeToString(texts[i])
+      String d = new String(Base64.decode(e))
+      System.out.println("[" + texts[i] + "] -> " + e + " -> [" + d + "]")
+    }
+    byte[] raw = {(byte) 0, (byte) 1, (byte) 2, (byte) 250, (byte) 251, (byte) 252, (byte) 253, (byte) 254, (byte) 255 }
+    String u = Base64.encodeUrl(raw)
+    System.out.println("url=" + u + " back=" + Base64.encodeToString(Base64.decode(u)))
+    StringBuilder big = new StringBuilder()
+    for (int i = 0 : i < 60 : i++) {
+      big.append("0123456789")
+    }
+    String m = Base64.encodeMime(big.toString().getBytes())
+    System.out.println("mime-lines=" + m.split("\r\n").length + " decoded=" + Base64.decodeMime(m).length)
+    try {
+      Base64.decode("a$b=")
+    } catch (IllegalArgumentException e) {
+      System.out.println("refused=" + e.getMessage())
+    }
+    try {
+      Base64.decode("abcde")
+    } catch (IllegalArgumentException e) {
+      System.out.println("refused-tail=" + e.getMessage())
+    }
+  }
+}

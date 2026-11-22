@@ -1,0 +1,13 @@
+[] ->  -> []
+[f] -> Zg== -> [f]
+[fo] -> Zm8= -> [fo]
+[foo] -> Zm9v -> [foo]
+[foob] -> Zm9vYg== -> [foob]
+[fooba] -> Zm9vYmE= -> [fooba]
+[foobar] -> Zm9vYmFy -> [foobar]
+[hello world] -> aGVsbG8gd29ybGQ= -> [hello world]
+[中文] -> 5Lit5paH -> [中文]
+url=AAEC-vv8_f7_ back=AAEC+vv8/f7/
+mime-lines=11 decoded=600
+refused=Illegal base64 character 24
+refused-tail=Last unit does not have enough valid bits
