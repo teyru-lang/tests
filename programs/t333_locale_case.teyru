@@ -1,0 +1,47 @@
+import java.util.Locale
+
+/* The three locales whose case mapping is not the language's default, one
+   shape each. The JDK is the reference here (t333_locale_case.java.ref), and
+   the .expected beside this file is its output: Turkish and Azerbaijani turn I
+   into dotless ı and i into dotted İ, and Lithuanian keeps the dot above an
+   i or j that an accent follows, drops it in upper case, and decomposes Ì/Í/Ĩ
+   into i + dot + accent. */
+class LocaleCase {
+  static String esc(String s) {
+    StringBuilder b = new StringBuilder()
+    for (int i = 0 : i < s.length() : i++) {
+      char c = s.charAt(i)
+      if (c < 0x20 || c > 0x7e) {
+        b.append("\\u")
+        String h = Integer.toHexString((int) c)
+        for (int k = h.length() : k < 4 : k++) {
+          b.append('0')
+        }
+        b.append(h)
+      } else {
+        b.append(c)
+      }
+    }
+    return b.toString()
+  }
+
+  public static void main(String[] a) {
+    Locale lt = Locale.forLanguageTag("lt")
+    Locale tr = Locale.forLanguageTag("tr")
+    Locale az = Locale.forLanguageTag("az")
+    String[] ltIns = { "i", "I", "i\u0307", "j\u0307", "\u012e", "\u012f", "\u00cc", "\u00cd", "\u0128", "\u0129", "istanbul", "ISTANBUL", "I\u0307" }
+    for (int i = 0 : i < ltIns.length : i++) {
+      String s = ltIns[i]
+      System.out.println("lt up[" + esc(s) + "]=" + esc(s.toUpperCase(lt)) + " low[" + esc(s) + "]=" + esc(s.toLowerCase(lt)))
+    }
+    String[] trIns = { "i", "I", "\u0130", "\u0131" }
+    for (int i = 0 : i < trIns.length : i++) {
+      String s = trIns[i]
+      System.out.println("tr up[" + esc(s) + "]=" + esc(s.toUpperCase(tr)) + " low[" + esc(s) + "]=" + esc(s.toLowerCase(tr)))
+    }
+    for (int i = 0 : i < trIns.length : i++) {
+      String s = trIns[i]
+      System.out.println("az up[" + esc(s) + "]=" + esc(s.toUpperCase(az)) + " low[" + esc(s) + "]=" + esc(s.toLowerCase(az)))
+    }
+  }
+}

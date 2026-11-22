@@ -1,0 +1,20 @@
+// The Java this case was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t333_locale_case.java.ref /tmp/Lt.java
+//   javac -d /tmp/out /tmp/Lt.java
+//   java -cp /tmp/out Lt
+
+import java.util.*;
+class Lt { public static void main(String[] a){
+ Locale lt=Locale.forLanguageTag("lt");
+ Locale tr=Locale.forLanguageTag("tr");
+ Locale az=Locale.forLanguageTag("az");
+ String[] ins={"i","I","i\u0307","j\u0307","\u012e","\u012f","\u00cc","\u00cd","\u0128","\u0129","istanbul","ISTANBUL","I\u0307"};
+ for(String s:ins) System.out.println("lt up["+esc(s)+"]="+esc(s.toUpperCase(lt))+" low["+esc(s)+"]="+esc(s.toLowerCase(lt)));
+ String[] ti={"i","I","\u0130","\u0131"};
+ for(String s:ti) System.out.println("tr up["+esc(s)+"]="+esc(s.toUpperCase(tr))+" low["+esc(s)+"]="+esc(s.toLowerCase(tr)));
+ for(String s:ti) System.out.println("az up["+esc(s)+"]="+esc(s.toUpperCase(az))+" low["+esc(s)+"]="+esc(s.toLowerCase(az)));
+ }
+ static String esc(String s){StringBuilder b=new StringBuilder();for(char c:s.toCharArray()){if(c<0x20||c>0x7e)b.append(String.format("\\u%04x",(int)c));else b.append(c);}return b.toString();}
+}
