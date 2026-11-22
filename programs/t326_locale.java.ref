@@ -56,6 +56,9 @@ class Loc {
     p("upper.tr", "istanbul".toUpperCase(Locale.forLanguageTag("tr")));
     p("lower.tr", "ISTANBUL".toLowerCase(Locale.forLanguageTag("tr")));
     p("upper.root", "stra\u00dfe".toUpperCase(Locale.ROOT));
+    p("time.de", DateFormat.getTimeInstance(DateFormat.MEDIUM, Locale.GERMANY).format(new Date(ms)));
+    p("time.en", DateFormat.getTimeInstance(DateFormat.MEDIUM, Locale.US).format(new Date(ms)));
+    p("time.ja", DateFormat.getTimeInstance(DateFormat.SHORT, Locale.JAPAN).format(new Date(ms)));
     p("months.de", DateFormatSymbols.getInstance(Locale.GERMANY).getMonths()[10]);
     p("months.ja", DateFormatSymbols.getInstance(Locale.JAPAN).getMonths()[0]);
   }

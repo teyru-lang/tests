@@ -39,8 +39,8 @@ class Loc {
 
   public static void main(String[] a) {
     long ms = 1700000000000L
-    String[] tags = {"en", "en-US", "en-GB", "de", "de-DE", "fr", "fr-FR", "ja", "ja-JP",
-                     "zh-TW", "zh-CN", "ko", "it", "pt-BR", "es-ES", "ru"}
+    String[] tags = { "en", "en-US", "en-GB", "de", "de-DE", "fr", "fr-FR", "ja", "ja-JP",
+      "zh-TW", "zh-CN", "ko", "it", "pt-BR", "es-ES", "ru" }
     for (String t : tags) {
       num(t, 1234567.891)
     }
@@ -60,6 +60,9 @@ class Loc {
     p("upper.tr", "istanbul".toUpperCase(Locale.forLanguageTag("tr")))
     p("lower.tr", "ISTANBUL".toLowerCase(Locale.forLanguageTag("tr")))
     p("upper.root", "straße".toUpperCase(Locale.ROOT))
+    p("time.de", DateFormat.getTimeInstance(DateFormat.MEDIUM, Locale.GERMANY).format(Instant.ofEpochMilli(ms)))
+    p("time.en", DateFormat.getTimeInstance(DateFormat.MEDIUM, Locale.US).format(Instant.ofEpochMilli(ms)))
+    p("time.ja", DateFormat.getTimeInstance(DateFormat.SHORT, Locale.JAPAN).format(Instant.ofEpochMilli(ms)))
     p("months.de", DateFormatSymbols.getInstance(Locale.GERMANY).getMonths()[10])
     p("months.ja", DateFormatSymbols.getInstance(Locale.JAPAN).getMonths()[0])
   }
