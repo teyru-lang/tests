@@ -104,6 +104,27 @@ class TomlCase {
     refused("[a]\nb = 1\n\n[a]\nc = 2\n")
     refused("a = [1, 2\n")
     refused("a = \"unclosed\n")
+
+    /* TOML's redefinition rules, the ones that separate it from JSON's
+       last-one-wins. Every decision below agrees with Python's tomllib, which
+       is the reference used to derive them; the messages are this library's. */
+    refused("a.b = 1\n[a]\nc = 2\n") /* a was created by a dotted key */
+    refused("[a]\nb=1\n[a]\nc=2\n") /* the same table twice */
+    refused("[[a]]\nb=1\n[a]\nc=2\n") /* [a] after [[a]] */
+    refused("a = {b=1}\n[a.c]\nd=1\n") /* extending an inline table */
+    refused("a=1\n[a]\nb=2\n") /* a scalar is not a table */
+    refused("a.b=1\na.b=2\n") /* the same key twice */
+    accepted("header-then-dotted", "[a]\nb.c = 1\n")
+    accepted("implicit-parent", "[a.b]\nc=1\n[a]\nd=2\n")
+  }
+
+  static void accepted(String name, String text) {
+    try {
+      TomlDocument.parse(text)
+      System.out.println("accepted: " + name)
+    } catch (TomlParseException e) {
+      System.out.println("accepted: " + name + " WAS REFUSED: " + e.getMessage())
+    }
   }
 
   static void refused(String text) {
