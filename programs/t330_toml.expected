@@ -51,4 +51,7 @@ refused: [a.c] reaches into the inline table a at line 2, column 1
 refused: [a] names a value, not a table at line 2, column 4
 refused: duplicate key 'b' at line 2, column 6
 accepted: header-then-dotted
+accepted: inline-dotted
+accepted: space-datetime
+accepted: signed-nan
 accepted: implicit-parent

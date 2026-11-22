@@ -115,6 +115,9 @@ class TomlCase {
     refused("a=1\n[a]\nb=2\n") /* a scalar is not a table */
     refused("a.b=1\na.b=2\n") /* the same key twice */
     accepted("header-then-dotted", "[a]\nb.c = 1\n")
+    accepted("inline-dotted", "a = {b.c = 1}\n")
+    accepted("space-datetime", "a = 1979-05-27 07:32:00\n")
+    accepted("signed-nan", "a = -nan\n")
     accepted("implicit-parent", "[a.b]\nc=1\n[a]\nd=2\n")
   }
 
