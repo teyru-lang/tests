@@ -80,11 +80,23 @@ class YamlCase {
     System.out.println("again.objects = " + again.getSequence("objects").size())
     System.out.println("again.literal = [" + again.getString("literal", "?").replace("\n", "\\n") + "]")
 
+    /* A document that is a bare scalar or a flow collection is legal YAML and
+       was an error here until the corpus test below found it. */
+    System.out.println("bare=" + describeRoot(YamlDocument.parse("45")))
+    System.out.println("bareword=" + describeRoot(YamlDocument.parse("hello")))
+    System.out.println("bareflow=" + describeRoot(YamlDocument.parse("[1, 2]")))
+
     refused("a: &anchor 1\nb: *anchor\n")
     refused("a: 1\nb: *missing\n")
     refused("a: !!str 1\n")
     refused("a: [1, 2\n")
     refused("a: 1\n  b: 2\n")
+  }
+
+  /* describe("") walks no segments and answers the root, which is the only way
+     to ask a document what its whole value is. */
+  static String describeRoot(YamlDocument doc) {
+    return doc.describe("")
   }
 
   static void refused(String text) {

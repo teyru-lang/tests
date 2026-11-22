@@ -53,6 +53,9 @@ again.name = demo
 again.count = 3
 again.objects = 2
 again.literal = [line1\nline2\n]
+bare=45
+bareword=hello
+bareflow=sequence
 refused: anchors (&name) are not supported: resolving one needs a document-wide graph at line 1
 refused: aliases (*name) are not supported: resolving one needs a document-wide graph at line 2
 refused: explicit tags (!tag) are not supported at line 1
