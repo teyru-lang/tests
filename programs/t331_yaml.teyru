@@ -89,6 +89,11 @@ class YamlCase {
     refused("a: &anchor 1\nb: *anchor\n")
     refused("a: 1\nb: *missing\n")
     refused("a: !!str 1\n")
+    /* A plain scalar runs on over deeper lines: "hello" + "world". */
+    System.out.println("continued=" + YamlDocument.parse("a: hello\n  world\n").getString("a", "?"))
+    YamlSequence contSeq = (YamlSequence) YamlDocument.parse("- one\n  two\n").root
+    System.out.println("continuedSeq=" + ((YamlScalar) contSeq.get(0)).value)
+
     refused("a: [1, 2\n")
     refused("a: 1\n  b: 2\n")
   }
