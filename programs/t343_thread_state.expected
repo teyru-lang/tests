@@ -5,3 +5,7 @@ blocked=true
 afterBlocked=TERMINATED
 waiting=true
 afterWaiting=TERMINATED
+default=5 consts=1,5,10
+set=10
+inherit=5
+bad=iae

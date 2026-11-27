@@ -61,5 +61,12 @@ class ThreadStates {
     synchronized (mon) { mon.notifyAll(); }
     wt.join();
     System.out.println("afterWaiting=" + wt.getState());
+    Thread p = new Thread(() -> {});
+    System.out.println("default=" + p.getPriority() + " consts=" + Thread.MIN_PRIORITY + "," + Thread.NORM_PRIORITY + "," + Thread.MAX_PRIORITY);
+    p.setPriority(Thread.MAX_PRIORITY);
+    System.out.println("set=" + p.getPriority());
+    Thread child = new Thread(() -> {}, "child");
+    System.out.println("inherit=" + child.getPriority());
+    try { p.setPriority(11); } catch (IllegalArgumentException e) { System.out.println("bad=iae"); }
   }
 }
