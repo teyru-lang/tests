@@ -1,0 +1,10 @@
+exc=7
+join=boom
+get=boom
+compose=6
+sink=5
+readCount0=0 write=false
+readHolds=2 readCount=2
+writeHolds=2 write=true byMe=true
+free=false read=0
+exchange=true

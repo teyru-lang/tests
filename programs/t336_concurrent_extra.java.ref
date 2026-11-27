@@ -1,0 +1,72 @@
+// The Java this case was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t336_concurrent_extra.java.ref /tmp/ConcurrentExtra.java
+//   javac -d /tmp/out /tmp/ConcurrentExtra.java
+//   java -cp /tmp/out ConcurrentExtra
+
+import java.util.concurrent.*;
+import java.util.concurrent.locks.*;
+
+class ConcurrentExtra {
+  public static void main(String[] a) {
+    CompletableFuture<Integer> bad = CompletableFuture.<Integer>failedFuture(new RuntimeException("boom"));
+    CompletableFuture<Integer> handled = bad.exceptionally(e -> 7);
+    System.out.println("exc=" + handled.join());
+    try {
+      bad.join();
+    } catch (CompletionException e) {
+      System.out.println("join=" + e.getCause().getMessage());
+    }
+    try {
+      bad.get();
+    } catch (ExecutionException e) {
+      System.out.println("get=" + e.getCause().getMessage());
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+    System.out.println("compose=" + CompletableFuture.completedFuture(3).thenCompose(x -> CompletableFuture.completedFuture(x * 2)).join());
+    final int[] sink = new int[1];
+    CompletableFuture.completedFuture(5).thenAccept(x -> sink[0] = x).thenRun(() -> System.out.println("sink=" + sink[0])).join();
+
+    ReentrantReadWriteLock rw = new ReentrantReadWriteLock();
+    System.out.println("readCount0=" + rw.getReadLockCount() + " write=" + rw.isWriteLocked());
+    rw.readLock().lock();
+    rw.readLock().lock();
+    System.out.println("readHolds=" + rw.getReadHoldCount() + " readCount=" + rw.getReadLockCount());
+    rw.readLock().unlock();
+    rw.readLock().unlock();
+    rw.writeLock().lock();
+    rw.writeLock().lock();
+    System.out.println("writeHolds=" + rw.getWriteHoldCount() + " write=" + rw.isWriteLocked() + " byMe=" + rw.isWriteLockedByCurrentThread());
+    rw.writeLock().unlock();
+    rw.writeLock().unlock();
+    System.out.println("free=" + rw.isWriteLocked() + " read=" + rw.getReadLockCount());
+
+    Exchanger<String> ex = new Exchanger<String>();
+    String[] got = new String[2];
+    Thread t1 = new Thread(() -> {
+      try {
+        got[0] = ex.exchange("a");
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    });
+    Thread t2 = new Thread(() -> {
+      try {
+        got[1] = ex.exchange("b");
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    });
+    t1.start();
+    t2.start();
+    try {
+      t1.join();
+      t2.join();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+    System.out.println("exchange=" + (got[0] + got[1]).equals("ba"));
+  }
+}

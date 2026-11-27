@@ -1,0 +1,65 @@
+/* The future chain, the read/write lock and the exchanger, one shape each.
+
+   This is the same program as t336_concurrent_extra.java.ref, and the .expected
+   beside it is OpenJDK 21's output for that file -- so the composition rules
+   (a failed future carries its failure through thenApply, exceptionally turns it
+   back into a value, join wraps in CompletionException while get wraps in
+   ExecutionException), the lock's hold counts, and the exchange are the
+   reference implementation's answers rather than this library's.
+
+   Every wait is a join on a thread that has already been started, and the only
+   concurrent part (the exchanger) joins both threads before printing, so the
+   output is the same on every run. */
+import java.util.concurrent.*
+import java.util.concurrent.locks.*
+class ConcurrentExtra {
+  public static void main(String[] a) {
+    // failure propagation and get()
+    CompletableFuture<Integer> bad = CompletableFuture.<Integer> failedFuture(new RuntimeException("boom"))
+    CompletableFuture<Integer> handled = bad.exceptionally(e -> 7)
+    System.out.println("exc=" + handled.join())
+    try {
+      bad.join()
+    } catch (CompletionException e) {
+      System.out.println("join=" + e.getCause().getMessage())
+    }
+    try {
+      bad.get()
+    } catch (ExecutionException e) {
+      System.out.println("get=" + e.getCause().getMessage())
+    }
+    // thenCompose
+    System.out.println("compose=" + CompletableFuture.completedFuture(3).thenCompose(x -> CompletableFuture.completedFuture(x * 2)).join())
+    // thenRun / thenAccept chain
+    final int[] sink = new int[1]
+    CompletableFuture.completedFuture(5).thenAccept(x -> sink[0] = x).thenRun(() -> System.out.println("sink=" + sink[0])).join()
+    // read/write lock
+    ReentrantReadWriteLock rw = new ReentrantReadWriteLock()
+    System.out.println("readCount0=" + rw.getReadLockCount() + " write=" + rw.isWriteLocked())
+    rw.readLock().lock()
+    rw.readLock().lock()
+    System.out.println("readHolds=" + rw.getReadHoldCount() + " readCount=" + rw.getReadLockCount())
+    rw.readLock().unlock()
+    rw.readLock().unlock()
+    rw.writeLock().lock()
+    rw.writeLock().lock()
+    System.out.println("writeHolds=" + rw.getWriteHoldCount() + " write=" + rw.isWriteLocked() + " byMe=" + rw.isWriteLockedByCurrentThread())
+    rw.writeLock().unlock()
+    rw.writeLock().unlock()
+    System.out.println("free=" + rw.isWriteLocked() + " read=" + rw.getReadLockCount())
+    // exchanger
+    Exchanger<String> ex = new Exchanger<String>()
+    String[] got = new String[2]
+    Thread t1 = new Thread(() -> {
+      got[0] = ex.exchange("a")
+    })
+    Thread t2 = new Thread(() -> {
+      got[1] = ex.exchange("b")
+    })
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+    System.out.println("exchange=" + (got[0] + got[1]).equals("ba"))
+  }
+}
