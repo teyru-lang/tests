@@ -1,0 +1,7 @@
+new=NEW
+timed=true
+done=TERMINATED
+blocked=true
+afterBlocked=TERMINATED
+waiting=true
+afterWaiting=TERMINATED

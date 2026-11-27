@@ -1,0 +1,65 @@
+// The Java this case was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t343_thread_state.java.ref /tmp/ThreadStates.java
+//   javac -d /tmp/out /tmp/ThreadStates.java
+//   java -cp /tmp/out ThreadStates
+
+class ThreadStates {
+  static class Sleeper implements Runnable {
+    public void run() {
+      try {
+        Thread.sleep(300);
+      } catch (InterruptedException e) {
+      }
+    }
+  }
+
+  static boolean poll(Thread t, Thread.State want, int ms) {
+    long deadline = System.nanoTime() + ms * 1000000L;
+    while (System.nanoTime() < deadline) {
+      if (t.getState() == want) {
+        return true;
+      }
+      try {
+        Thread.sleep(1);
+      } catch (InterruptedException e) {
+      }
+    }
+    return false;
+  }
+
+  public static void main(String[] a) throws Exception {
+    Thread fresh = new Thread(new Sleeper());
+    System.out.println("new=" + fresh.getState());
+
+    Thread t = new Thread(new Sleeper());
+    t.start();
+    System.out.println("timed=" + poll(t, Thread.State.TIMED_WAITING, 2000));
+    t.join();
+    System.out.println("done=" + t.getState());
+
+    final Object lock = new Object();
+    final Thread[] holder = new Thread[1];
+    synchronized (lock) {
+      Thread w = new Thread(() -> { synchronized (lock) { } });
+      holder[0] = w;
+      w.start();
+      System.out.println("blocked=" + poll(w, Thread.State.BLOCKED, 2000));
+    }
+    holder[0].join();
+    System.out.println("afterBlocked=" + holder[0].getState());
+
+    final Object mon = new Object();
+    Thread wt = new Thread(() -> {
+      synchronized (mon) {
+        try { mon.wait(); } catch (InterruptedException e) { }
+      }
+    });
+    wt.start();
+    System.out.println("waiting=" + poll(wt, Thread.State.WAITING, 2000));
+    synchronized (mon) { mon.notifyAll(); }
+    wt.join();
+    System.out.println("afterWaiting=" + wt.getState());
+  }
+}
