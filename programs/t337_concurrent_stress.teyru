@@ -64,5 +64,53 @@ class ConcurrentStress {
     } catch (TimeoutException e) {
       System.out.println("timeout=yes")
     }
+    /* The edge cases a chain has to get right: a timed exchange that gave up
+       leaves the exchanger usable, the write-to-read downgrade is allowed, allOf
+       carries a failure, and anyOf takes the first of two already-complete
+       futures (the left one). */
+    final Exchanger<String> ex2 = new Exchanger<String>()
+    try {
+      ex2.exchange("first", 30)
+    } catch (TimeoutException e) {
+      System.out.println("timedOut=yes")
+    }
+    final String[] got2 = new String[2]
+    Thread u1 = new Thread(() -> {
+      try {
+        got2[0] = ex2.exchange("a")
+      } catch (TimeoutException e) {
+        got2[0] = "err"
+      }
+    })
+    Thread u2 = new Thread(() -> {
+      try {
+        got2[1] = ex2.exchange("b")
+      } catch (TimeoutException e) {
+        got2[1] = "err"
+      }
+    })
+    u1.start()
+    u2.start()
+    u1.join()
+    u2.join()
+    System.out.println("reused=" + (got2[0] + got2[1]).equals("ba"))
+
+    ReentrantReadWriteLock rw2 = new ReentrantReadWriteLock()
+    rw2.writeLock().lock()
+    rw2.readLock().lock()
+    System.out.println("downgrade=" + rw2.getReadHoldCount() + "," + rw2.getWriteHoldCount() + "," + rw2.isWriteLockedByCurrentThread())
+    rw2.readLock().unlock()
+    rw2.writeLock().unlock()
+    System.out.println("freeAgain=" + rw2.isWriteLocked() + "," + rw2.getReadLockCount())
+
+    CompletableFuture<Void> failedAll = CompletableFuture.allOf(CompletableFuture.completedFuture(1), CompletableFuture.<Integer> failedFuture(new RuntimeException("nope")))
+    try {
+      failedAll.join()
+    } catch (CompletionException e) {
+      System.out.println("allFailed=" + e.getCause().getMessage())
+    }
+    CompletableFuture<String> firstOne = CompletableFuture.completedFuture("first")
+    CompletableFuture<String> secondOne = CompletableFuture.completedFuture("second")
+    System.out.println("any=" + CompletableFuture.anyOf(firstOne, secondOne).join())
   }
 }

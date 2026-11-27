@@ -1,3 +1,9 @@
 total=2000
 sum=1275
 timeout=yes
+timedOut=yes
+reused=true
+downgrade=1,1,true
+freeAgain=false,0
+allFailed=nope
+any=first
