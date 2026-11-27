@@ -12,6 +12,8 @@ arriveAfter=-2147483648 await=-2147483648
 bulk=3 ph=0
 beforeLast phase=0 unarr=1
 afterLast phase=1 unarr=3
+unregistered=IllegalStateException
+zeroStill=false phase=0
 invokeAll=60 size=3
 invokeAny=fast
 allFailed=bad

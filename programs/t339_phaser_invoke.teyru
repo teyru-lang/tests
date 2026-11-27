@@ -79,6 +79,17 @@ class PhaserInvoke {
     b.arrive()
     System.out.println("afterLast phase=" + b.getPhase() + " unarr=" + b.getUnarrivedParties())
 
+    /* A phaser with no parties cannot be arrived at: Java throws
+       IllegalStateException, and a zero-party phaser is still not terminated. */
+    Phaser zero = new Phaser(0)
+    try {
+      zero.arrive()
+      System.out.println("unregistered=none")
+    } catch (IllegalStateException e) {
+      System.out.println("unregistered=" + e.getClass().getSimpleName())
+    }
+    System.out.println("zeroStill=" + zero.isTerminated() + " phase=" + zero.getPhase())
+
     ExecutorService pool = Executors.newFixedThreadPool(2)
     List<Callable<Integer>> tasks = new ArrayList<Callable<Integer>>()
     tasks.add(new N(10))
