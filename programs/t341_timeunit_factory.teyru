@@ -1,0 +1,39 @@
+/* TimeUnit and ThreadFactory.
+
+   TimeUnit's seven constants with the conversion arithmetic (2500ms is 2s,
+   2s is 2000ms, 3s in milliseconds is 3000), name(), and sleep(); a custom
+   ThreadFactory names the pool's one worker, and Executors.defaultThreadFactory()
+   produces Java's pool-N-thread-M shape. The .expected is OpenJDK 21's run of
+   the same program. */
+class TimeUnits {
+  static class Named implements ThreadFactory {
+    public Thread newThread(Runnable r) {
+      return new Thread(r, "worker-x")
+    }
+  }
+  static class Who implements Callable<String> {
+    public String call() {
+      return Thread.currentThread().getName()
+    }
+  }
+
+  public static void main(String[] a) {
+    ExecutorService one = Executors.newSingleThreadExecutor(new Named())
+    Future<String> f = one.submit(new Who())
+    System.out.println("name=" + f.get())
+    one.shutdown()
+    one.awaitTermination(5000L)
+    System.out.println("unit.msToS=" + TimeUnit.MILLISECONDS.toSeconds(2500L))
+    System.out.println("unit.sToMs=" + TimeUnit.SECONDS.toMillis(2L))
+    System.out.println("unit.sToNanos=" + TimeUnit.SECONDS.toNanos(1L))
+    System.out.println("unit.convert=" + TimeUnit.MILLISECONDS.convert(3L, TimeUnit.SECONDS))
+    System.out.println("unit.name=" + TimeUnit.MINUTES.name())
+    long start = System.nanoTime()
+    TimeUnit.MILLISECONDS.sleep(30)
+    long ms = (System.nanoTime() - start) / 1000000L
+    System.out.println("slept=" + TimeUnit.MILLISECONDS.toSeconds(ms))
+    ThreadFactory d = Executors.defaultThreadFactory()
+    Thread t = d.newThread(() -> {})
+    System.out.println("defaultNamed=" + (t.getName().startsWith("pool-")))
+  }
+}

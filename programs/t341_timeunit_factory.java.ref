@@ -1,0 +1,37 @@
+// The Java this case was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t341_timeunit_factory.java.ref /tmp/TimeUnits.java
+//   javac -d /tmp/out /tmp/TimeUnits.java
+//   java -cp /tmp/out TimeUnits
+
+import java.util.concurrent.*;
+
+class TimeUnits {
+  static class Named implements ThreadFactory {
+    public Thread newThread(Runnable r) { return new Thread(r, "worker-x"); }
+  }
+  static class Who implements Callable<String> {
+    public String call() { return Thread.currentThread().getName(); }
+  }
+
+  public static void main(String[] a) throws Exception {
+    ExecutorService one = Executors.newSingleThreadExecutor(new Named());
+    Future<String> f = one.submit(new Who());
+    System.out.println("name=" + f.get());
+    one.shutdown();
+    one.awaitTermination(5000, TimeUnit.MILLISECONDS);
+    System.out.println("unit.msToS=" + TimeUnit.MILLISECONDS.toSeconds(2500L));
+    System.out.println("unit.sToMs=" + TimeUnit.SECONDS.toMillis(2L));
+    System.out.println("unit.sToNanos=" + TimeUnit.SECONDS.toNanos(1L));
+    System.out.println("unit.convert=" + TimeUnit.MILLISECONDS.convert(3L, TimeUnit.SECONDS));
+    System.out.println("unit.name=" + TimeUnit.MINUTES.name());
+    long start = System.nanoTime();
+    TimeUnit.MILLISECONDS.sleep(30);
+    long ms = (System.nanoTime() - start) / 1000000L;
+    System.out.println("slept=" + TimeUnit.MILLISECONDS.toSeconds(ms));
+    ThreadFactory d = Executors.defaultThreadFactory();
+    Thread t = d.newThread(() -> {});
+    System.out.println("defaultNamed=" + (t.getName().startsWith("pool-")));
+  }
+}

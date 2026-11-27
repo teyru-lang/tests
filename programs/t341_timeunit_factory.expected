@@ -1,0 +1,8 @@
+name=worker-x
+unit.msToS=2
+unit.sToMs=2000
+unit.sToNanos=1000000000
+unit.convert=3000
+unit.name=MINUTES
+slept=0
+defaultNamed=true
