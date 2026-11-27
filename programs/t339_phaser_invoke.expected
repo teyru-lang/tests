@@ -1,0 +1,18 @@
+init phase=0 reg=2 arr=0 unarr=2
+arrive1=0 phase=0 arr=1 unarr=1
+worker=1,1 phase=1 arr=0 unarr=2
+awaitGood=1
+dereg phaseBefore=0 returned=0 phase=-2147483647 terminated=true reg=0
+zero terminated=false phase=0
+reg0=0
+registerReturned=0 reg=1
+adv2=1 phase=1
+force phase=-2147483648 term=true reg=3
+arriveAfter=-2147483648 await=-2147483648
+bulk=3 ph=0
+beforeLast phase=0 unarr=1
+afterLast phase=1 unarr=3
+invokeAll=60 size=3
+invokeAny=fast
+allFailed=bad
+done=true

@@ -1,0 +1,94 @@
+// The Java this case was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t339_phaser_invoke.java.ref /tmp/PhaserInvoke.java
+//   javac -d /tmp/out /tmp/PhaserInvoke.java
+//   java -cp /tmp/out PhaserInvoke
+
+import java.util.*;
+import java.util.concurrent.*;
+
+class PhaserInvoke {
+  static class N implements Callable<Integer> {
+    private final int v;
+    N(int v) { this.v = v; }
+    public Integer call() { return v; }
+  }
+  static class Bad implements Callable<Integer> {
+    public Integer call() { throw new RuntimeException("bad"); }
+  }
+  static class Slow implements Callable<String> {
+    public String call() { try { Thread.sleep(200); } catch (InterruptedException e) {} return "slow"; }
+  }
+  static class Fast implements Callable<String> {
+    public String call() { return "fast"; }
+  }
+
+  public static void main(String[] a) throws Exception {
+    Phaser p = new Phaser(2);
+    System.out.println("init phase=" + p.getPhase() + " reg=" + p.getRegisteredParties() + " arr=" + p.getArrivedParties() + " unarr=" + p.getUnarrivedParties());
+    int r1 = p.arrive();
+    System.out.println("arrive1=" + r1 + " phase=" + p.getPhase() + " arr=" + p.getArrivedParties() + " unarr=" + p.getUnarrivedParties());
+    final Phaser fp = p;
+    final int[] got = new int[2];
+    Thread t = new Thread(() -> {
+      got[0] = fp.arriveAndAwaitAdvance();
+      got[1] = fp.getPhase();
+    });
+    t.start();
+    t.join();
+    System.out.println("worker=" + got[0] + "," + got[1] + " phase=" + p.getPhase() + " arr=" + p.getArrivedParties() + " unarr=" + p.getUnarrivedParties());
+    System.out.println("awaitGood=" + p.awaitAdvance(p.getPhase() - 1));
+    Phaser q = new Phaser(1);
+    int before = q.getPhase();
+    int afterDereg = q.arriveAndDeregister();
+    System.out.println("dereg phaseBefore=" + before + " returned=" + afterDereg + " phase=" + q.getPhase() + " terminated=" + q.isTerminated() + " reg=" + q.getRegisteredParties());
+    Phaser z = new Phaser(0);
+    System.out.println("zero terminated=" + z.isTerminated() + " phase=" + z.getPhase());
+    Phaser reg = new Phaser();
+    System.out.println("reg0=" + reg.getRegisteredParties());
+    int bp = reg.register();
+    System.out.println("registerReturned=" + bp + " reg=" + reg.getRegisteredParties());
+    int adv2 = reg.arriveAndAwaitAdvance();
+    System.out.println("adv2=" + adv2 + " phase=" + reg.getPhase());
+    Phaser f = new Phaser(3);
+    f.arrive();
+    f.forceTermination();
+    System.out.println("force phase=" + f.getPhase() + " term=" + f.isTerminated() + " reg=" + f.getRegisteredParties());
+    System.out.println("arriveAfter=" + f.arrive() + " await=" + f.awaitAdvance(0));
+    Phaser b = new Phaser(1);
+    b.bulkRegister(2);
+    System.out.println("bulk=" + b.getRegisteredParties() + " ph=" + b.getPhase());
+    b.arrive();
+    b.arrive();
+    System.out.println("beforeLast phase=" + b.getPhase() + " unarr=" + b.getUnarrivedParties());
+    b.arrive();
+    System.out.println("afterLast phase=" + b.getPhase() + " unarr=" + b.getUnarrivedParties());
+
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    List<Callable<Integer>> tasks = new ArrayList<Callable<Integer>>();
+    tasks.add(new N(10));
+    tasks.add(new N(20));
+    tasks.add(new N(30));
+    List<Future<Integer>> fs = pool.invokeAll(tasks);
+    int sum = 0;
+    for (int i = 0; i < fs.size(); i++) {
+      sum = sum + fs.get(i).get();
+    }
+    System.out.println("invokeAll=" + sum + " size=" + fs.size());
+    List<Callable<String>> mixed = new ArrayList<Callable<String>>();
+    mixed.add(new Slow());
+    mixed.add(new Fast());
+    System.out.println("invokeAny=" + pool.invokeAny(mixed));
+    List<Callable<Integer>> failing = new ArrayList<Callable<Integer>>();
+    failing.add(new Bad());
+    try {
+      pool.invokeAny(failing);
+    } catch (ExecutionException e) {
+      System.out.println("allFailed=" + e.getCause().getMessage());
+    }
+    pool.shutdown();
+    pool.awaitTermination(5000, TimeUnit.MILLISECONDS);
+    System.out.println("done=" + pool.isTerminated());
+  }
+}
