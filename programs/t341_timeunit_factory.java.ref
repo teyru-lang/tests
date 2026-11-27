@@ -30,6 +30,11 @@ class TimeUnits {
     TimeUnit.MILLISECONDS.sleep(30);
     long ms = (System.nanoTime() - start) / 1000000L;
     System.out.println("slept=" + TimeUnit.MILLISECONDS.toSeconds(ms));
+    long z0 = System.nanoTime();
+    TimeUnit.MILLISECONDS.sleep(0);
+    TimeUnit.MILLISECONDS.sleep(-1);
+    System.out.println("nonPositiveQuick=" + ((System.nanoTime() - z0) / 1000000L < 50));
+
     ThreadFactory d = Executors.defaultThreadFactory();
     Thread t = d.newThread(() -> {});
     System.out.println("defaultNamed=" + (t.getName().startsWith("pool-")));

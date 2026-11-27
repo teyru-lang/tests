@@ -5,4 +5,5 @@ unit.sToNanos=1000000000
 unit.convert=3000
 unit.name=MINUTES
 slept=0
+nonPositiveQuick=true
 defaultNamed=true
