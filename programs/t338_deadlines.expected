@@ -1,0 +1,8 @@
+aliveAfterBudget=true returnedEarly=true
+aliveAfterJoin=false
+joinDoneAtOnce=true
+keptValue=5
+timeout=TimeoutException msg=null
+fallback=fb
+keptFallback=v
+negativeFailed=true

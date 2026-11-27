@@ -1,0 +1,50 @@
+// The Java this case was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t338_deadlines.java.ref /tmp/Deadlines.java
+//   javac -d /tmp/out /tmp/Deadlines.java
+//   java -cp /tmp/out Deadlines
+
+import java.util.concurrent.*;
+
+class Deadlines {
+  static class Slow implements Runnable {
+    public void run() {
+      try {
+        Thread.sleep(400);
+      } catch (InterruptedException e) {
+      }
+    }
+  }
+
+  public static void main(String[] a) throws Exception {
+    Thread t = new Thread(new Slow());
+    t.start();
+    long start = System.nanoTime();
+    t.join(50);
+    long waited = (System.nanoTime() - start) / 1000000L;
+    System.out.println("aliveAfterBudget=" + t.isAlive() + " returnedEarly=" + (waited < 300));
+    t.join();
+    System.out.println("aliveAfterJoin=" + t.isAlive());
+    long start2 = System.nanoTime();
+    t.join(1000);
+    System.out.println("joinDoneAtOnce=" + ((System.nanoTime() - start2) / 1000000L < 500));
+
+    System.out.println("keptValue=" + CompletableFuture.completedFuture(5).orTimeout(2000, TimeUnit.MILLISECONDS).join());
+    CompletableFuture<Integer> never = new CompletableFuture<Integer>();
+    try {
+      never.orTimeout(30, TimeUnit.MILLISECONDS).join();
+      System.out.println("timeout=none");
+    } catch (CompletionException e) {
+      String message = e.getCause().getMessage();
+      System.out.println("timeout=" + e.getCause().getClass().getSimpleName() + " msg=" + (message == null ? "null" : message));
+    }
+    CompletableFuture<String> late = new CompletableFuture<String>();
+    System.out.println("fallback=" + late.completeOnTimeout("fb", 30, TimeUnit.MILLISECONDS).join());
+    System.out.println("keptFallback=" + CompletableFuture.completedFuture("v").completeOnTimeout("fb", 2000, TimeUnit.MILLISECONDS).join());
+    CompletableFuture<Integer> negative = new CompletableFuture<Integer>();
+    negative.orTimeout(-1, TimeUnit.MILLISECONDS);
+    Thread.sleep(50);
+    System.out.println("negativeFailed=" + negative.isCompletedExceptionally());
+  }
+}

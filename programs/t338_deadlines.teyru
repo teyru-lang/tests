@@ -1,0 +1,52 @@
+/* join(long) and the two future deadlines.
+
+   A thread that sleeps for 400ms is joined with a 50ms budget (it must still be
+   alive, and the call must return quickly), then joined without a budget, then
+   joined again with one (it must return at once). A completed future's
+   orTimeout keeps its value; an uncompleted one fails with TimeoutException and
+   no message; completeOnTimeout supplies the fallback; a negative budget is not
+   an error in Java -- the deadline is simply already past.
+
+   The .expected is OpenJDK 21's run of the same program. The time comparisons
+   are thresholds with a wide margin (a real wait must be far below the sleep),
+   so the answers do not depend on machine speed. */
+class Deadlines {
+  static class Slow implements Runnable {
+    public void run() {
+      try {
+        Thread.sleep(400)
+      } catch (InterruptedException e) {}
+    }
+  }
+
+  public static void main(String[] a) {
+    Thread t = new Thread(new Slow())
+    t.start()
+    long start = System.nanoTime()
+    t.join(50)
+    long waited = (System.nanoTime() - start) / 1000000L
+    System.out.println("aliveAfterBudget=" + t.isAlive() + " returnedEarly=" + (waited < 300))
+    t.join()
+    System.out.println("aliveAfterJoin=" + t.isAlive())
+    long start2 = System.nanoTime()
+    t.join(1000)
+    System.out.println("joinDoneAtOnce=" + ((System.nanoTime() - start2) / 1000000L < 500))
+
+    System.out.println("keptValue=" + CompletableFuture.completedFuture(5).orTimeout(2000).join())
+    CompletableFuture<Integer> never = new CompletableFuture<Integer>()
+    try {
+      never.orTimeout(30).join()
+      System.out.println("timeout=none")
+    } catch (CompletionException e) {
+      String message = e.getCause().getMessage()
+      System.out.println("timeout=" + e.getCause().getClass().getSimpleName() + " msg=" + (message == null ? "null" : message))
+    }
+    CompletableFuture<String> late = new CompletableFuture<String>()
+    System.out.println("fallback=" + late.completeOnTimeout("fb", 30).join())
+    System.out.println("keptFallback=" + CompletableFuture.completedFuture("v").completeOnTimeout("fb", 2000).join())
+    CompletableFuture<Integer> negative = new CompletableFuture<Integer>()
+    negative.orTimeout(-1)
+    Thread.sleep(50)
+    System.out.println("negativeFailed=" + negative.isCompletedExceptionally())
+  }
+}
