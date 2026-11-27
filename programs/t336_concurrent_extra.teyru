@@ -34,6 +34,19 @@ class ConcurrentExtra {
     final int[] sink = new int[1]
     CompletableFuture.completedFuture(5).thenAccept(x -> sink[0] = x).thenRun(() -> System.out.println("sink=" + sink[0])).join()
     // read/write lock
+    /* The combining forms: a stage that needs both answers, and the either
+       forms where the first to finish decides. With both futures already
+       complete, the left one is the first, so the answers are deterministic. */
+    final int[] seen = new int[1]
+    System.out.println("whenComplete=" + CompletableFuture.completedFuture(3).whenComplete((v, e) -> seen[0] = v).join() + " seen=" + seen[0])
+    System.out.println("combine=" + CompletableFuture.completedFuture(2).thenCombine(CompletableFuture.completedFuture(5), (Integer x, Integer y) -> x * y).join())
+    CompletableFuture.completedFuture("a").thenAcceptBoth(CompletableFuture.completedFuture("b"), (x, y) -> System.out.println("both=" + x + y)).join()
+    CompletableFuture.completedFuture(1).runAfterBoth(CompletableFuture.completedFuture(2), () -> System.out.println("bothRan")).join()
+    System.out.println("either=" + CompletableFuture.completedFuture(10).applyToEither(CompletableFuture.completedFuture(20), x -> x + 1).join())
+    CompletableFuture.completedFuture(10).acceptEither(CompletableFuture.completedFuture(20), x -> System.out.println("took=" + x)).join()
+    CompletableFuture.completedFuture(1).runAfterEither(CompletableFuture.completedFuture(2), () -> System.out.println("eitherRan")).join()
+    System.out.println("failCombine=" + CompletableFuture.<Integer> failedFuture(new RuntimeException("x")).thenCombine(CompletableFuture.completedFuture(1), (Integer p, Integer q) -> p + q).exceptionally(e -> -9).join())
+
     ReentrantReadWriteLock rw = new ReentrantReadWriteLock()
     System.out.println("readCount0=" + rw.getReadLockCount() + " write=" + rw.isWriteLocked())
     rw.readLock().lock()

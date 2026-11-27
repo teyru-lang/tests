@@ -3,6 +3,14 @@ join=boom
 get=boom
 compose=6
 sink=5
+whenComplete=3 seen=3
+combine=10
+both=ab
+bothRan
+either=11
+took=10
+eitherRan
+failCombine=-9
 readCount0=0 write=false
 readHolds=2 readCount=2
 writeHolds=2 write=true byMe=true
