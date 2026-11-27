@@ -1,0 +1,38 @@
+// The Java this case was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t340_completion_service.java.ref /tmp/CompletionOrder.java
+//   javac -d /tmp/out /tmp/CompletionOrder.java
+//   java -cp /tmp/out CompletionOrder
+
+import java.util.concurrent.*;
+
+class CompletionOrder {
+  static class N implements Callable<Integer> {
+    private final int v;
+    N(int v) { this.v = v; }
+    public Integer call() { return v; }
+  }
+
+  public static void main(String[] a) throws Exception {
+    ExecutorService pool = Executors.newFixedThreadPool(3);
+    CompletionService<Integer> cs = new ExecutorCompletionService<Integer>(pool);
+    cs.submit(new N(3));
+    cs.submit(new N(1));
+    cs.submit(new N(2));
+    int sum = 0, n = 0;
+    while (n < 3) {
+      Future<Integer> f = cs.take();
+      sum = sum + f.get();
+      n = n + 1;
+    }
+    System.out.println("taken=" + n + " sum=" + sum);
+    System.out.println("pollEmpty=" + (cs.poll() == null));
+    cs.submit(new N(7));
+    Future<Integer> got = cs.poll(5000, TimeUnit.MILLISECONDS);
+    System.out.println("pollValue=" + (got == null ? -1 : got.get()));
+    pool.shutdown();
+    pool.awaitTermination(5000, TimeUnit.MILLISECONDS);
+    System.out.println("done=" + pool.isTerminated());
+  }
+}

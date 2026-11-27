@@ -1,0 +1,40 @@
+/* java.util.concurrent.CompletionService: futures in completion order.
+
+   Three tasks answer 3, 1 and 2 on a pool of three; take() is called three times
+   and the values are summed, which is the same answer whatever order they finish
+   in. poll() on an empty service answers null, and poll(millis) waits for the
+   next completion. The .expected is OpenJDK 21's run of the same program. */
+class CompletionOrder {
+  static class N implements Callable<Integer> {
+    private final int v
+    N(int v) {
+      this.v = v
+    }
+    public Integer call() {
+      return v
+    }
+  }
+
+  public static void main(String[] a) {
+    ExecutorService pool = Executors.newFixedThreadPool(3)
+    CompletionService<Integer> cs = new ExecutorCompletionService<Integer>(pool)
+    cs.submit(new N(3))
+    cs.submit(new N(1))
+    cs.submit(new N(2))
+    int sum = 0
+    int n = 0
+    while (n < 3) {
+      Future<Integer> f = cs.take()
+      sum = sum + f.get()
+      n = n + 1
+    }
+    System.out.println("taken=" + n + " sum=" + sum)
+    System.out.println("pollEmpty=" + (cs.poll() == null))
+    cs.submit(new N(7))
+    Future<Integer> got = cs.poll(5000L)
+    System.out.println("pollValue=" + (got == null ? -1 : got.get()))
+    pool.shutdown()
+    pool.awaitTermination(5000L)
+    System.out.println("done=" + pool.isTerminated())
+  }
+}
