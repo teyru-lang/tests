@@ -1,0 +1,11 @@
+get0=0
+set=5
+casFail=false
+casOk=true now=9
+getAndAdd=9 now=12
+inc=13 dec=12
+threads=1000
+long=15
+refCas=true tag=done
+badType=iae
+badName=rte-NoSuchFieldException

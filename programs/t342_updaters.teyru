@@ -1,0 +1,68 @@
+/* The atomic field updaters: get/set, compareAndSet, the add family, the
+   reference form, and the two construction errors.
+
+   The class under test has an int, a long and a reference field; the updaters
+   are created once and shared, and two threads increment one int field 500
+   times each through one updater, which is the case a monitor-based
+   implementation has to get right. A wrong field type is IllegalArgumentException
+   and a missing field is a RuntimeException wrapping NoSuchFieldException, both
+   of which are Java's answers.
+
+   The .expected is OpenJDK 21's run of the same program. */
+class Updaters {
+  static class Counter {
+    volatile int n = 0
+    volatile long big = 0L
+    volatile String tag = "start"
+  }
+
+  public static void main(String[] a) {
+    Counter c = new Counter()
+    AtomicIntegerFieldUpdater<Counter> up = AtomicIntegerFieldUpdater.<Counter> newUpdater(Counter.class, "n")
+    System.out.println("get0=" + up.get(c))
+    up.set(c, 5)
+    System.out.println("set=" + up.get(c))
+    System.out.println("casFail=" + up.compareAndSet(c, 4, 9))
+    System.out.println("casOk=" + up.compareAndSet(c, 5, 9) + " now=" + up.get(c))
+    System.out.println("getAndAdd=" + up.getAndAdd(c, 3) + " now=" + up.get(c))
+    System.out.println("inc=" + up.incrementAndGet(c) + " dec=" + up.decrementAndGet(c))
+
+    Counter d = new Counter()
+    final AtomicIntegerFieldUpdater<Counter> fu = up
+    Thread t1 = new Thread(() -> {
+      for (int i = 0 : i < 500 : i++) {
+        fu.incrementAndGet(d)
+      }
+    })
+    Thread t2 = new Thread(() -> {
+      for (int i = 0 : i < 500 : i++) {
+        fu.incrementAndGet(d)
+      }
+    })
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+    System.out.println("threads=" + fu.get(d))
+
+    AtomicLongFieldUpdater<Counter> lu = AtomicLongFieldUpdater.<Counter> newUpdater(Counter.class, "big")
+    lu.set(d, 10L)
+    System.out.println("long=" + lu.addAndGet(d, 5L))
+
+    AtomicReferenceFieldUpdater<Counter, String> ru = AtomicReferenceFieldUpdater.<Counter, String> newUpdater(Counter.class, String.class, "tag")
+    System.out.println("refCas=" + ru.compareAndSet(d, "start", "done") + " tag=" + ru.get(d))
+
+    try {
+      AtomicIntegerFieldUpdater.<Counter> newUpdater(Counter.class, "big")
+    } catch (IllegalArgumentException e) {
+      System.out.println("badType=iae")
+    }
+    try {
+      AtomicIntegerFieldUpdater.<Counter> newUpdater(Counter.class, "nope")
+    } catch (IllegalArgumentException e) {
+      System.out.println("badName=iae")
+    } catch (RuntimeException e) {
+      System.out.println("badName=rte-" + e.getCause().getClass().getSimpleName())
+    }
+  }
+}
