@@ -1,0 +1,43 @@
+// The Java this case was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t344_uncaught.java.ref /tmp/Uncaught.java
+//   javac -d /tmp/out /tmp/Uncaught.java
+//   java -cp /tmp/out Uncaught
+
+class Uncaught {
+  static class Boom implements Runnable {
+    private final String message;
+    Boom(String message) { this.message = message; }
+    public void run() {
+      throw new RuntimeException(this.message);
+    }
+  }
+
+  public static void main(String[] a) throws Exception {
+    final String[] seen = new String[2];
+
+    Thread own = new Thread(new Boom("own"), "worker");
+    own.setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+      public void uncaughtException(Thread t, Throwable e) {
+        seen[0] = t.getName() + ":" + e.getMessage() + ":" + e.getClass().getSimpleName();
+      }
+    });
+    System.out.println("ownRegistered=" + (own.getUncaughtExceptionHandler() != null));
+    own.start();
+    own.join();
+    System.out.println("own=" + seen[0]);
+
+    Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+      public void uncaughtException(Thread t, Throwable e) {
+        seen[1] = t.getName() + ":" + e.getMessage();
+      }
+    });
+    Thread byDefault = new Thread(new Boom("def"), "defaulted");
+    System.out.println("defaultAvailable=" + (Thread.getDefaultUncaughtExceptionHandler() != null));
+    byDefault.start();
+    byDefault.join();
+    System.out.println("default=" + seen[1]);
+    Thread.setDefaultUncaughtExceptionHandler(null);
+  }
+}

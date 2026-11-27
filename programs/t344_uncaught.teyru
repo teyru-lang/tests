@@ -1,0 +1,47 @@
+/* Thread.UncaughtExceptionHandler: a thread's own handler, the static default,
+   and what getUncaughtExceptionHandler answers.
+
+   Both threads in this program throw, and both have a handler somewhere, so
+   nothing is printed to stderr: a handler that ran leaves no trace otherwise,
+   which is the point of the test. The .expected is OpenJDK 21's run of the same
+   program. */
+class Uncaught {
+  static class Boom implements Runnable {
+    private final String message
+    Boom(String message) {
+      this.message = message
+    }
+    public void run() {
+      throw new RuntimeException(this.message)
+    }
+  }
+
+  public static void main(String[] a) {
+    final String[] seen = new String[2]
+
+    Thread own = new Thread(new Boom("own"), "worker")
+    own.setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+      public void uncaughtException(Thread t, Throwable e) {
+        seen[0] = t.getName() + ":" + e.getMessage() + ":" + e.getClass().getSimpleName()
+      }
+    })
+    System.out.println("ownRegistered=" + (own.getUncaughtExceptionHandler() != null))
+    own.start()
+    own.join()
+    System.out.println("own=" + seen[0])
+
+    Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+      public void uncaughtException(Thread t, Throwable e) {
+        seen[1] = t.getName() + ":" + e.getMessage()
+      }
+    })
+    Thread byDefault = new Thread(new Boom("def"), "defaulted")
+    /* Java would answer the thread group here when the thread has no handler
+       of its own; there is no ThreadGroup, so this asks the static default. */
+    System.out.println("defaultAvailable=" + (Thread.getDefaultUncaughtExceptionHandler() != null))
+    byDefault.start()
+    byDefault.join()
+    System.out.println("default=" + seen[1])
+    Thread.setDefaultUncaughtExceptionHandler(null)
+  }
+}
