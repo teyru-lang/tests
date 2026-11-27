@@ -1,0 +1,80 @@
+// The Java this case was taken from, run by the JDK that produced the
+// .expected file beside it:
+//
+//   cp tests/programs/t337_concurrent_stress.java.ref /tmp/ConcurrentStress.java
+//   javac -d /tmp/out /tmp/ConcurrentStress.java
+//   java -cp /tmp/out ConcurrentStress
+
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.locks.*;
+
+class ConcurrentStress {
+  public static void main(String[] a) {
+    final ReentrantReadWriteLock rw = new ReentrantReadWriteLock();
+    final int[] value = new int[1];
+    java.util.List<Thread> threads = new java.util.ArrayList<Thread>();
+    for (int w = 0; w < 4; w++) {
+      Thread t = new Thread(() -> {
+        for (int i = 0; i < 500; i++) {
+          rw.writeLock().lock();
+          value[0] = value[0] + 1;
+          rw.writeLock().unlock();
+        }
+      });
+      threads.add(t);
+    }
+    for (int r = 0; r < 8; r++) {
+      Thread t = new Thread(() -> {
+        int seen = 0;
+        for (int i = 0; i < 200; i++) {
+          rw.readLock().lock();
+          seen = seen + value[0];
+          rw.readLock().unlock();
+        }
+      });
+      threads.add(t);
+    }
+    for (int i = 0; i < threads.size(); i++) {
+      threads.get(i).start();
+    }
+    for (int i = 0; i < threads.size(); i++) {
+      try {
+        threads.get(i).join();
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }
+    System.out.println("total=" + value[0]);
+
+    final CompletableFuture<Integer>[] parts = (CompletableFuture<Integer>[]) new CompletableFuture[50];
+    for (int i = 0; i < parts.length; i++) {
+      final int n = i;
+      final CompletableFuture<Integer> f = new CompletableFuture<Integer>();
+      parts[i] = f;
+      Thread t = new Thread(() -> f.complete(n + 1));
+      t.start();
+      try {
+        t.join();
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }
+    CompletableFuture<Integer> sum = CompletableFuture.completedFuture(0);
+    for (int i = 0; i < parts.length; i++) {
+      final CompletableFuture<Integer> p = parts[i];
+      sum = sum.thenCombine(p, (Integer x, Integer y) -> x + y);
+    }
+    System.out.println("sum=" + sum.join());
+
+    Exchanger<String> ex = new Exchanger<String>();
+    try {
+      ex.exchange("alone", 50, TimeUnit.MILLISECONDS);
+      System.out.println("timeout=no");
+    } catch (TimeoutException e) {
+      System.out.println("timeout=yes");
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+  }
+}

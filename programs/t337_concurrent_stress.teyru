@@ -1,0 +1,68 @@
+/* The new synchronizers under contention, and the answers that must not depend
+   on the interleaving.
+
+   Four writer threads add 500 each under the write lock while eight readers
+   take the read lock 200 times each: whatever the order, the total is 2000, and
+   a read/write lock that let a writer and a reader overlap would not produce a
+   stable answer at all. Fifty futures are each completed by their own thread and
+   then summed with thenCombine (1275), and a lone exchange with a 50ms budget
+   times out. The .expected is OpenJDK 21's output for the same program. */
+class ConcurrentStress {
+  public static void main(String[] a) {
+    final ReentrantReadWriteLock rw = new ReentrantReadWriteLock()
+    final int[] value = new int[1]
+    List<Thread> threads = new ArrayList<Thread>()
+    for (int w = 0 : w < 4 : w++) {
+      Thread t = new Thread(() -> {
+        for (int i = 0 : i < 500 : i++) {
+          rw.writeLock().lock()
+            value[0] = value[0] + 1
+            rw.writeLock().unlock()
+        }
+      })
+      threads.add(t)
+    }
+    for (int r = 0 : r < 8 : r++) {
+      Thread t = new Thread(() -> {
+        int seen = 0
+          for (int i = 0 : i < 200 : i++) {
+          rw.readLock().lock()
+            seen = seen + value[0]
+            rw.readLock().unlock()
+        }
+      })
+      threads.add(t)
+    }
+    for (int i = 0 : i < threads.size() : i++) {
+      threads.get(i).start()
+    }
+    for (int i = 0 : i < threads.size() : i++) {
+      threads.get(i).join()
+    }
+    System.out.println("total=" + value[0])
+
+    final CompletableFuture<Integer>[] parts = (CompletableFuture<Integer>[]) new CompletableFuture[50]
+    for (int i = 0 : i < parts.length : i++) {
+      final int n = i
+      final CompletableFuture<Integer> f = new CompletableFuture<Integer>()
+      parts[i] = f
+      Thread t = new Thread(() -> f.complete(n + 1))
+      t.start()
+      t.join()
+    }
+    CompletableFuture<Integer> sum = CompletableFuture.completedFuture(0)
+    for (int i = 0 : i < parts.length : i++) {
+      final CompletableFuture<Integer> p = parts[i]
+      sum = sum.thenCombine(p, (Integer x, Integer y) -> x + y)
+    }
+    System.out.println("sum=" + sum.join())
+
+    Exchanger<String> ex = new Exchanger<String>()
+    try {
+      ex.exchange("alone", 50)
+      System.out.println("timeout=no")
+    } catch (TimeoutException e) {
+      System.out.println("timeout=yes")
+    }
+  }
+}
