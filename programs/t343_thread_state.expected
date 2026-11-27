@@ -9,3 +9,7 @@ default=5 consts=1,5,10
 set=10
 inherit=5
 bad=iae
+before=false
+inside=true
+after=false
+spin=ok

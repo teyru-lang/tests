@@ -80,5 +80,15 @@ class ThreadStates {
     } catch (IllegalArgumentException e) {
       System.out.println("bad=iae")
     }
+    /* holdsLock is the assertion a program writes about its own monitor, and
+       onSpinWait is a hint that must simply exist. */
+    Object held = new Object()
+    System.out.println("before=" + Thread.holdsLock(held))
+    synchronized (held) {
+      System.out.println("inside=" + Thread.holdsLock(held))
+    }
+    System.out.println("after=" + Thread.holdsLock(held))
+    Thread.onSpinWait()
+    System.out.println("spin=ok")
   }
 }

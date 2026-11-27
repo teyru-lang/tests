@@ -68,5 +68,13 @@ class ThreadStates {
     Thread child = new Thread(() -> {}, "child");
     System.out.println("inherit=" + child.getPriority());
     try { p.setPriority(11); } catch (IllegalArgumentException e) { System.out.println("bad=iae"); }
+    Object held = new Object();
+    System.out.println("before=" + Thread.holdsLock(held));
+    synchronized (held) {
+      System.out.println("inside=" + Thread.holdsLock(held));
+    }
+    System.out.println("after=" + Thread.holdsLock(held));
+    Thread.onSpinWait();
+    System.out.println("spin=ok");
   }
 }
